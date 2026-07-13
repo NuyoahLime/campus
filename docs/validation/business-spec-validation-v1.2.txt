@@ -1,0 +1,26 @@
+=== v1.2-AI-FROZEN Validator v1.2.1 ===
+Time: 2026-07-13T23:31:04.916179
+Files checked: 12
+[PASS] Registry DEC: 25
+[PASS] Decision record DECs match registry
+[PASS] Decision packages: 13
+[PASS] P1: 6 unique IDs
+[PASS] P2: 4 unique IDs
+[PASS] State machine check: 7 machines
+
+==================================================
+Validator version: v1.2.1
+Errors:   0
+Warnings: 10
+Result:   PASS
+  [WARN] 01-用户与权限规格.md: no v1.0/v1.1 change log entries
+  [WARN] 02-学校入驻与账号管理规格.md: no v1.0/v1.1 change log entries
+  [WARN] 03-挑战项目资源管理规格.md: no v1.0/v1.1 change log entries
+  [WARN] 04-活动管理规格.md: no v1.0/v1.1 change log entries
+  [WARN] 05-成绩管理规格.md: no v1.0/v1.1 change log entries
+  [WARN] 06-排行榜规格.md: no v1.0/v1.1 change log entries
+  [WARN] 07-成绩申诉规格.md: no v1.0/v1.1 change log entries
+  [WARN] 08-素材与活动成果规格.md: no v1.0/v1.1 change log entries
+  [WARN] 09-反馈与通知规格.md: no v1.0/v1.1 change log entries
+  [WARN] 10-平台管理规格.md: no v1.0/v1.1 change log entries
+Exit code: 0

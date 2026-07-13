@@ -1,0 +1,71 @@
+version: v1.2-AI-FROZEN
+freeze_date: 2026-07-13
+total_decs: 25
+total_packages: 13
+total_p1: 6
+total_p2: 4
+
+decisions:
+  - {id: DEC-PERMISSION-001, name: 用户角色权限与超管边界, package: PKG-PERMISSION, files: ["01","10"]}
+  - {id: DEC-SCHOOL-001, name: 学校入驻流程, package: PKG-SCHOOL, files: ["02"]}
+  - {id: DEC-ACCOUNT-001, name: 账号创建与生命周期, package: PKG-ACCOUNT, files: ["02"]}
+  - {id: DEC-ACCOUNT-STATE-002, name: 账号完整状态机, package: PKG-ACCOUNT, files: ["02","10"]}
+  - {id: DEC-PROJECT-001, name: 挑战项目与规则版本, package: PKG-PROJECT, files: ["03"]}
+  - {id: DEC-ACTIVITY-001, name: 活动申请与创建流程, package: PKG-ACTIVITY, files: ["04"]}
+  - {id: DEC-ACTIVITY-002, name: 活动执行状态, package: PKG-ACTIVITY, files: ["04"]}
+  - {id: DEC-ACTIVITY-003, name: 活动项目老师学生配置, package: PKG-ACTIVITY, files: ["04"]}
+  - {id: DEC-ACTIVITY-STATE-003, name: 活动终态与对象隔离, package: PKG-ACTIVITY, files: ["04"]}
+  - {id: DEC-SCORE-001, name: 成绩录入与审核权限, package: PKG-SCORE, files: ["05"]}
+  - {id: DEC-SCORE-002, name: 成绩尝试与有效成绩, package: PKG-SCORE, files: ["05"]}
+  - {id: DEC-SCORE-003, name: 成绩状态与审核流程, package: PKG-SCORE, files: ["05"]}
+  - {id: DEC-SCORE-004, name: 成绩修改与更正, package: PKG-SCORE, files: ["05","07"]}
+  - {id: DEC-RANKING-001, name: 排行榜三层体系, package: PKG-RANKING, files: ["06"]}
+  - {id: DEC-RANK-STATE-003, name: 排行及L3授权状态机, package: PKG-RANKING, files: ["06","10"]}
+  - {id: DEC-RANK-VERSION-004, name: 排行定义版本拆分, package: PKG-RANKING, files: ["06"]}
+  - {id: DEC-APPEAL-001, name: 成绩申诉更正闭环, package: PKG-APPEAL, files: ["07"]}
+  - {id: DEC-APPEAL-STATE-003, name: 申诉终态与撤回, package: PKG-APPEAL, files: ["07"]}
+  - {id: DEC-MEDIA-001, name: 素材分级审核, package: PKG-MEDIA, files: ["08"]}
+  - {id: DEC-MEDIA-STATE-004, name: 素材双状态拆分, package: PKG-MEDIA, files: ["08"]}
+  - {id: DEC-RESULT-001, name: 活动成果发布, package: PKG-RESULT, files: ["08"]}
+  - {id: DEC-RESULT-PUBLISH-002, name: 成果审核发布拆分, package: PKG-RESULT, files: ["08"]}
+  - {id: DEC-FEEDBACK-001, name: 反馈路由, package: PKG-FEEDBACK, files: ["09"]}
+  - {id: DEC-NOTIFY-001, name: 通知机制, package: PKG-NOTIFY, files: ["09"]}
+  - {id: DEC-LIFECYCLE-001, name: 生命周期数据保留, package: PKG-LIFECYCLE, files: ["02","04","05","06","07","08","09","10","11"]}
+
+spec_files:
+  "01": {decs: [DEC-PERMISSION-001, DEC-SCORE-001]}
+  "02": {decs: [DEC-SCHOOL-001, DEC-ACCOUNT-001, DEC-ACCOUNT-STATE-002, DEC-LIFECYCLE-001]}
+  "03": {decs: [DEC-PROJECT-001]}
+  "04": {decs: [DEC-ACTIVITY-001, DEC-ACTIVITY-002, DEC-ACTIVITY-003, DEC-ACTIVITY-STATE-003, DEC-LIFECYCLE-001]}
+  "05": {decs: [DEC-SCORE-001, DEC-SCORE-002, DEC-SCORE-003, DEC-SCORE-004, DEC-LIFECYCLE-001]}
+  "06": {decs: [DEC-RANKING-001, DEC-RANK-STATE-003, DEC-RANK-VERSION-004, DEC-LIFECYCLE-001]}
+  "07": {decs: [DEC-APPEAL-001, DEC-APPEAL-STATE-003, DEC-SCORE-004, DEC-LIFECYCLE-001]}
+  "08": {decs: [DEC-MEDIA-001, DEC-MEDIA-STATE-004, DEC-RESULT-001, DEC-RESULT-PUBLISH-002, DEC-LIFECYCLE-001]}
+  "09": {decs: [DEC-FEEDBACK-001, DEC-NOTIFY-001, DEC-LIFECYCLE-001]}
+  "10": {decs: [DEC-PERMISSION-001, DEC-ACCOUNT-STATE-002, DEC-RANK-STATE-003, DEC-LIFECYCLE-001]}
+  "11": {decs: [DEC-LIFECYCLE-001]}
+
+deferred_p1:
+  - {id: P1-SCHOOL-DUPLICATE-SIMILARITY-001, desc: 学校名称相似度重复提示, file: "02"}
+  - {id: P1-ACCOUNT-IMPORT-TEACHER-001, desc: 老师账号批量导入, file: "02"}
+  - {id: P1-ACCOUNT-IMPORT-STUDENT-001, desc: 学生账号批量导入, file: "02"}
+  - {id: P1-AUTH-EXTERNAL-LOGIN-001, desc: 手机验证码及第三方登录, file: "02"}
+  - {id: P1-SCORE-BATCH-REVIEW-001, desc: 成绩批量审核, file: "05"}
+  - {id: P1-DATA-RETENTION-POLICY-001, desc: 数据归档保留期限配置, file: "11"}
+
+deferred_p2:
+  - {id: P2-DATA-EXPORT-001, desc: 学校管理员数据导出, file: "01"}
+  - {id: P2-PROJECT-RULE-NOTIFY-001, desc: 项目规则变更通知, file: "03"}
+  - {id: P2-RANK-DISPLAY-EXPIRY-001, desc: 排行榜自动过期展示期限, file: "06"}
+  - {id: P2-EXTERNAL-NOTIFICATION-001, desc: 短信邮件微信通知, file: "09"}
+
+forbidden_phrases:
+  - 共20个
+  - 毫秒或其他最小单位
+  - 素材原则上必须关联活动
+  - 学校暂停或停用后，授权状态自动暂停
+  - 仅草稿计算状态且无关联版本的排行榜可物理删除
+  - 超管审核 → 平台公开
+  - "版本号升级至v1.1；无业务规则变更"
+  - "## 3.X"
+  - 是否允许小数
