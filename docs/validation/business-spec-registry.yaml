@@ -2,6 +2,7 @@ version: v1.2-AI-FROZEN
 freeze_date: 2026-07-13
 total_decs: 25
 total_packages: 13
+total_state_machines: 17
 total_p1: 6
 total_p2: 4
 
@@ -69,3 +70,205 @@ forbidden_phrases:
   - "版本号升级至v1.1；无业务规则变更"
   - "## 3.X"
   - 是否允许小数
+
+state_machines:
+  - id: school_registration
+    entity: SchoolRegistration
+    field: registration_status
+    source: "02-学校入驻与账号管理规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [SUBMITTED], terminal: false}
+      - {code: SUBMITTED, name: 已提交, prev: [DRAFT, NEED_SUPPLEMENT], next: [NEED_SUPPLEMENT, APPROVED, REJECTED, WITHDRAWN], terminal: false}
+      - {code: NEED_SUPPLEMENT, name: 需补充, prev: [SUBMITTED], next: [SUBMITTED, WITHDRAWN], terminal: false}
+      - {code: APPROVED, name: 已通过, prev: [SUBMITTED], next: [], terminal: true}
+      - {code: REJECTED, name: 已驳回, prev: [SUBMITTED], next: [], terminal: true}
+      - {code: WITHDRAWN, name: 已撤回, prev: [SUBMITTED, NEED_SUPPLEMENT], next: [], terminal: true}
+
+  - id: school
+    entity: School
+    field: school_status
+    source: "02-学校入驻与账号管理规格.md"
+    states:
+      - {code: PENDING_ENABLE, name: 待启用, prev: [], next: [NORMAL], terminal: false}
+      - {code: NORMAL, name: 正常, prev: [PENDING_ENABLE, SUSPENDED], next: [SUSPENDED, DISABLED], terminal: false}
+      - {code: SUSPENDED, name: 暂停, prev: [NORMAL], next: [NORMAL, DISABLED], terminal: false}
+      - {code: DISABLED, name: 停用, prev: [NORMAL, SUSPENDED], next: [PENDING_ENABLE], terminal: false}
+
+  - id: account
+    entity: User
+    field: account_status
+    source: "02-学校入驻与账号管理规格.md"
+    states:
+      - {code: PENDING_ACTIVATION, name: 待激活, prev: [], next: [NORMAL, DISABLED], terminal: false}
+      - {code: NORMAL, name: 正常, prev: [PENDING_ACTIVATION, LOCKED, DISABLED], next: [LOCKED, DISABLED], terminal: false}
+      - {code: LOCKED, name: 锁定, prev: [NORMAL], next: [NORMAL, DISABLED], terminal: false}
+      - {code: DISABLED, name: 停用, prev: [PENDING_ACTIVATION, NORMAL, LOCKED], next: [NORMAL], terminal: false}
+
+  - id: challenge_project
+    entity: ChallengeProject
+    field: project_status
+    source: "03-挑战项目资源管理规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [PUBLISHED], terminal: false}
+      - {code: PUBLISHED, name: 已上架, prev: [DRAFT, ARCHIVED], next: [ARCHIVED], terminal: false}
+      - {code: ARCHIVED, name: 已下架, prev: [PUBLISHED], next: [PUBLISHED], terminal: false}
+
+  - id: activity_application
+    entity: ActivityApplication
+    field: application_status
+    source: "04-活动管理规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [SUBMITTED], terminal: false}
+      - {code: SUBMITTED, name: 已提交, prev: [DRAFT], next: [APPROVED, REJECTED, WITHDRAWN], terminal: false}
+      - {code: APPROVED, name: 已通过, prev: [SUBMITTED], next: [], terminal: true}
+      - {code: REJECTED, name: 已驳回, prev: [SUBMITTED], next: [DRAFT], terminal: false}
+      - {code: WITHDRAWN, name: 已撤回, prev: [SUBMITTED], next: [], terminal: true}
+
+  - id: activity_execution
+    entity: Activity
+    field: execution_status
+    source: "04-活动管理规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [PUBLISHED, CANCELLED], terminal: false}
+      - {code: PUBLISHED, name: 已发布, prev: [DRAFT], next: [IN_PROGRESS, CANCELLED], terminal: false}
+      - {code: IN_PROGRESS, name: 进行中, prev: [PUBLISHED], next: [ENDED], terminal: false}
+      - {code: ENDED, name: 已结束, prev: [IN_PROGRESS], next: [], terminal: true}
+      - {code: CANCELLED, name: 已取消, prev: [DRAFT, PUBLISHED], next: [], terminal: true}
+
+  - id: activity_public
+    entity: Activity
+    field: public_status
+    source: "04-活动管理规格.md"
+    states:
+      - {code: NOT_SUBMITTED, name: 未提交, prev: [], next: [PENDING_PLATFORM_REVIEW], terminal: false}
+      - {code: PENDING_PLATFORM_REVIEW, name: 待平台审核, prev: [NOT_SUBMITTED], next: [PLATFORM_APPROVED, PLATFORM_REJECTED], terminal: false}
+      - {code: PLATFORM_APPROVED, name: 平台审核通过, prev: [PENDING_PLATFORM_REVIEW], next: [PUBLIC], terminal: false}
+      - {code: PLATFORM_REJECTED, name: 平台审核驳回, prev: [PENDING_PLATFORM_REVIEW], next: [NOT_SUBMITTED], terminal: false}
+      - {code: PUBLIC, name: 已公开, prev: [PLATFORM_APPROVED], next: [SCHOOL_WITHDRAWN, PLATFORM_TAKEDOWN], terminal: false}
+      - {code: SCHOOL_WITHDRAWN, name: 学校已撤回, prev: [PUBLIC], next: [NOT_SUBMITTED], terminal: false}
+      - {code: PLATFORM_TAKEDOWN, name: 平台已下架, prev: [PUBLIC], next: [NOT_SUBMITTED], terminal: false}
+
+  - id: score
+    entity: Score
+    field: score_status
+    source: "05-成绩管理规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [PENDING_REVIEW], terminal: false}
+      - {code: PENDING_REVIEW, name: 待审核, prev: [DRAFT], next: [APPROVED, REJECTED], terminal: false}
+      - {code: APPROVED, name: 审核通过, prev: [PENDING_REVIEW], next: [INVALIDATED], terminal: false}
+      - {code: REJECTED, name: 审核驳回, prev: [PENDING_REVIEW], next: [DRAFT], terminal: false}
+      - {code: INVALIDATED, name: 已失效, prev: [APPROVED], next: [], terminal: true}
+
+  - id: abnormal_score_entry
+    entity: AbnormalScoreEntry
+    field: entry_status
+    source: "05-成绩管理规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [PENDING_APPROVAL, TERMINATED], terminal: false}
+      - {code: PENDING_APPROVAL, name: 待审批, prev: [DRAFT], next: [REJECTED, APPROVED_PENDING_ENTRY, TERMINATED], terminal: false}
+      - {code: REJECTED, name: 已驳回, prev: [PENDING_APPROVAL], next: [DRAFT], terminal: false}
+      - {code: APPROVED_PENDING_ENTRY, name: 已批准待录入, prev: [PENDING_APPROVAL], next: [SCORE_REVIEWING], terminal: false}
+      - {code: SCORE_REVIEWING, name: 成绩审核中, prev: [APPROVED_PENDING_ENTRY], next: [COMPLETED], terminal: false}
+      - {code: COMPLETED, name: 已完成, prev: [SCORE_REVIEWING], next: [], terminal: true}
+      - {code: TERMINATED, name: 已终止, prev: [DRAFT, PENDING_APPROVAL], next: [], terminal: true}
+
+  - id: ranking_version
+    entity: RankingVersion
+    field: version_status
+    source: "06-排行榜规格.md"
+    states:
+      - {code: DRAFT_CALC, name: 草稿计算, prev: [], next: [GENERATED, VOIDED], terminal: false}
+      - {code: GENERATED, name: 已生成, prev: [DRAFT_CALC], next: [PUBLISHED, VOIDED], terminal: false}
+      - {code: PUBLISHED, name: 已发布, prev: [GENERATED], next: [WITHDRAWN, EXPIRED, REPLACED], terminal: false}
+      - {code: WITHDRAWN, name: 已撤回, prev: [PUBLISHED], next: [], terminal: true}
+      - {code: EXPIRED, name: 已过期, prev: [PUBLISHED], next: [], terminal: true}
+      - {code: REPLACED, name: 已被替换, prev: [PUBLISHED], next: [], terminal: true}
+      - {code: VOIDED, name: 已作废, prev: [DRAFT_CALC, GENERATED], next: [], terminal: true}
+
+  - id: l3_authorization
+    entity: L3Authorization
+    field: authorization_status
+    source: "06-排行榜规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [PENDING_REVIEW, WITHDRAWN], terminal: false}
+      - {code: PENDING_REVIEW, name: 待平台审核, prev: [DRAFT], next: [APPROVED, REJECTED], terminal: false}
+      - {code: APPROVED, name: 审核通过, prev: [PENDING_REVIEW, SUSPENDED], next: [SUSPENDED, WITHDRAWN], terminal: false}
+      - {code: REJECTED, name: 审核驳回, prev: [PENDING_REVIEW], next: [DRAFT], terminal: false}
+      - {code: SUSPENDED, name: 已暂停, prev: [APPROVED], next: [APPROVED, WITHDRAWN], terminal: false}
+      - {code: WITHDRAWN, name: 已撤回, prev: [DRAFT, APPROVED, SUSPENDED], next: [], terminal: true}
+
+  - id: appeal
+    entity: ScoreAppeal
+    field: appeal_status
+    source: "07-成绩申诉规格.md"
+    states:
+      - {code: SUBMITTED, name: 已提交, prev: [], next: [PROCESSING, WITHDRAWN], terminal: false}
+      - {code: PROCESSING, name: 处理中, prev: [SUBMITTED, RETURNED_TO_SCHOOL], next: [REJECTED, ACCEPTED_PENDING_CORRECTION, RANK_CHECKING, ESCALATED, WITHDRAWN], terminal: false}
+      - {code: REJECTED, name: 已驳回, prev: [PROCESSING, RANK_CHECKING], next: [], terminal: true}
+      - {code: ACCEPTED_PENDING_CORRECTION, name: 已接受待更正, prev: [PROCESSING], next: [SCORE_CORRECTING], terminal: false}
+      - {code: SCORE_CORRECTING, name: 成绩更正中, prev: [ACCEPTED_PENDING_CORRECTION], next: [RESOLVED], terminal: false}
+      - {code: RANK_CHECKING, name: 排行核查中, prev: [PROCESSING], next: [RANK_FIXING, REJECTED, WITHDRAWN], terminal: false}
+      - {code: RANK_FIXING, name: 排行修正中, prev: [RANK_CHECKING], next: [RESOLVED], terminal: false}
+      - {code: ESCALATED, name: 已升级, prev: [PROCESSING], next: [PLATFORM_PROCESSING], terminal: false}
+      - {code: PLATFORM_PROCESSING, name: 平台处理中, prev: [ESCALATED], next: [PLATFORM_DECIDED, RETURNED_TO_SCHOOL], terminal: false}
+      - {code: RETURNED_TO_SCHOOL, name: 平台退回学校, prev: [PLATFORM_PROCESSING], next: [PROCESSING], terminal: false}
+      - {code: PLATFORM_DECIDED, name: 平台已裁决, prev: [PLATFORM_PROCESSING], next: [RESOLVED], terminal: false}
+      - {code: RESOLVED, name: 已解决, prev: [SCORE_CORRECTING, RANK_FIXING, PLATFORM_DECIDED], next: [], terminal: true}
+      - {code: WITHDRAWN, name: 已撤回, prev: [SUBMITTED, PROCESSING, RANK_CHECKING], next: [], terminal: true}
+
+  - id: media_internal
+    entity: Media
+    field: internal_status
+    source: "08-素材与活动成果规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [PENDING_INTERNAL_REVIEW], terminal: false}
+      - {code: PENDING_INTERNAL_REVIEW, name: 待校内审核, prev: [DRAFT], next: [INTERNAL_APPROVED, REJECTED], terminal: false}
+      - {code: INTERNAL_APPROVED, name: 校内审核通过, prev: [PENDING_INTERNAL_REVIEW, INTERNAL_DISABLED], next: [INTERNAL_DISABLED], terminal: false}
+      - {code: REJECTED, name: 校内审核驳回, prev: [PENDING_INTERNAL_REVIEW], next: [DRAFT], terminal: false}
+      - {code: INTERNAL_DISABLED, name: 校内已停用, prev: [INTERNAL_APPROVED], next: [INTERNAL_APPROVED], terminal: false}
+
+  - id: media_public
+    entity: Media
+    field: public_status
+    source: "08-素材与活动成果规格.md"
+    states:
+      - {code: NOT_SUBMITTED, name: 未提交, prev: [], next: [PENDING_PUBLIC_REVIEW], terminal: false}
+      - {code: PENDING_PUBLIC_REVIEW, name: 待平台公开审核, prev: [NOT_SUBMITTED, PLATFORM_REJECTED], next: [PLATFORM_APPROVED, PLATFORM_REJECTED], terminal: false}
+      - {code: PLATFORM_APPROVED, name: 平台公开审核通过, prev: [PENDING_PUBLIC_REVIEW], next: [PUBLIC], terminal: false}
+      - {code: PLATFORM_REJECTED, name: 平台公开审核驳回, prev: [PENDING_PUBLIC_REVIEW], next: [NOT_SUBMITTED, PENDING_PUBLIC_REVIEW], terminal: false}
+      - {code: PUBLIC, name: 已公开, prev: [PLATFORM_APPROVED], next: [PLATFORM_TAKEDOWN], terminal: false}
+      - {code: PLATFORM_TAKEDOWN, name: 平台已下架, prev: [PUBLIC], next: [NOT_SUBMITTED], terminal: false}
+
+  - id: result_internal
+    entity: ActivityResult
+    field: result_internal_status
+    source: "08-素材与活动成果规格.md"
+    states:
+      - {code: DRAFT, name: 草稿, prev: [], next: [INTERNAL_PUBLISHED], terminal: false}
+      - {code: INTERNAL_PUBLISHED, name: 校内已发布, prev: [DRAFT], next: [INTERNAL_WITHDRAWN], terminal: false}
+      - {code: INTERNAL_WITHDRAWN, name: 校内已撤回, prev: [INTERNAL_PUBLISHED], next: [DRAFT], terminal: false}
+
+  - id: result_public
+    entity: ActivityResult
+    field: result_public_status
+    source: "08-素材与活动成果规格.md"
+    states:
+      - {code: NOT_SUBMITTED, name: 未提交, prev: [], next: [PENDING_PUBLIC_REVIEW], terminal: false}
+      - {code: PENDING_PUBLIC_REVIEW, name: 待平台公开审核, prev: [NOT_SUBMITTED], next: [PLATFORM_APPROVED, PLATFORM_REJECTED], terminal: false}
+      - {code: PLATFORM_APPROVED, name: 平台公开审核通过, prev: [PENDING_PUBLIC_REVIEW], next: [PUBLIC], terminal: false}
+      - {code: PLATFORM_REJECTED, name: 平台公开审核驳回, prev: [PENDING_PUBLIC_REVIEW], next: [NOT_SUBMITTED], terminal: false}
+      - {code: PUBLIC, name: 已公开, prev: [PLATFORM_APPROVED, ANOMALY_PENDING], next: [ANOMALY_PENDING, PLATFORM_TAKEDOWN], terminal: false}
+      - {code: ANOMALY_PENDING, name: 公开异常待处理, prev: [PUBLIC], next: [PUBLIC, NOT_SUBMITTED, PLATFORM_TAKEDOWN], terminal: false}
+      - {code: PLATFORM_TAKEDOWN, name: 平台已下架, prev: [PUBLIC, ANOMALY_PENDING], next: [NOT_SUBMITTED], terminal: false}
+
+  - id: feedback
+    entity: Feedback
+    field: feedback_status
+    source: "09-反馈与通知规格.md"
+    states:
+      - {code: SUBMITTED, name: 已提交, prev: [], next: [PROCESSING, CLOSED], terminal: false}
+      - {code: PROCESSING, name: 处理中, prev: [SUBMITTED, ESCALATED], next: [RESOLVED, ESCALATED, CLOSED], terminal: false}
+      - {code: RESOLVED, name: 已处理, prev: [PROCESSING], next: [CLOSED], terminal: false}
+      - {code: ESCALATED, name: 已升级, prev: [PROCESSING], next: [PROCESSING], terminal: false}
+      - {code: CLOSED, name: 已关闭, prev: [SUBMITTED, PROCESSING, RESOLVED], next: [], terminal: true}
+

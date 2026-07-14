@@ -7,7 +7,7 @@ from datetime import datetime
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 ROOT = Path(__file__).parent.parent
 SPEC_DIR = ROOT / "docs" / "business-spec"
-REG_PATH = ROOT / "docs" / "spec" / "business-spec-registry.yaml"
+REG_PATH = ROOT / "docs" / "validation" / "business-spec-registry.yaml"
 DEC_PATH = ROOT / "docs" / "decision" / "业务决策记录-v1.2.md"
 
 errors = []; warnings = []
@@ -196,46 +196,90 @@ for sf in spec_paths.values():
 # ============================================================
 # 11. State machine registry validation
 # ============================================================
-sms = reg.get('state_machines', [])
-if sms:
-    for sm in sms:
-        sid = sm.get('id', 'unknown')
-        states = sm.get('states', [])
-        codes = {s['code'] for s in states}
-        state_map = {s['code']: s for s in states}
+sms = reg.get('state_machines', None)
 
-        # Unique codes
-        if len(codes) != len(states): err(f"SM {sid}: duplicate state codes")
+# Negative: missing key
+if sms is None:
+    err("Registry missing 'state_machines' key")
+    sms = []
+# Negative: empty list
+elif len(sms) == 0:
+    err("Registry 'state_machines' is empty (must register all state machines)")
 
-        # Initial states
-        initials = [s for s in states if s.get('previous', s.get('prev', [])) == []]
-        if not initials: err(f"SM {sid}: no initial state")
+# Negative: duplicate IDs
+sm_ids = [sm.get('id', '') for sm in sms]
+dup_ids = [i for i in set(sm_ids) if sm_ids.count(i) > 1]
+if dup_ids:
+    err(f"Duplicate state machine IDs: {dup_ids}")
 
-        for s in states:
-            code = s['code']
-            prev = s.get('previous', s.get('prev', []))
-            nxt = s.get('next', [])
+# Negative: count mismatch vs declared total
+declared_sm_count = reg.get('total_state_machines', None)
+if declared_sm_count is not None and len(sms) != declared_sm_count:
+    err(f"State machine count mismatch: declared={declared_sm_count}, actual={len(sms)}")
 
-            # All prev/next defined
-            for p in prev:
-                if p not in codes: err(f"SM {sid}: {code}.prev.{p} undefined")
-            for n in nxt:
-                if n not in codes: err(f"SM {sid}: {code}.next.{n} undefined")
+# Per-machine validation
+for sm in sms:
+    sid = sm.get('id', 'unknown')
+    states = sm.get('states', [])
+    codes = {s['code'] for s in states}
+    state_map = {s['code']: s for s in states}
 
-            # Terminal has no next
-            if s.get('terminal', False) and len(nxt) > 0:
-                err(f"SM {sid}: terminal {code} has next states {nxt}")
+    # Negative: empty states list
+    if len(states) == 0:
+        err(f"SM {sid}: empty states list")
+        continue
 
-            # Symmetry: A→B implies B.prev includes A
-            for n in nxt:
-                if n in state_map:
-                    tn = state_map[n]
-                    tn_prev = tn.get('previous', tn.get('prev', []))
-                    if code not in tn_prev and tn_prev:  # skip initial states
-                        err(f"SM {sid}: {code}→{n} asymmetric, {n}.prev={tn_prev} missing {code}")
-else:
-    warn("No state_machines defined in registry")
-print(f"[PASS] State machine check: {len(sms)} machines")
+    # Unique codes
+    if len(codes) != len(states):
+        err(f"SM {sid}: duplicate state codes")
+
+    # Initial states
+    initials = [s for s in states if s.get('previous', s.get('prev', [])) == []]
+    if not initials:
+        err(f"SM {sid}: no initial state")
+    if len(initials) > 1:
+        warn(f"SM {sid}: multiple initial states: {[s['code'] for s in initials]}")
+
+    for s in states:
+        code = s['code']
+        prev = s.get('previous', s.get('prev', []))
+        nxt = s.get('next', [])
+
+        # Negative: undefined transitions
+        for p in prev:
+            if p not in codes:
+                err(f"SM {sid}: {code}.prev.{p} undefined state")
+        for n in nxt:
+            if n not in codes:
+                err(f"SM {sid}: {code}.next.{n} undefined state")
+
+        # Terminal has no next
+        if s.get('terminal', False) and len(nxt) > 0:
+            err(f"SM {sid}: terminal {code} has next states {nxt}")
+
+        # Symmetry: A→B implies B.prev includes A (skip initial states)
+        for n in nxt:
+            if n in state_map:
+                tn = state_map[n]
+                tn_prev = tn.get('previous', tn.get('prev', []))
+                if code not in tn_prev and tn_prev:
+                    err(f"SM {sid}: {code}→{n} asymmetric, {n}.prev missing {code}")
+
+    # Negative: unreachable states (non-initial with no incoming transitions)
+    all_targets = set()
+    for s in states:
+        all_targets.update(s.get('next', []))
+    for s in states:
+        if s.get('previous', s.get('prev', [])) != [] and s['code'] not in all_targets:
+            warn(f"SM {sid}: state {s['code']} has prev but no incoming transitions (possibly unreachable)")
+
+    # Negative: non-terminal dead ends
+    for s in states:
+        if not s.get('terminal', False) and len(s.get('next', [])) == 0:
+            err(f"SM {sid}: non-terminal {s['code']} has no next states (dead end)")
+
+declared = declared_sm_count if declared_sm_count is not None else 'not set'
+print(f"[PASS] State machine check: {len(sms)} registered, declared={declared}")
 
 # ============================================================
 # 12. Version check

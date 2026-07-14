@@ -1,12 +1,12 @@
 === v1.2-AI-FROZEN Validator v1.2.1 ===
-Time: 2026-07-13T23:31:04.916179
+Time: 2026-07-14T12:00:46.326432
 Files checked: 12
 [PASS] Registry DEC: 25
 [PASS] Decision record DECs match registry
 [PASS] Decision packages: 13
 [PASS] P1: 6 unique IDs
 [PASS] P2: 4 unique IDs
-[PASS] State machine check: 7 machines
+[PASS] State machine check: 17 registered, declared=17
 
 ==================================================
 Validator version: v1.2.1
