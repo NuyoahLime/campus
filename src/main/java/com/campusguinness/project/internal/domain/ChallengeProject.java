@@ -1,0 +1,107 @@
+package com.campusguinness.project.internal.domain;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * ChallengeProject aggregate root.
+ *
+ * <p>State machine (CG-PROJECT-001):
+ * <pre>
+ *   DRAFT → PUBLISHED → ARCHIVED
+ *                ↑          │
+ *                └──────────┘
+ * </pre>
+ *
+ * <p>Invariants:
+ * - A project must be in DRAFT status to be initially published.
+ * - A project must be in PUBLISHED status to be archived.
+ * - A project in ARCHIVED status can be re-published.
+ * - DRAFT projects cannot be directly archived.
+ */
+public final class ChallengeProject {
+
+    private final ChallengeProjectId id;
+    private ProjectName name;
+    private ProjectCategory category;
+    private ScoreConfig scoreConfig;
+    private String description;
+    private ProjectStatus status;
+    private final List<Object> domainEvents;
+
+    private ChallengeProject(ChallengeProjectId id, ProjectName name,
+                             ProjectCategory category, ScoreConfig scoreConfig,
+                             String description, ProjectStatus status) {
+        this.id = id;
+        this.name = name;
+        this.category = category;
+        this.scoreConfig = scoreConfig;
+        this.description = description;
+        this.status = status;
+        this.domainEvents = new ArrayList<>();
+    }
+
+    /** Factory: create a new ChallengeProject in DRAFT status. */
+    public static ChallengeProject create(ChallengeProjectId id, ProjectName name,
+                                          ProjectCategory category, ScoreConfig scoreConfig,
+                                          String description) {
+        if (id == null) throw new IllegalArgumentException("id must not be null");
+        if (name == null) throw new IllegalArgumentException("name must not be null");
+        if (category == null) throw new IllegalArgumentException("category must not be null");
+        if (scoreConfig == null) throw new IllegalArgumentException("scoreConfig must not be null");
+
+        ChallengeProject project = new ChallengeProject(id, name, category, scoreConfig, description, ProjectStatus.DRAFT);
+        project.domainEvents.add(new ChallengeProjectCreated(id));
+        return project;
+    }
+
+    /** Reconstitute from persistence — takes final status, no domain events. */
+    public static ChallengeProject reconstitute(ChallengeProjectId id, ProjectName name,
+                                                ProjectCategory category, ScoreConfig scoreConfig,
+                                                String description, ProjectStatus status) {
+        if (id == null) throw new IllegalArgumentException("id must not be null");
+        if (name == null) throw new IllegalArgumentException("name must not be null");
+        if (category == null) throw new IllegalArgumentException("category must not be null");
+        if (scoreConfig == null) throw new IllegalArgumentException("scoreConfig must not be null");
+        if (status == null) throw new IllegalArgumentException("status must not be null");
+        return new ChallengeProject(id, name, category, scoreConfig, description, status);
+    }
+
+    /** Publish: DRAFT → PUBLISHED, or ARCHIVED → PUBLISHED (re-publish). */
+    public void publish() {
+        if (status != ProjectStatus.DRAFT && status != ProjectStatus.ARCHIVED) {
+            throw new InvalidProjectStateTransitionException(status, "publish");
+        }
+        this.status = ProjectStatus.PUBLISHED;
+        this.domainEvents.add(new ProjectPublished(id));
+    }
+
+    /** Archive: PUBLISHED → ARCHIVED. */
+    public void archive() {
+        if (status != ProjectStatus.PUBLISHED) {
+            throw new InvalidProjectStateTransitionException(status, "archive");
+        }
+        this.status = ProjectStatus.ARCHIVED;
+        this.domainEvents.add(new ProjectArchived(id));
+    }
+
+    /** Clear accumulated domain events (useful after publishing/handling). */
+    public void clearDomainEvents() {
+        this.domainEvents.clear();
+    }
+
+    // ── Getters (no public setters) ──
+
+    public ChallengeProjectId id() { return id; }
+    public ProjectName name() { return name; }
+    public ProjectCategory category() { return category; }
+    public ScoreConfig scoreConfig() { return scoreConfig; }
+    public String description() { return description; }
+    public ProjectStatus status() { return status; }
+
+    /** Returns unmodifiable view of accumulated domain events. */
+    public List<Object> domainEvents() {
+        return Collections.unmodifiableList(domainEvents);
+    }
+}

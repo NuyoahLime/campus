@@ -6,7 +6,7 @@ secrets/
 deploy/env/
 
 # Java
-backend/target/
+target/
 *.class
 *.jar
 *.war
