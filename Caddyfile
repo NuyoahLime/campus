@@ -1,0 +1,13 @@
+# Caddyfile — Local HTTPS Acceptance Proxy
+# Run: caddy run --config Caddyfile --adapter caddyfile
+# Requires: caddy trust (once)
+{
+	auto_https disable_redirects
+}
+
+https://localhost {
+	bind 127.0.0.1 [::1]
+	tls internal
+
+	reverse_proxy 127.0.0.1:8080
+}
