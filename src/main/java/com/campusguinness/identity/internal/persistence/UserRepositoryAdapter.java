@@ -11,7 +11,28 @@ import java.util.Optional;
 class UserRepositoryAdapter implements UserRepository {
     private final UserJpaRepository jpa;
     UserRepositoryAdapter(UserJpaRepository r) { this.jpa = r; }
-    @Override @Transactional public void save(User u) { jpa.save(UserPersistenceMapper.toEntity(u)); }
-    @Override @Transactional(readOnly = true) public Optional<User> findById(UserId id) { return jpa.findById(id.value()).map(UserPersistenceMapper::toDomain); }
-    @Override public boolean existsByUsername(String username) { return jpa.existsByUsername(username); }
+
+    @Override
+    @Transactional
+    public void save(User u) {
+        var existing = jpa.findById(u.id().value());
+        if (existing.isPresent()) {
+            UserPersistenceMapper.updateEntity(existing.get(), u);
+            jpa.saveAndFlush(existing.get());
+        } else {
+            throw new IllegalStateException(
+                    "Cannot insert new User through generic repository. Use UserAccountProvisioningPort instead.");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findById(UserId id) {
+        return jpa.findById(id.value()).map(UserPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public boolean existsByUsername(String username) {
+        return jpa.existsByUsername(username);
+    }
 }
