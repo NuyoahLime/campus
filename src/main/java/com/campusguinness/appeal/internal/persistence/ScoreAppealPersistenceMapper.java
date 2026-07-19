@@ -19,6 +19,13 @@ final class ScoreAppealPersistenceMapper {
         return e;
     }
 
+    static void updateEntity(ScoreAppealEntity e, ScoreAppeal domain) {
+        e.setAppealStatus(domain.status().name());
+        e.setHandlerId(domain.handlerId()); e.setEscalatedTo(domain.escalatedTo());
+        e.setResolution(domain.resolution()); e.setResolvedAt(domain.resolvedAt());
+        e.setUpdatedAt(Instant.now());
+    }
+
     static ScoreAppeal toDomain(ScoreAppealEntity e) {
         return ScoreAppeal.reconstitute(new ScoreAppeal.Builder()
                 .id(new ScoreAppealId(e.getId())).schoolId(e.getSchoolId())

@@ -18,7 +18,7 @@ class ScoreAttemptRepositoryAdapterTest {
     @Mock ScoreAttemptJpaRepository jpa;
     @InjectMocks ScoreAttemptRepositoryAdapter adapter;
 
-    @Test void saveCallsJpa() { adapter.save(draft()); verify(jpa).save(any()); }
+    @Test void saveCallsJpa() { when(jpa.findById(any())).thenReturn(Optional.empty()); adapter.save(draft()); verify(jpa).saveAndFlush(any()); }
     @Test void findByIdEmpty() { when(jpa.findById(any())).thenReturn(Optional.empty()); assertThat(adapter.findById(new ScoreAttemptId(UUID.randomUUID()))).isEmpty(); }
     @Test void restoresApprovedNoEvents() {
         var e = entity("APPROVED"); when(jpa.findById(e.getId())).thenReturn(Optional.of(e));

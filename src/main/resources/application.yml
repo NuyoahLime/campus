@@ -33,6 +33,18 @@ spring:
     store-type: jdbc
     jdbc:
       initialize-schema: never
+    timeout: 30m
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: false
+        same-site: lax
+        path: /
+      tracking-modes: cookie
+      persistent: false
 
   security:
     user:

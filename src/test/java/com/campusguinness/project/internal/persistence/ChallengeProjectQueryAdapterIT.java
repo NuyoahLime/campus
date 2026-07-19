@@ -3,6 +3,7 @@ package com.campusguinness.project.internal.persistence;
 import com.campusguinness.PostgreSqlIntegrationTestSupport;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -16,6 +17,27 @@ class ChallengeProjectQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
 
     @Autowired private ChallengeProjectQueryAdapter adapter;
     @Autowired private ChallengeProjectJpaRepository jpa;
+    @Autowired private JdbcTemplate jdbc;
+
+    @BeforeEach
+    void cleanLeakedData() {
+        // Delete in reverse FK order — children before parents
+        jdbc.update("DELETE FROM appeal_records");
+        jdbc.update("DELETE FROM score_appeals");
+        jdbc.update("DELETE FROM score_review_records");
+        jdbc.update("DELETE FROM score_correction_records");
+        jdbc.update("DELETE FROM abnormal_score_entries");
+        jdbc.update("DELETE FROM score_attempts");
+        jdbc.update("DELETE FROM ranking_entry_score_sources");
+        jdbc.update("DELETE FROM ranking_entries");
+        jdbc.update("DELETE FROM ranking_versions");
+        jdbc.update("DELETE FROM l3_authorizations");
+        jdbc.update("DELETE FROM ranking_definitions");
+        jdbc.update("DELETE FROM project_rule_compatibilities");
+        jdbc.update("DELETE FROM activity_projects");
+        jdbc.update("DELETE FROM project_rule_versions");
+        jdbc.update("DELETE FROM challenge_projects");
+    }
 
     @Test @DisplayName("returns only PUBLISHED projects, sorted by createdAt DESC")
     void filtersPublishedOnly() {

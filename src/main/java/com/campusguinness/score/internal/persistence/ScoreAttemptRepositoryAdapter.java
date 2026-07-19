@@ -11,7 +11,15 @@ import java.util.Optional;
 class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
     private final ScoreAttemptJpaRepository jpaRepository;
     ScoreAttemptRepositoryAdapter(ScoreAttemptJpaRepository r) { this.jpaRepository = r; }
-    @Override @Transactional public void save(ScoreAttempt s) { jpaRepository.save(ScoreAttemptPersistenceMapper.toEntity(s)); }
+    @Override @Transactional public void save(ScoreAttempt s) {
+        var existing = jpaRepository.findById(s.id().value());
+        if (existing.isPresent()) {
+            ScoreAttemptPersistenceMapper.updateEntity(existing.get(), s);
+            jpaRepository.saveAndFlush(existing.get());
+        } else {
+            jpaRepository.saveAndFlush(ScoreAttemptPersistenceMapper.toEntity(s));
+        }
+    }
     @Override @Transactional(readOnly = true) public Optional<ScoreAttempt> findById(ScoreAttemptId id) {
         return jpaRepository.findById(id.value()).map(ScoreAttemptPersistenceMapper::toDomain);
     }
