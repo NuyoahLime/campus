@@ -21,6 +21,17 @@ final class ScoreAttemptPersistenceMapper {
         return e;
     }
 
+    static void updateEntity(ScoreAttemptEntity e, ScoreAttempt domain) {
+        e.setScoreValue(null); e.setScoreDurationMs(null); e.setScoreGrade(null);
+        mapScoreValueToEntity(domain.scoreValue(), e);
+        e.setCurrentEffective(domain.isCurrentEffective());
+        e.setReplacesId(domain.replacesId());
+        e.setScoreStatus(domain.status().name());
+        e.setSubmittedAt(domain.submittedAt());
+        e.setManualMakeup(domain.isManualMakeup());
+        e.setUpdatedAt(Instant.now());
+    }
+
     static ScoreAttempt toDomain(ScoreAttemptEntity e) {
         String typeStr = e.getScoreStorageType();
         if (typeStr == null || typeStr.isBlank())

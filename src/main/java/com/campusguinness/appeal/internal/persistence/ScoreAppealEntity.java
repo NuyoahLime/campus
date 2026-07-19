@@ -9,6 +9,7 @@ public class ScoreAppealEntity {
     @Column(name = "student_id", nullable = false) private UUID studentId;
     @Column(name = "appeal_type", nullable = false, length = 32) private String appealType;
     @Column(name = "appeal_reason", nullable = false, columnDefinition = "text") private String appealReason;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "evidence_file_keys", columnDefinition = "jsonb") private String evidenceFileKeys;
     @Column(name = "appeal_status", nullable = false, length = 32) private String appealStatus;
     @Column(name = "handler_id") private UUID handlerId;
