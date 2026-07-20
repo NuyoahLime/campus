@@ -54,6 +54,12 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
      * All child tables use ON DELETE RESTRICT, so deletion order matters.
      */
     private void cleanActivityTestData() {
+        // FK-safe order — all child tables use ON DELETE RESTRICT
+        jdbc.update("DELETE FROM appeal_records");
+        jdbc.update("DELETE FROM score_appeals");
+        jdbc.update("DELETE FROM score_review_records");
+        jdbc.update("DELETE FROM score_correction_records");
+        jdbc.update("DELETE FROM abnormal_score_entries");
         jdbc.update("DELETE FROM score_attempts");
         jdbc.update("DELETE FROM activity_projects");
         jdbc.update("DELETE FROM activity_participants");
