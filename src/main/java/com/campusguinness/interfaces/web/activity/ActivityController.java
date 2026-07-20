@@ -4,7 +4,9 @@ import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.query.ActivityQueryService;
 import com.campusguinness.activity.application.result.ActivityResult;
 import com.campusguinness.activity.application.service.ActivityManagementService;
+import com.campusguinness.infrastructure.security.AuthorizationPolicy;
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.interfaces.web.common.PageResponse;
 
 import jakarta.validation.Valid;
@@ -22,11 +24,14 @@ public class ActivityController {
     private final ActivityManagementService service;
     private final ActivityQueryService queryService;
     private final CurrentActor currentActor;
+    private final SchoolMembershipResolver membershipResolver;
 
-    public ActivityController(ActivityManagementService service, ActivityQueryService queryService, CurrentActor currentActor) {
+    public ActivityController(ActivityManagementService service, ActivityQueryService queryService,
+                               CurrentActor currentActor, SchoolMembershipResolver membershipResolver) {
         this.service = service;
         this.queryService = queryService;
         this.currentActor = currentActor;
+        this.membershipResolver = membershipResolver;
     }
 
     @GetMapping
@@ -43,7 +48,9 @@ public class ActivityController {
 
     @PostMapping
     public ResponseEntity<ActivityResponse> create(@Valid @RequestBody CreateActivityRequest req) {
-        var cmd = new CreateActivityCommand(req.schoolId(), currentActor.requireUserId(), req.title(),
+        UUID actorId = currentActor.requireUserId();
+        AuthorizationPolicy.requireTeacherOrAbove(membershipResolver, actorId, req.schoolId());
+        var cmd = new CreateActivityCommand(req.schoolId(), actorId, req.title(),
                 req.description(), req.startTime(), req.endTime(), req.location());
         ActivityResult r = service.create(cmd);
         return ResponseEntity.created(URI.create("/api/v1/activities/" + r.id()))
