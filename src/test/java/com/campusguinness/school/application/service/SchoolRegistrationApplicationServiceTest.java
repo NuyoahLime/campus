@@ -1,5 +1,6 @@
 package com.campusguinness.school.application.service;
 
+import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.port.SchoolRegistrationRepository;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
@@ -22,9 +23,10 @@ import static org.mockito.Mockito.*;
 class SchoolRegistrationApplicationServiceTest {
 
     @Mock private SchoolRegistrationRepository repository;
+    @Mock private SchoolMembershipResolver membershipResolver;
     private SchoolRegistrationApplicationService service;
 
-    @BeforeEach void setUp() { service = new SchoolRegistrationApplicationService(repository); }
+    @BeforeEach void setUp() { service = new SchoolRegistrationApplicationService(repository, membershipResolver); }
 
     private SubmitSchoolRegistrationCommand validCmd() {
         return new SubmitSchoolRegistrationCommand("测试学校","USCC","1234567890","PRIMARY",
@@ -47,6 +49,7 @@ class SchoolRegistrationApplicationServiceTest {
         void shouldApprove() {
             UUID id = UUID.randomUUID(), reviewerId = UUID.randomUUID(), schoolId = UUID.randomUUID();
             var reg = submittedReg(id);
+            when(membershipResolver.isSchoolAdmin(any(), any())).thenReturn(true);
             when(repository.findById(any())).thenReturn(Optional.of(reg));
             var r = service.approve(id, reviewerId, "ok", schoolId);
             assertThat(r.status()).isEqualTo("APPROVED");
@@ -60,6 +63,7 @@ class SchoolRegistrationApplicationServiceTest {
         @Test @DisplayName("rejects with reason")
         void shouldReject() {
             UUID id = UUID.randomUUID();
+            when(membershipResolver.isSchoolAdmin(any(), any())).thenReturn(true);
             when(repository.findById(any())).thenReturn(Optional.of(submittedReg(id)));
             var r = service.reject(id, UUID.randomUUID(), "incomplete");
             assertThat(r.status()).isEqualTo("REJECTED");

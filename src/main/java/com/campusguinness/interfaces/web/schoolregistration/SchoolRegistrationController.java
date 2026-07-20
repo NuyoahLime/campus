@@ -1,15 +1,12 @@
 package com.campusguinness.interfaces.web.schoolregistration;
 
-import com.campusguinness.infrastructure.security.AuthorizationPolicy;
 import com.campusguinness.infrastructure.security.CurrentActor;
-import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,17 +19,11 @@ public class SchoolRegistrationController {
 
     private final SchoolRegistrationApplicationService service;
     private final CurrentActor currentActor;
-    private final SchoolMembershipResolver membershipResolver;
-    private final JdbcTemplate jdbc;
 
     public SchoolRegistrationController(SchoolRegistrationApplicationService service,
-                                         CurrentActor currentActor,
-                                         SchoolMembershipResolver membershipResolver,
-                                         JdbcTemplate jdbc) {
+                                         CurrentActor currentActor) {
         this.service = service;
         this.currentActor = currentActor;
-        this.membershipResolver = membershipResolver;
-        this.jdbc = jdbc;
     }
 
     @PostMapping
@@ -49,35 +40,15 @@ public class SchoolRegistrationController {
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveSchoolRegistrationRequest req) {
-        UUID actorId = currentActor.requireUserId();
-        UUID realSchoolId = resolveRegistrationSchoolId(id);
-        AuthorizationPolicy.requireSchoolAdmin(membershipResolver, actorId, realSchoolId);
-        SchoolRegistrationResult r = service.approve(id, actorId, req.comment(), realSchoolId);
+        SchoolRegistrationResult r = service.approve(id, currentActor.requireUserId(), req.comment(), req.schoolId());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectSchoolRegistrationRequest req) {
-        UUID actorId = currentActor.requireUserId();
-        UUID realSchoolId = resolveRegistrationSchoolId(id);
-        AuthorizationPolicy.requireSchoolAdmin(membershipResolver, actorId, realSchoolId);
-        SchoolRegistrationResult r = service.reject(id, actorId, req.reason());
+        SchoolRegistrationResult r = service.reject(id, currentActor.requireUserId(), req.reason());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
-    }
-
-    /** Resolve the actual schoolId from the persisted registration — never trust the request body. */
-    private UUID resolveRegistrationSchoolId(UUID registrationId) {
-        var rows = jdbc.queryForList(
-                "SELECT created_school_id FROM school_registrations WHERE id = ?", UUID.class, registrationId);
-        if (rows.isEmpty()) {
-            throw new IllegalArgumentException("SchoolRegistration not found: " + registrationId);
-        }
-        UUID schoolId = rows.getFirst();
-        if (schoolId == null) {
-            throw new IllegalArgumentException("SchoolRegistration has no associated school");
-        }
-        return schoolId;
     }
 
     @PostMapping("/{id}/withdraw")

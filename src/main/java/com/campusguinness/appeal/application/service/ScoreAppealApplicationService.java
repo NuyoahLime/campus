@@ -3,6 +3,9 @@ package com.campusguinness.appeal.application.service;
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.AuthorizationPolicy;
+
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
@@ -11,7 +14,15 @@ import java.util.UUID;
 @Transactional
 public class ScoreAppealApplicationService {
     private final ScoreAppealRepository repo;
-    public ScoreAppealApplicationService(ScoreAppealRepository r) { this.repo = r; }
+    private final JdbcTemplate jdbc;
+    public ScoreAppealApplicationService(ScoreAppealRepository r, JdbcTemplate j) { this.repo = r; this.jdbc = j; }
+
+    /** Submits an appeal after verifying the actor owns the score attempt. */
+    public ScoreAppealResult submitAuthorized(UUID actorId, UUID schoolId, UUID scoreAttemptId,
+                                               UUID studentId, String appealType, String appealReason) {
+        AuthorizationPolicy.requireResourceOwner(actorId, resolveScoreOwner(scoreAttemptId));
+        return submit(schoolId, scoreAttemptId, studentId, appealType, appealReason);
+    }
 
     public ScoreAppealResult submit(UUID schoolId, UUID scoreAttemptId, UUID studentId, String appealType, String appealReason) {
         var a = ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID()))
@@ -19,6 +30,15 @@ public class ScoreAppealApplicationService {
                 .appealType(appealType).appealReason(appealReason));
         repo.save(a);
         return result(a);
+    }
+
+    private UUID resolveScoreOwner(UUID scoreAttemptId) {
+        var rows = jdbc.queryForList(
+                "SELECT student_id FROM score_attempts WHERE id = ?", UUID.class, scoreAttemptId);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("ScoreAttempt not found: " + scoreAttemptId);
+        }
+        return rows.getFirst();
     }
     public ScoreAppealResult beginProcessing(UUID id, UUID handlerId) { var a=find(id); a.beginProcessing(handlerId); repo.save(a); return result(a); }
     public ScoreAppealResult reject(UUID id, String resolution) { var a=find(id); a.reject(resolution); repo.save(a); return result(a); }
