@@ -51,7 +51,7 @@ public class SchoolRegistrationController {
     public ResponseEntity<SchoolRegistrationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveSchoolRegistrationRequest req) {
         UUID actorId = currentActor.requireUserId();
         UUID realSchoolId = resolveRegistrationSchoolId(id);
-        AuthorizationPolicy.requireTeacherOrAbove(membershipResolver, actorId, realSchoolId);
+        AuthorizationPolicy.requireSchoolAdmin(membershipResolver, actorId, realSchoolId);
         SchoolRegistrationResult r = service.approve(id, actorId, req.comment(), realSchoolId);
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
@@ -61,7 +61,7 @@ public class SchoolRegistrationController {
     public ResponseEntity<SchoolRegistrationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectSchoolRegistrationRequest req) {
         UUID actorId = currentActor.requireUserId();
         UUID realSchoolId = resolveRegistrationSchoolId(id);
-        AuthorizationPolicy.requireTeacherOrAbove(membershipResolver, actorId, realSchoolId);
+        AuthorizationPolicy.requireSchoolAdmin(membershipResolver, actorId, realSchoolId);
         SchoolRegistrationResult r = service.reject(id, actorId, req.reason());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
