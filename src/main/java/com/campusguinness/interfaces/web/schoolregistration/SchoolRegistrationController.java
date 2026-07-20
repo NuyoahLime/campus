@@ -1,6 +1,8 @@
 package com.campusguinness.interfaces.web.schoolregistration;
 
+import com.campusguinness.infrastructure.security.AuthorizationPolicy;
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
@@ -15,15 +17,18 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/school-registrations")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class SchoolRegistrationController {
 
     private final SchoolRegistrationApplicationService service;
     private final CurrentActor currentActor;
+    private final SchoolMembershipResolver membershipResolver;
 
-    public SchoolRegistrationController(SchoolRegistrationApplicationService service, CurrentActor currentActor) {
+    public SchoolRegistrationController(SchoolRegistrationApplicationService service,
+                                         CurrentActor currentActor,
+                                         SchoolMembershipResolver membershipResolver) {
         this.service = service;
         this.currentActor = currentActor;
+        this.membershipResolver = membershipResolver;
     }
 
     @PostMapping
@@ -38,14 +43,19 @@ public class SchoolRegistrationController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveSchoolRegistrationRequest req) {
-        SchoolRegistrationResult r = service.approve(id, currentActor.requireUserId(), req.comment(), req.schoolId());
+        UUID actorId = currentActor.requireUserId();
+        AuthorizationPolicy.requireTeacherOrAbove(membershipResolver, actorId, req.schoolId());
+        SchoolRegistrationResult r = service.approve(id, actorId, req.comment(), req.schoolId());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectSchoolRegistrationRequest req) {
-        SchoolRegistrationResult r = service.reject(id, currentActor.requireUserId(), req.reason());
+        UUID actorId = currentActor.requireUserId();
+        SchoolRegistrationResult r = service.reject(id, actorId, req.reason());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 

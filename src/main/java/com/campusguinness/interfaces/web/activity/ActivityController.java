@@ -17,7 +17,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/activities")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class ActivityController {
 
     private final ActivityManagementService service;
@@ -52,6 +51,7 @@ public class ActivityController {
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ActivityResponse> publish(@PathVariable UUID id) {
         ActivityResult r = service.publish(id);
         return ResponseEntity.ok(new ActivityResponse(r.id(), r.executionStatus(), r.publicStatus()));

@@ -14,7 +14,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/score-appeals")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class ScoreAppealController {
 
     private final ScoreAppealApplicationService service;
