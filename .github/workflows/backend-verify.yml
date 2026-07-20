@@ -38,15 +38,13 @@ jobs:
         run: |
           set -euo pipefail
           java -version
-          chmod +x ./mvnw
-          ./mvnw --version
+          mvn --version
 
       - name: Run Maven clean verify
         shell: bash
         run: |
           set -euo pipefail
-          chmod +x ./mvnw
-          ./mvnw --batch-mode --no-transfer-progress clean verify
+          mvn --batch-mode --no-transfer-progress clean verify
 
       - name: Upload test reports
         if: always()
