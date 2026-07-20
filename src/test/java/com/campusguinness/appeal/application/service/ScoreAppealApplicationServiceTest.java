@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.Optional;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
@@ -16,9 +17,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ScoreAppealApplicationServiceTest {
     @Mock ScoreAppealRepository repo;
+    @Mock JdbcTemplate jdbc;
     ScoreAppealApplicationService svc;
 
-    @BeforeEach void setUp() { svc = new ScoreAppealApplicationService(repo); }
+    @BeforeEach void setUp() { svc = new ScoreAppealApplicationService(repo, jdbc); }
 
     private ScoreAppeal appeal() { return ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID())).schoolId(UUID.randomUUID()).scoreAttemptId(UUID.randomUUID()).studentId(UUID.randomUUID()).appealType("SCORE").appealReason("r")); }
 
