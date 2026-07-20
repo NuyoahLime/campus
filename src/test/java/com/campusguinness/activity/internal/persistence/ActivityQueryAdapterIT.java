@@ -4,7 +4,6 @@ import com.campusguinness.PostgreSqlIntegrationTestSupport;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,7 +11,17 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Transactional
+/**
+ * Isolation strategy: clears shared Testcontainers tables in FK-safe order
+ * both before AND after each test method, so that:
+ * <ul>
+ *   <li>Incoming contamination from other IT classes is removed before assertions.</li>
+ *   <li>This class's own test data does not leak to subsequent IT classes.</li>
+ * </ul>
+ * The appeal integration tests (ScoreAppealPathAVerificationIT,
+ * ScoreAppealCorePersistenceIT, ScoreAppealJsonbMappingIT) separately own
+ * responsibility for their own cleanup and will be addressed in a follow-up.
+ */
 class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
 
     @Autowired private ActivityQueryAdapter adapter;
@@ -24,6 +33,7 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
 
     @BeforeEach
     void setUp() {
+        cleanActivityTestData();
         schoolId = UUID.randomUUID();
         userId = UUID.randomUUID();
         jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -31,6 +41,31 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
                 "INT-"+UUID.randomUUID().toString().substring(0,8), "PRIMARY", "Beijing", "addr", "n", "p", "e", "NORMAL");
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)",
                 userId, "user-"+UUID.randomUUID().toString().substring(0,8), "hash", "NORMAL");
+    }
+
+    @AfterEach
+    void tearDown() {
+        cleanActivityTestData();
+    }
+
+    /**
+     * FK-safe cleanup of tables that may contain test data leaking from
+     * other IT classes that share the same Testcontainers instance.
+     * All child tables use ON DELETE RESTRICT, so deletion order matters.
+     */
+    private void cleanActivityTestData() {
+        // FK-safe order — all child tables use ON DELETE RESTRICT
+        jdbc.update("DELETE FROM appeal_records");
+        jdbc.update("DELETE FROM score_appeals");
+        jdbc.update("DELETE FROM score_review_records");
+        jdbc.update("DELETE FROM score_correction_records");
+        jdbc.update("DELETE FROM abnormal_score_entries");
+        jdbc.update("DELETE FROM score_attempts");
+        jdbc.update("DELETE FROM activity_projects");
+        jdbc.update("DELETE FROM activity_participants");
+        jdbc.update("DELETE FROM media");
+        jdbc.update("DELETE FROM activity_results");
+        jdbc.update("DELETE FROM activities");
     }
 
     @Test @DisplayName("returns only public execution statuses, excludes CANCELLED")
