@@ -21,15 +21,16 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
 
     private UUID schoolId, studentId, oldAttemptId, appealId;
     private UUID enteredById;
+    private UUID activityId, apId, projectId, ruleVerId, handlerId;
 
     @BeforeEach
     void setUp() {
         schoolId = UUID.randomUUID(); studentId = UUID.randomUUID();
         oldAttemptId = UUID.randomUUID(); appealId = UUID.randomUUID();
         enteredById = UUID.randomUUID();
-        UUID projectId = UUID.randomUUID(); UUID activityId = UUID.randomUUID();
-        UUID apId = UUID.randomUUID(); UUID ruleVerId = UUID.randomUUID();
-        UUID handlerId = UUID.randomUUID();
+        projectId = UUID.randomUUID(); activityId = UUID.randomUUID();
+        apId = UUID.randomUUID(); ruleVerId = UUID.randomUUID();
+        handlerId = UUID.randomUUID();
 
         String uc = "UC-" + UUID.randomUUID().toString().substring(0, 8);
         String ic = "IC-" + UUID.randomUUID().toString().substring(0, 8);
@@ -53,6 +54,21 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
                 oldAttemptId, schoolId, apId, studentId, 1, "INTEGER", 100, true, "APPROVED", enteredById, 1);
         jdbc.update("INSERT INTO score_appeals(id,school_id,score_attempt_id,student_id,appeal_type,appeal_reason,appeal_status,handler_id,version) VALUES (?,?,?,?,?,?,?,?,?)",
                 appealId, schoolId, oldAttemptId, studentId, "SCORE", "wrong score", "PROCESSING", handlerId, 1);
+    }
+
+    @AfterEach
+    void tearDown() {
+        // FK-safe deletion of owned data. This class has no @Transactional,
+        // so JdbcTemplate operations auto-commit immediately.
+        jdbc.update("DELETE FROM appeal_records WHERE appeal_id IN (SELECT id FROM score_appeals WHERE school_id = ?)", schoolId);
+        jdbc.update("DELETE FROM score_appeals WHERE school_id = ?", schoolId);
+        jdbc.update("DELETE FROM score_attempts WHERE school_id = ?", schoolId);
+        jdbc.update("DELETE FROM activity_projects WHERE activity_id = ?", activityId);
+        jdbc.update("DELETE FROM project_rule_versions WHERE id = ?", ruleVerId);
+        jdbc.update("DELETE FROM challenge_projects WHERE id = ?", projectId);
+        jdbc.update("DELETE FROM activities WHERE id = ?", activityId);
+        jdbc.update("DELETE FROM users WHERE id IN (?,?,?)", studentId, enteredById, handlerId);
+        jdbc.update("DELETE FROM schools WHERE id = ?", schoolId);
     }
 
     @Test @DisplayName("full Path A success: appeal resolved, old invalidated, new current effective")
