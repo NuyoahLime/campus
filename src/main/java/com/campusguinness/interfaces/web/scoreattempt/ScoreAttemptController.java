@@ -6,12 +6,14 @@ import com.campusguinness.score.application.service.ScoreAttemptApplicationServi
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/score-attempts")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class ScoreAttemptController {
 
     private final ScoreAttemptApplicationService service;

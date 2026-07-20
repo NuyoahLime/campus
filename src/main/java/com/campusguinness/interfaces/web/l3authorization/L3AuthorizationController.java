@@ -6,6 +6,7 @@ import com.campusguinness.ranking.application.service.L3AuthorizationApplication
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/l3-authorizations")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class L3AuthorizationController {
     private final L3AuthorizationApplicationService service;
     private final CurrentActor currentActor;

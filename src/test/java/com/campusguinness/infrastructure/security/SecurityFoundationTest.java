@@ -69,7 +69,7 @@ class SecurityFoundationTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
-    @Test @WithMockUser
+    @Test @WithMockUser(roles = "SUPER_ADMIN")
     void postWithCsrfReachesController() throws Exception {
         mvc.perform(post("/api/v1/users")
                 .with(csrf())

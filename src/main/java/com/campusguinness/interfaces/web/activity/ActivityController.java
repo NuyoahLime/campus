@@ -9,6 +9,7 @@ import com.campusguinness.interfaces.web.common.PageResponse;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/activities")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class ActivityController {
 
     private final ActivityManagementService service;

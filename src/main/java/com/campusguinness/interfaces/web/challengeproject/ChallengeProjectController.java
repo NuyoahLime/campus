@@ -8,6 +8,7 @@ import com.campusguinness.project.application.service.ChallengeProjectApplicatio
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/challenge-projects")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class ChallengeProjectController {
 
     private final ChallengeProjectApplicationService service;

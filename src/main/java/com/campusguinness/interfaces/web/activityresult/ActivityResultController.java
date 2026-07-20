@@ -4,12 +4,14 @@ import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/activity-results")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class ActivityResultController {
 
     private final ActivityResultApplicationService service;
