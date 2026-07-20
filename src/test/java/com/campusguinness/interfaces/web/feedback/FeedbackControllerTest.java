@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.feedback;
 import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.application.service.FeedbackApplicationService;
 import com.campusguinness.feedback.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,20 +23,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FeedbackControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean FeedbackApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
+    private final UUID actorId = UUID.randomUUID();
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),UUID.randomUUID(),"GENERAL","test content"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test content"))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
     @Test void beginProcessingReturns200() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.beginProcessing(eq(id), any())).thenReturn(new FeedbackResult(id, "PROCESSING"));
         mvc.perform(post("/api/v1/feedbacks/" + id + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
     }
     @Test void resolveReturns200() throws Exception {
@@ -53,9 +58,10 @@ class FeedbackControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CLOSED"));
     }
     @Test void notFoundReturns404() throws Exception {
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.beginProcessing(any(), any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/feedbacks/" + UUID.randomUUID() + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isNotFound());
     }
     @Test void conflictReturns409() throws Exception {
@@ -66,9 +72,10 @@ class FeedbackControllerTest {
     }
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),UUID.randomUUID(),"GENERAL","test"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test"))))
                 .andExpect(jsonPath("$.submitterId").doesNotExist()).andExpect(jsonPath("$.content").doesNotExist());
     }
 }

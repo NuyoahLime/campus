@@ -2,6 +2,7 @@ package com.campusguinness.interfaces.web.scoreappeal;
 
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +16,11 @@ import java.util.UUID;
 public class ScoreAppealController {
 
     private final ScoreAppealApplicationService service;
+    private final CurrentActor currentActor;
 
-    public ScoreAppealController(ScoreAppealApplicationService service) {
+    public ScoreAppealController(ScoreAppealApplicationService service, CurrentActor currentActor) {
         this.service = service;
+        this.currentActor = currentActor;
     }
 
     @PostMapping
@@ -28,8 +31,8 @@ public class ScoreAppealController {
     }
 
     @PostMapping("/{id}/begin-processing")
-    public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id, @Valid @RequestBody BeginProcessingRequest req) {
-        ScoreAppealResult r = service.beginProcessing(id, req.handlerId());
+    public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id) {
+        ScoreAppealResult r = service.beginProcessing(id, currentActor.requireUserId());
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));
     }
 

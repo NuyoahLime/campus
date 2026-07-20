@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.activityapplication;
 import com.campusguinness.activity.application.command.SubmitActivityApplicationCommand;
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.application.service.ActivityApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -16,9 +17,11 @@ import java.util.UUID;
 public class ActivityApplicationController {
 
     private final ActivityApplicationService service;
+    private final CurrentActor currentActor;
 
-    public ActivityApplicationController(ActivityApplicationService service) {
+    public ActivityApplicationController(ActivityApplicationService service, CurrentActor currentActor) {
         this.service = service;
+        this.currentActor = currentActor;
     }
 
     @PostMapping
@@ -31,13 +34,13 @@ public class ActivityApplicationController {
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<ActivityApplicationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveActivityApplicationRequest req) {
-        ActivityApplicationResult r = service.approve(id, req.reviewerId(), req.activityId());
+        ActivityApplicationResult r = service.approve(id, currentActor.requireUserId(), req.activityId());
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 
     @PostMapping("/{id}/reject")
     public ResponseEntity<ActivityApplicationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectActivityApplicationRequest req) {
-        ActivityApplicationResult r = service.reject(id, req.reviewerId(), req.reason());
+        ActivityApplicationResult r = service.reject(id, currentActor.requireUserId(), req.reason());
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 

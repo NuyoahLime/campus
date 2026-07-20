@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-/** TEMPORARY_EXPLICIT_ACTOR_ID */
+/** reviewerId is now sourced from the authenticated SecurityContext via CurrentActor. */
 public record RejectSchoolRegistrationRequest(
-        @NotNull UUID reviewerId,
         @NotBlank String reason) {}

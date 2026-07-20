@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.l3authorization;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.ranking.application.result.L3AuthorizationResult;
 import com.campusguinness.ranking.application.service.L3AuthorizationApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,7 +22,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class L3AuthorizationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean L3AuthorizationApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
+    private final UUID actorId = UUID.randomUUID();
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
@@ -32,9 +35,10 @@ class L3AuthorizationControllerTest {
     }
     @Test void approveReturns200() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.approve(eq(id), any(), any())).thenReturn(new L3AuthorizationResult(id, "APPROVED"));
         mvc.perform(post("/api/v1/l3-authorizations/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest(UUID.randomUUID(), "ok"))))
+                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest("ok"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
     }
     @Test void withdrawReturns200() throws Exception {
@@ -45,9 +49,10 @@ class L3AuthorizationControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
     }
     @Test void notFound() throws Exception {
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.approve(any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/l3-authorizations/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest(UUID.randomUUID(), "ok"))))
+                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest("ok"))))
                 .andExpect(status().isNotFound());
     }
 }

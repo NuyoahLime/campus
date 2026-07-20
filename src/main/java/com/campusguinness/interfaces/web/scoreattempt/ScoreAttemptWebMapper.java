@@ -9,11 +9,11 @@ import java.math.BigDecimal;
 class ScoreAttemptWebMapper {
     private ScoreAttemptWebMapper() {}
 
-    static SubmitScoreCommand toCommand(SubmitScoreRequest req) {
+    static SubmitScoreCommand toCommand(SubmitScoreRequest req, java.util.UUID actorId) {
         ScoreStorageType type = ScoreStorageType.valueOf(req.scoreStorageType());
         ScoreValue value = toScoreValue(type, req);
         return new SubmitScoreCommand(req.schoolId(), req.activityProjectId(), req.studentId(),
-                req.attemptNumber(), type, value, req.scoreBusinessTime(), req.timeSource(), req.enteredBy());
+                req.attemptNumber(), type, value, req.scoreBusinessTime(), req.timeSource(), actorId);
     }
 
     private static ScoreValue toScoreValue(ScoreStorageType type, SubmitScoreRequest req) {

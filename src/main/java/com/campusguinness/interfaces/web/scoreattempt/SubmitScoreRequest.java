@@ -19,5 +19,4 @@ public record SubmitScoreRequest(
         @Positive Long durationMs,
         String grade,
         Instant scoreBusinessTime,
-        String timeSource,
-        @NotNull UUID enteredBy) {}
+        String timeSource) {}

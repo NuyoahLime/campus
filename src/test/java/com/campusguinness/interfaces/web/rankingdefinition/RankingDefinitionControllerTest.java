@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.rankingdefinition;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.application.service.RankingDefinitionApplicationService;
 import com.campusguinness.ranking.internal.domain.RankingLayer;
@@ -23,13 +24,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RankingDefinitionControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean RankingDefinitionApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
+    private final UUID actorId = UUID.randomUUID();
 
     @Test void createReturns201() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.create(any(), anyString(), any(), any(), any())).thenReturn(new RankingDefinitionResult(id, true));
         mvc.perform(post("/api/v1/ranking-definitions").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID(),UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID()))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.enabled").value(true));
     }
     @Test void enableReturns200() throws Exception {

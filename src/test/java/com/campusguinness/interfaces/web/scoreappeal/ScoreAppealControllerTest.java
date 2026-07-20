@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.scoreappeal;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ScoreAppealControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
+    private final UUID actorId = UUID.randomUUID();
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
@@ -34,9 +37,10 @@ class ScoreAppealControllerTest {
     }
     @Test void beginProcessingReturns200() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.beginProcessing(eq(id), any())).thenReturn(new ScoreAppealResult(id, "PROCESSING"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
     }
     @Test void rejectReturns200() throws Exception {
@@ -55,15 +59,17 @@ class ScoreAppealControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
     }
     @Test void notFoundReturns404() throws Exception {
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.beginProcessing(any(), any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/score-appeals/" + UUID.randomUUID() + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isNotFound());
     }
     @Test void stateConflictReturns409() throws Exception {
+        when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.beginProcessing(any(), any())).thenThrow(new InvalidAppealStateTransitionException(AppealStatus.RESOLVED, "begin processing"));
         mvc.perform(post("/api/v1/score-appeals/" + UUID.randomUUID() + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isConflict());
     }
     @Test void responseExcludesInternalFields() throws Exception {

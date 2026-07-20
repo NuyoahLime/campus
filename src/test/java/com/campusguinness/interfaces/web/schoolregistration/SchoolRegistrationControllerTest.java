@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.schoolregistration;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,7 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SchoolRegistrationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean SchoolRegistrationApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
+    private final UUID actorId = UUID.randomUUID();
 
     @Nested class Submit {
         @Test void shouldReturn201() throws Exception {
@@ -37,18 +40,20 @@ class SchoolRegistrationControllerTest {
     @Nested class Approve {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID(), sid = UUID.randomUUID();
+            when(currentActor.requireUserId()).thenReturn(actorId);
             when(service.approve(eq(id), any(), any(), eq(sid))).thenReturn(new SchoolRegistrationResult(id, "t", "APPROVED", sid));
             mvc.perform(post("/api/v1/school-registrations/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest(UUID.randomUUID(), "ok", sid))))
+                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok", sid))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
         }
     }
     @Nested class Reject {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
+            when(currentActor.requireUserId()).thenReturn(actorId);
             when(service.reject(eq(id), any(), any())).thenReturn(new SchoolRegistrationResult(id, "t", "REJECTED", null));
             mvc.perform(post("/api/v1/school-registrations/" + id + "/reject").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new RejectSchoolRegistrationRequest(UUID.randomUUID(), "reason"))))
+                    .content(mapper.writeValueAsString(new RejectSchoolRegistrationRequest("reason"))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
         }
     }
@@ -62,9 +67,10 @@ class SchoolRegistrationControllerTest {
     }
     @Nested class Errors {
         @Test void notFound() throws Exception {
+            when(currentActor.requireUserId()).thenReturn(actorId);
             when(service.approve(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
             mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest(UUID.randomUUID(), "ok", UUID.randomUUID()))))
+                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok", UUID.randomUUID()))))
                     .andExpect(status().isNotFound());
         }
     }

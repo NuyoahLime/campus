@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.activity;
 import com.campusguinness.activity.application.query.ActivityQueryService;
 import com.campusguinness.activity.application.result.ActivityResult;
 import com.campusguinness.activity.application.service.ActivityManagementService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,14 +26,16 @@ class ActivityControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityManagementService service;
     @MockitoBean ActivityQueryService queryService;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Nested class Create {
         @Test void shouldReturn201() throws Exception {
             UUID id = UUID.randomUUID();
+            when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
             when(service.create(any())).thenReturn(new ActivityResult(id, "DRAFT", "NOT_SUBMITTED"));
             mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new CreateActivityRequest(UUID.randomUUID(), UUID.randomUUID(), "t", "d", null, null, null))))
+                    .content(mapper.writeValueAsString(new CreateActivityRequest(UUID.randomUUID(), "t", "d", null, null, null))))
                     .andExpect(status().isCreated()).andExpect(jsonPath("$.executionStatus").value("DRAFT"));
         }
     }

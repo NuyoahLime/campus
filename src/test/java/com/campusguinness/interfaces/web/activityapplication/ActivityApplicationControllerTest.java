@@ -2,6 +2,7 @@ package com.campusguinness.interfaces.web.activityapplication;
 
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.application.service.ActivityApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ActivityApplicationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
+    private final UUID actorId = UUID.randomUUID();
 
     @Nested class Submit {
         @Test void shouldReturn201() throws Exception {
@@ -36,17 +39,19 @@ class ActivityApplicationControllerTest {
     @Nested class Approve {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID(), aid = UUID.randomUUID();
+            when(currentActor.requireUserId()).thenReturn(actorId);
             when(service.approve(any(), any(), any())).thenReturn(new ActivityApplicationResult(id, "APPROVED", aid));
             mvc.perform(post("/api/v1/activity-applications/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(UUID.randomUUID(), aid))))
+                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(aid))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.createdActivityId").value(aid.toString()));
         }
     }
     @Nested class Errors {
         @Test void notFound() throws Exception {
+            when(currentActor.requireUserId()).thenReturn(actorId);
             when(service.approve(any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
             mvc.perform(post("/api/v1/activity-applications/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(UUID.randomUUID(), UUID.randomUUID()))))
+                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(UUID.randomUUID()))))
                     .andExpect(status().isNotFound());
         }
     }

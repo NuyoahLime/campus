@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.l3authorization;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.ranking.application.result.L3AuthorizationResult;
 import com.campusguinness.ranking.application.service.L3AuthorizationApplicationService;
 
@@ -14,7 +15,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/l3-authorizations")
 public class L3AuthorizationController {
     private final L3AuthorizationApplicationService service;
-    public L3AuthorizationController(L3AuthorizationApplicationService s) { this.service = s; }
+    private final CurrentActor currentActor;
+    public L3AuthorizationController(L3AuthorizationApplicationService s, CurrentActor a) { this.service = s; this.currentActor = a; }
 
     @PostMapping
     public ResponseEntity<L3AuthorizationResponse> submit(@Valid @RequestBody CreateL3AuthorizationRequest req) {
@@ -25,7 +27,7 @@ public class L3AuthorizationController {
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<L3AuthorizationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveL3AuthorizationRequest req) {
-        var r = service.approve(id, req.reviewerId(), req.comment());
+        var r = service.approve(id, currentActor.requireUserId(), req.comment());
         return ResponseEntity.ok(new L3AuthorizationResponse(r.id(), r.status()));
     }
 
