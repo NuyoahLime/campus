@@ -5,10 +5,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+
 /**
- * Provides a {@link PasswordEncoder} bean for password hashing and verification.
- * <p>
- * Uses BCrypt with strength 12 (~250ms per hash).
+ * Auth infrastructure configuration: PasswordEncoder and Clock.
  * Separate from {@link SecurityConfig} to keep auth infrastructure decoupled
  * from HTTP security rules.
  */
@@ -18,5 +18,10 @@ public class PasswordEncoderConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
     }
 }

@@ -27,6 +27,14 @@ logging:
   level:
     root: WARN
 
+campus-guinness:
+  security:
+    login-lockout:
+      enabled: true
+      failure-threshold: 3
+      lock-duration: 10m
+      reset-failures-on-success: true
+
 testcontainers:
   ryuk:
     disabled: true
