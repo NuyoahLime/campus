@@ -7,10 +7,13 @@ import com.campusguinness.school.application.service.SchoolRegistrationApplicati
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -19,11 +22,29 @@ public class SchoolRegistrationController {
 
     private final SchoolRegistrationApplicationService service;
     private final CurrentActor currentActor;
+    private final JdbcTemplate jdbc;
 
     public SchoolRegistrationController(SchoolRegistrationApplicationService service,
-                                         CurrentActor currentActor) {
+                                         CurrentActor currentActor, JdbcTemplate jdbc) {
         this.service = service;
         this.currentActor = currentActor;
+        this.jdbc = jdbc;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public List<SchoolRegistrationSummary> listPending() {
+        return jdbc.query(
+                "SELECT id, school_name, school_type, region, registration_status, created_at " +
+                        "FROM school_registrations WHERE registration_status = 'SUBMITTED' " +
+                        "ORDER BY created_at DESC",
+                (rs, rowNum) -> new SchoolRegistrationSummary(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("school_name"),
+                        rs.getString("school_type"),
+                        rs.getString("region"),
+                        rs.getString("registration_status"),
+                        rs.getObject("created_at", Instant.class)));
     }
 
     @PostMapping
