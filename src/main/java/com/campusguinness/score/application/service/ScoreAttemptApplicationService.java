@@ -6,6 +6,7 @@ import com.campusguinness.score.application.result.ScoreAttemptResult;
 import com.campusguinness.score.internal.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -24,5 +25,12 @@ public class ScoreAttemptApplicationService {
         s.submit();
         repository.save(s);
         return new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScoreAttemptResult> findBySchool(UUID schoolId) {
+        return repository.findBySchoolId(schoolId).stream()
+                .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
+                .toList();
     }
 }

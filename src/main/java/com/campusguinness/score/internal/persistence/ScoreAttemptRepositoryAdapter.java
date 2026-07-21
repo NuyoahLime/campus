@@ -5,7 +5,9 @@ import com.campusguinness.score.internal.domain.ScoreAttempt;
 import com.campusguinness.score.internal.domain.ScoreAttemptId;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
@@ -22,5 +24,9 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
     }
     @Override @Transactional(readOnly = true) public Optional<ScoreAttempt> findById(ScoreAttemptId id) {
         return jpaRepository.findById(id.value()).map(ScoreAttemptPersistenceMapper::toDomain);
+    }
+    @Override @Transactional(readOnly = true) public List<ScoreAttempt> findBySchoolId(UUID schoolId) {
+        return jpaRepository.findBySchoolId(schoolId).stream()
+                .map(ScoreAttemptPersistenceMapper::toDomain).toList();
     }
 }

@@ -12,6 +12,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/score-attempts")
@@ -26,6 +28,16 @@ public class ScoreAttemptController {
         this.service = service;
         this.currentActor = currentActor;
         this.membershipResolver = membershipResolver;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER')")
+    public List<ScoreAttemptResult> list(@RequestParam UUID schoolId) {
+        UUID actorId = currentActor.requireUserId();
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireTeacherOrAbove(membershipResolver, actorId, schoolId);
+        }
+        return service.findBySchool(schoolId);
     }
 
     @PostMapping
