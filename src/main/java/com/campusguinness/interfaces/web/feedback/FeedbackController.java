@@ -14,7 +14,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/feedbacks")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class FeedbackController {
 
     private final FeedbackApplicationService service;
@@ -33,18 +32,21 @@ public class FeedbackController {
     }
 
     @PostMapping("/{id}/begin-processing")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<FeedbackResponse> beginProcessing(@PathVariable UUID id) {
         FeedbackResult r = service.beginProcessing(id, currentActor.requireUserId());
         return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/resolve")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<FeedbackResponse> resolve(@PathVariable UUID id, @Valid @RequestBody ResolveFeedbackRequest req) {
         FeedbackResult r = service.resolve(id, req.reply());
         return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/close")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<FeedbackResponse> close(@PathVariable UUID id, @Valid @RequestBody CloseFeedbackRequest req) {
         FeedbackResult r = service.close(id, req.reason());
         return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
