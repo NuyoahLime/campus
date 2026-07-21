@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.media;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.media.application.command.RegisterMediaCommand;
 import com.campusguinness.media.application.result.MediaResult;
 import com.campusguinness.media.application.service.MediaApplicationService;
@@ -14,18 +15,21 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/media")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class MediaController {
 
     private final MediaApplicationService service;
+    private final CurrentActor currentActor;
 
-    public MediaController(MediaApplicationService service) {
+    public MediaController(MediaApplicationService service, CurrentActor currentActor) {
         this.service = service;
+        this.currentActor = currentActor;
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER')")
     public ResponseEntity<MediaResponse> register(@Valid @RequestBody RegisterMediaRequest req) {
-        var cmd = new RegisterMediaCommand(req.schoolId(), req.activityId(), req.uploaderId(),
+        UUID uploaderId = currentActor.requireUserId();
+        var cmd = new RegisterMediaCommand(req.schoolId(), req.activityId(), uploaderId,
                 req.fileKey(), req.fileName(), req.fileType(), req.fileFormat(),
                 req.fileSizeBytes(), req.checksum(), req.description());
         MediaResult r = service.register(cmd);
@@ -34,12 +38,14 @@ public class MediaController {
     }
 
     @PostMapping("/{id}/internal-review")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public ResponseEntity<MediaResponse> submitForInternalReview(@PathVariable UUID id) {
         MediaResult r = service.submitForInternalReview(id);
         return ResponseEntity.ok(new MediaResponse(r.id(), r.internalStatus(), r.publicStatus(), null));
     }
 
     @PostMapping("/{id}/internal-approve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public ResponseEntity<MediaResponse> approveInternal(@PathVariable UUID id) {
         MediaResult r = service.approveInternal(id);
         return ResponseEntity.ok(new MediaResponse(r.id(), r.internalStatus(), r.publicStatus(), null));
