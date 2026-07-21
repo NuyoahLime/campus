@@ -19,4 +19,13 @@ public interface CurrentActor {
      * @throws IllegalStateException if the principal is of an unexpected type
      */
     UUID requireUserId();
+
+    /**
+     * Whether the current actor holds the SUPER_ADMIN platform role.
+     * Defaults to {@code false}; infrastructure implementations override
+     * by checking the SecurityContext authorities.
+     */
+    default boolean isSuperAdmin() {
+        return false;
+    }
 }

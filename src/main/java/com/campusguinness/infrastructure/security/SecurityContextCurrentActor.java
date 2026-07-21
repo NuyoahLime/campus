@@ -32,4 +32,15 @@ public class SecurityContextCurrentActor implements CurrentActor {
 
         return userDetails.getUserId();
     }
+
+    @Override
+    public boolean isSuperAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()
+                && auth.getPrincipal() instanceof CampusGuinnessUserDetails userDetails) {
+            return userDetails.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        }
+        return false;
+    }
 }
