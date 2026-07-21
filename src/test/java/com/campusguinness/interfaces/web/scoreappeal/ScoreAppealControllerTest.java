@@ -63,6 +63,12 @@ class ScoreAppealControllerTest {
         mvc.perform(post("/api/v1/score-appeals/" + id + "/withdraw"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
     }
+    @Test void withdrawDeniedReturns403() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.withdraw(id)).thenThrow(new org.springframework.security.access.AccessDeniedException("not owner"));
+        mvc.perform(post("/api/v1/score-appeals/" + id + "/withdraw"))
+                .andExpect(status().isForbidden());
+    }
     @Test void notFoundReturns404() throws Exception {
         when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.beginProcessing(any(), any())).thenThrow(new IllegalArgumentException("not found"));

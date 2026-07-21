@@ -48,6 +48,7 @@ public class ScoreAppealController {
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public ResponseEntity<ScoreAppealResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectScoreAppealRequest req) {
         ScoreAppealResult r = service.reject(id, req.resolution());
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));

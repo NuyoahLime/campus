@@ -4,8 +4,11 @@ import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.infrastructure.security.AuthorizationPolicy;
+import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
@@ -15,7 +18,17 @@ import java.util.UUID;
 public class ScoreAppealApplicationService {
     private final ScoreAppealRepository repo;
     private final JdbcTemplate jdbc;
-    public ScoreAppealApplicationService(ScoreAppealRepository r, JdbcTemplate j) { this.repo = r; this.jdbc = j; }
+    private final CurrentActor currentActor;
+    private final SchoolMembershipResolver membershipResolver;
+
+    public ScoreAppealApplicationService(ScoreAppealRepository r, JdbcTemplate j,
+                                          CurrentActor currentActor,
+                                          SchoolMembershipResolver membershipResolver) {
+        this.repo = r;
+        this.jdbc = j;
+        this.currentActor = currentActor;
+        this.membershipResolver = membershipResolver;
+    }
 
     /** Submits an appeal after verifying the actor owns the score attempt. */
     public ScoreAppealResult submitAuthorized(UUID actorId, UUID schoolId, UUID scoreAttemptId,
@@ -40,10 +53,49 @@ public class ScoreAppealApplicationService {
         }
         return rows.getFirst();
     }
-    public ScoreAppealResult beginProcessing(UUID id, UUID handlerId) { var a=find(id); a.beginProcessing(handlerId); repo.save(a); return result(a); }
-    public ScoreAppealResult reject(UUID id, String resolution) { var a=find(id); a.reject(resolution); repo.save(a); return result(a); }
-    public ScoreAppealResult withdraw(UUID id) { var a=find(id); a.withdraw(); repo.save(a); return result(a); }
-    public ScoreAppealResult resolve(UUID id, String resolution) { var a=find(id); a.resolve(resolution); repo.save(a); return result(a); }
-    private ScoreAppeal find(UUID id) { return repo.findById(new ScoreAppealId(id)).orElseThrow(()->new IllegalArgumentException("ScoreAppeal not found: "+id)); }
-    private ScoreAppealResult result(ScoreAppeal a) { return new ScoreAppealResult(a.id().value(), a.status().name()); }
+
+    public ScoreAppealResult beginProcessing(UUID id, UUID handlerId) {
+        var a = find(id);
+        a.beginProcessing(handlerId);
+        repo.save(a);
+        return result(a);
+    }
+
+    public ScoreAppealResult reject(UUID id, String resolution) {
+        var a = find(id);
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), a.schoolId());
+        }
+        a.reject(resolution);
+        repo.save(a);
+        return result(a);
+    }
+
+    public ScoreAppealResult withdraw(UUID id) {
+        var a = find(id);
+        UUID actorId = currentActor.requireUserId();
+        if (!a.studentId().equals(actorId)) {
+            throw new AccessDeniedException(
+                    "Actor " + actorId + " cannot withdraw appeal owned by student " + a.studentId());
+        }
+        a.withdraw();
+        repo.save(a);
+        return result(a);
+    }
+
+    public ScoreAppealResult resolve(UUID id, String resolution) {
+        var a = find(id);
+        a.resolve(resolution);
+        repo.save(a);
+        return result(a);
+    }
+
+    private ScoreAppeal find(UUID id) {
+        return repo.findById(new ScoreAppealId(id))
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found: " + id));
+    }
+
+    private ScoreAppealResult result(ScoreAppeal a) {
+        return new ScoreAppealResult(a.id().value(), a.status().name());
+    }
 }
