@@ -5,13 +5,14 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
  * Atomic JDBC operations for account lockout state.
- * Uses parameterized SQL — never trusts client-provided userId for auth updates.
+ * Uses Timestamp for JDBC compatibility — PostgreSQL timestamptz via NamedParameterJdbcTemplate.
  */
 @Component
 @Transactional
@@ -25,26 +26,16 @@ public class AuthStateRepository {
         this.clock = clock;
     }
 
-    /**
-     * Auto-unlock if locked_until has expired. Called before password check.
-     * @return true if an unlock was performed
-     */
     public boolean unlockIfExpired(String normalizedUsername) {
         int updated = jdbc.update(
                 "UPDATE users SET account_status = 'NORMAL', login_failures = 0, locked_until = NULL, version = version + 1 " +
                         "WHERE username = :uname AND account_status = 'LOCKED' AND locked_until IS NOT NULL AND locked_until <= :now",
                 new MapSqlParameterSource()
                         .addValue("uname", normalizedUsername)
-                        .addValue("now", Instant.now(clock)));
+                        .addValue("now", Timestamp.from(Instant.now(clock))));
         return updated > 0;
     }
 
-    /**
-     * Atomically increment failure count AND lock if threshold reached — single UPDATE.
-     * Uses PostgreSQL CASE to avoid a two-step gap where failures>=threshold but status=NORMAL.
-     * Unknown usernames and already-locked accounts return 0 updated rows (not an error).
-     * Locked accounts are NOT incremented and their locked_until is NOT extended.
-     */
     public int incrementAndLockIfNeeded(String normalizedUsername, int threshold, Instant lockExpiry) {
         return jdbc.update(
                 "UPDATE users SET " +
@@ -56,10 +47,9 @@ public class AuthStateRepository {
                 new MapSqlParameterSource()
                         .addValue("uname", normalizedUsername)
                         .addValue("threshold", threshold)
-                        .addValue("expiry", lockExpiry));
+                        .addValue("expiry", Timestamp.from(lockExpiry)));
     }
 
-    /** Reset failures on successful login. */
     public int resetFailures(UUID userId) {
         return jdbc.update(
                 "UPDATE users SET login_failures = 0, locked_until = NULL, version = version + 1 " +

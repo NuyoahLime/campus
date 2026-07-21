@@ -36,9 +36,9 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req,
                                    HttpServletRequest request, HttpServletResponse response) {
-        loginSecurity.beforeAuthentication(req.username());
-
         try {
+            loginSecurity.beforeAuthentication(req.username());
+
             var token = UsernamePasswordAuthenticationToken.unauthenticated(req.username(), req.password());
             Authentication auth = authManager.authenticate(token);
 
@@ -61,6 +61,11 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiErrorResponse.of("AUTHENTICATION_FAILED",
                             "The username or password is invalid.", request.getRequestURI()));
+        } catch (Exception e) {
+            log.error("Unexpected error during login", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiErrorResponse.of("INTERNAL_ERROR",
+                            "An unexpected error occurred", request.getRequestURI()));
         }
     }
 
