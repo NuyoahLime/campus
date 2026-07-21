@@ -5,7 +5,6 @@ import com.campusguinness.appeal.application.service.ScoreAppealApplicationServi
 import com.campusguinness.appeal.application.service.ScoreAppealCorrectionService;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.infrastructure.security.CurrentActor;
-import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.score.internal.domain.ScoreValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
@@ -30,7 +29,6 @@ class ScoreAppealControllerTest {
     @MockitoBean ScoreAppealApplicationService service;
     @MockitoBean ScoreAppealCorrectionService correctionService;
     @MockitoBean CurrentActor currentActor;
-    @MockitoBean SchoolMembershipResolver membershipResolver;
     @Autowired ObjectMapper mapper;
     private final UUID actorId = UUID.randomUUID();
 
@@ -99,8 +97,6 @@ class ScoreAppealControllerTest {
 
     @Test void listPendingReturns200() throws Exception {
         UUID schoolId = UUID.randomUUID();
-        when(currentActor.requireUserId()).thenReturn(actorId);
-        when(currentActor.isSuperAdmin()).thenReturn(true);
         when(service.findPendingBySchool(schoolId)).thenReturn(java.util.List.of());
         mvc.perform(get("/api/v1/score-appeals").param("schoolId", schoolId.toString()))
                 .andExpect(status().isOk());

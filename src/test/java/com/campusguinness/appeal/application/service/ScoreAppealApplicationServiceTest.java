@@ -142,6 +142,49 @@ class ScoreAppealApplicationServiceTest {
     }
 
     @Nested
+    class FindPendingBySchool {
+        @Test
+        void shouldReturnPendingWhenSchoolAdmin() {
+            when(membershipResolver.isSchoolAdmin(actorId, schoolId)).thenReturn(true);
+            when(repo.findBySchoolIdAndStatusIn(eq(schoolId), anyList()))
+                    .thenReturn(java.util.List.of());
+            assertThat(svc.findPendingBySchool(schoolId)).isEmpty();
+            verify(repo).findBySchoolIdAndStatusIn(eq(schoolId), anyList());
+        }
+
+        @Test
+        void shouldReturnPendingWhenSuperAdmin() {
+            when(currentActor.isSuperAdmin()).thenReturn(true);
+            when(repo.findBySchoolIdAndStatusIn(eq(schoolId), anyList()))
+                    .thenReturn(java.util.List.of());
+            assertThat(svc.findPendingBySchool(schoolId)).isEmpty();
+            verify(membershipResolver, never()).isSchoolAdmin(any(), any());
+        }
+
+        @Test
+        void shouldDenyWhenNotSchoolAdmin() {
+            when(membershipResolver.isSchoolAdmin(actorId, schoolId)).thenReturn(false);
+            assertThatThrownBy(() -> svc.findPendingBySchool(schoolId))
+                    .isInstanceOf(AccessDeniedException.class);
+            verify(repo, never()).findBySchoolIdAndStatusIn(any(), anyList());
+        }
+
+        @Test
+        void shouldReturnAppealsWithCorrectStatus() {
+            when(currentActor.isSuperAdmin()).thenReturn(true);
+            var submitted = appeal(schoolId, studentId);
+            var processing = appeal(schoolId, studentId);
+            processing.beginProcessing(actorId);
+            when(repo.findBySchoolIdAndStatusIn(eq(schoolId), anyList()))
+                    .thenReturn(java.util.List.of(submitted, processing));
+            var results = svc.findPendingBySchool(schoolId);
+            assertThat(results).hasSize(2);
+            assertThat(results).extracting(r -> r.status())
+                    .containsExactlyInAnyOrder("SUBMITTED", "PROCESSING");
+        }
+    }
+
+    @Nested
     class Resolve {
         @Test void success() { var a=appeal(schoolId, studentId); a.beginProcessing(UUID.randomUUID()); a.acceptPendingCorrection(); a.beginScoreCorrecting(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.resolve(a.id().value(),"done").status()).isEqualTo("RESOLVED"); verify(repo).save(any()); }
         @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.resolve(UUID.randomUUID(),"done")).isInstanceOf(IllegalArgumentException.class); verify(repo,never()).save(any()); }

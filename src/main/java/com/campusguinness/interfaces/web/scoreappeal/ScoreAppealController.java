@@ -3,9 +3,7 @@ package com.campusguinness.interfaces.web.scoreappeal;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
 import com.campusguinness.appeal.application.service.ScoreAppealCorrectionService;
-import com.campusguinness.infrastructure.security.AuthorizationPolicy;
 import com.campusguinness.infrastructure.security.CurrentActor;
-import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.score.internal.domain.ScoreStorageType;
 import com.campusguinness.score.internal.domain.ScoreValue;
 
@@ -26,25 +24,18 @@ public class ScoreAppealController {
     private final ScoreAppealApplicationService service;
     private final ScoreAppealCorrectionService correctionService;
     private final CurrentActor currentActor;
-    private final SchoolMembershipResolver membershipResolver;
 
     public ScoreAppealController(ScoreAppealApplicationService service,
                                   ScoreAppealCorrectionService correctionService,
-                                  CurrentActor currentActor,
-                                  SchoolMembershipResolver membershipResolver) {
+                                  CurrentActor currentActor) {
         this.service = service;
         this.correctionService = correctionService;
         this.currentActor = currentActor;
-        this.membershipResolver = membershipResolver;
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public List<ScoreAppealResult> listPending(@RequestParam UUID schoolId) {
-        UUID actorId = currentActor.requireUserId();
-        if (!currentActor.isSuperAdmin()) {
-            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, actorId, schoolId);
-        }
         return service.findPendingBySchool(schoolId);
     }
 

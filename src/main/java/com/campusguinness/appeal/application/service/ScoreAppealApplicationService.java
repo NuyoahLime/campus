@@ -98,6 +98,9 @@ public class ScoreAppealApplicationService {
 
     @Transactional(readOnly = true)
     public List<ScoreAppealResult> findPendingBySchool(UUID schoolId) {
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), schoolId);
+        }
         return repo.findBySchoolIdAndStatusIn(schoolId,
                         List.of(AppealStatus.SUBMITTED, AppealStatus.PROCESSING)).stream()
                 .map(a -> new ScoreAppealResult(a.id().value(), a.status().name()))
