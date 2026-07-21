@@ -1,6 +1,7 @@
 package com.campusguinness.interfaces.web.scoreattempt;
 
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.score.application.result.ScoreAttemptResult;
 import com.campusguinness.score.application.service.ScoreAttemptApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,12 +25,14 @@ class ScoreAttemptControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAttemptApplicationService service;
     @MockitoBean CurrentActor currentActor;
+    @MockitoBean SchoolMembershipResolver membershipResolver;
     @Autowired ObjectMapper mapper;
     private final UUID actorId = UUID.randomUUID();
 
     @Test void submitIntegerScoreReturns201() throws Exception {
         UUID id = UUID.randomUUID();
         when(currentActor.requireUserId()).thenReturn(actorId);
+        when(membershipResolver.isTeacherOrAbove(any(), any())).thenReturn(true);
         when(service.submit(any())).thenReturn(new ScoreAttemptResult(id, "PENDING_REVIEW", "INTEGER"));
         mvc.perform(post("/api/v1/score-attempts").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new SubmitScoreRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),1,"INTEGER",100L,null,null,null,null,"teacher"))))
@@ -38,6 +41,7 @@ class ScoreAttemptControllerTest {
     @Test void submitDecimalScoreReturns201() throws Exception {
         UUID id = UUID.randomUUID();
         when(currentActor.requireUserId()).thenReturn(actorId);
+        when(membershipResolver.isTeacherOrAbove(any(), any())).thenReturn(true);
         when(service.submit(any())).thenReturn(new ScoreAttemptResult(id, "PENDING_REVIEW", "DECIMAL"));
         mvc.perform(post("/api/v1/score-attempts").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new SubmitScoreRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),1,"DECIMAL",null,new java.math.BigDecimal("98.76"),null,null,null,"teacher"))))
@@ -46,6 +50,7 @@ class ScoreAttemptControllerTest {
     @Test void submitDurationScoreReturns201() throws Exception {
         UUID id = UUID.randomUUID();
         when(currentActor.requireUserId()).thenReturn(actorId);
+        when(membershipResolver.isTeacherOrAbove(any(), any())).thenReturn(true);
         when(service.submit(any())).thenReturn(new ScoreAttemptResult(id, "PENDING_REVIEW", "DURATION"));
         mvc.perform(post("/api/v1/score-attempts").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new SubmitScoreRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),1,"DURATION",null,null,12500L,null,null,"teacher"))))
@@ -54,6 +59,7 @@ class ScoreAttemptControllerTest {
     @Test void submitGradeScoreReturns201() throws Exception {
         UUID id = UUID.randomUUID();
         when(currentActor.requireUserId()).thenReturn(actorId);
+        when(membershipResolver.isTeacherOrAbove(any(), any())).thenReturn(true);
         when(service.submit(any())).thenReturn(new ScoreAttemptResult(id, "PENDING_REVIEW", "GRADE"));
         mvc.perform(post("/api/v1/score-attempts").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new SubmitScoreRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),1,"GRADE",null,null,null,"优秀",null,"teacher"))))
