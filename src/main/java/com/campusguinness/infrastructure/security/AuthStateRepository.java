@@ -40,28 +40,19 @@ public class AuthStateRepository {
     }
 
     /**
-     * Atomically increment failure count. Reaches threshold → locks account.
-     * Unknown usernames return 0 updated rows (not an error).
+     * Atomically increment failure count AND lock if threshold reached — single UPDATE.
+     * Uses PostgreSQL CASE to avoid a two-step gap where failures>=threshold but status=NORMAL.
+     * Unknown usernames and already-locked accounts return 0 updated rows (not an error).
+     * Locked accounts are NOT incremented and their locked_until is NOT extended.
      */
-    public int incrementFailures(String normalizedUsername, int threshold, Instant lockExpiry) {
+    public int incrementAndLockIfNeeded(String normalizedUsername, int threshold, Instant lockExpiry) {
         return jdbc.update(
-                "UPDATE users SET login_failures = login_failures + 1, version = version + 1 " +
+                "UPDATE users SET " +
+                        "login_failures = login_failures + 1, " +
+                        "account_status = CASE WHEN login_failures + 1 >= :threshold THEN 'LOCKED' ELSE account_status END, " +
+                        "locked_until = CASE WHEN login_failures + 1 >= :threshold THEN :expiry ELSE locked_until END, " +
+                        "version = version + 1 " +
                         "WHERE username = :uname AND account_status = 'NORMAL' AND login_failures < :threshold",
-                new MapSqlParameterSource()
-                        .addValue("uname", normalizedUsername)
-                        .addValue("threshold", threshold));
-
-        // If the above updated 0 rows, the user either doesn't exist, is already locked,
-        // or has already reached threshold. Check if we need to lock.
-    }
-
-    /**
-     * Lock the account if failures have reached threshold. Idempotent.
-     */
-    public int lockIfThresholdReached(String normalizedUsername, int threshold, Instant lockExpiry) {
-        return jdbc.update(
-                "UPDATE users SET account_status = 'LOCKED', locked_until = :expiry, version = version + 1 " +
-                        "WHERE username = :uname AND account_status = 'NORMAL' AND login_failures >= :threshold",
                 new MapSqlParameterSource()
                         .addValue("uname", normalizedUsername)
                         .addValue("threshold", threshold)

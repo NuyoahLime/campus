@@ -40,17 +40,16 @@ public class LoginSecurityApplicationService {
         repo.unlockIfExpired(name);
     }
 
-    /** Called on BadCredentialsException. Increments failure count and may lock. */
+    /** Called on BadCredentialsException. Atomically increments and locks if threshold reached. */
     public void recordBadCredentials(String rawLoginName) {
         if (!props.enabled()) return;
         String name = normalizer.normalize(rawLoginName);
         if (name.isEmpty()) return;
 
         Instant lockExpiry = Instant.now(clock).plus(props.lockDuration());
-        repo.incrementFailures(name, props.failureThreshold(), lockExpiry);
-        int locked = repo.lockIfThresholdReached(name, props.failureThreshold(), lockExpiry);
-        if (locked > 0) {
-            log.warn("Account locked: username={}, until={}", name, lockExpiry);
+        int updated = repo.incrementAndLockIfNeeded(name, props.failureThreshold(), lockExpiry);
+        if (updated > 0) {
+            log.debug("Bad credentials recorded for: {}", name);
         }
     }
 

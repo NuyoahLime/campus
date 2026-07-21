@@ -22,13 +22,15 @@ import static org.mockito.Mockito.when;
 class CampusGuinnessUserDetailsServiceTest {
 
     @Mock AuthenticationAccountQuery accountQuery;
+    @Mock LoginIdentifierNormalizer normalizer;
     CampusGuinnessUserDetailsService service;
 
     private static final UUID USER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new CampusGuinnessUserDetailsService(accountQuery);
+        when(normalizer.normalize(anyString())).thenAnswer(inv -> ((String) inv.getArgument(0)).trim());
+        service = new CampusGuinnessUserDetailsService(accountQuery, normalizer);
     }
 
     private AuthenticationAccount account(String status, String platformRole) {

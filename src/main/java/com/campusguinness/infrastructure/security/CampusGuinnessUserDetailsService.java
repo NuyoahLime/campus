@@ -31,14 +31,17 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
     private static final Set<String> KNOWN_PLATFORM_ROLES = Set.of("SUPER_ADMIN");
 
     private final AuthenticationAccountQuery accountQuery;
+    private final LoginIdentifierNormalizer normalizer;
 
-    public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery) {
+    public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery,
+                                             LoginIdentifierNormalizer normalizer) {
         this.accountQuery = accountQuery;
+        this.normalizer = normalizer;
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        String normalized = normalizeLoginName(username);
+        String normalized = normalizer.normalize(username);
 
         AuthenticationAccount account = accountQuery.findByLoginName(normalized)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
@@ -52,13 +55,6 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
                 account.accountStatus(),
                 authorities
         );
-    }
-
-    /**
-     * Normalize login name: trim whitespace. Future: lowercase if case-insensitive.
-     */
-    private String normalizeLoginName(String raw) {
-        return raw != null ? raw.trim() : "";
     }
 
     /**
