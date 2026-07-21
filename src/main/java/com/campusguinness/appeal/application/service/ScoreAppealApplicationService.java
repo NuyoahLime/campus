@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -93,6 +94,14 @@ public class ScoreAppealApplicationService {
     private ScoreAppeal find(UUID id) {
         return repo.findById(new ScoreAppealId(id))
                 .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScoreAppealResult> findPendingBySchool(UUID schoolId) {
+        return repo.findBySchoolIdAndStatusIn(schoolId,
+                        List.of(AppealStatus.SUBMITTED, AppealStatus.PROCESSING)).stream()
+                .map(a -> new ScoreAppealResult(a.id().value(), a.status().name()))
+                .toList();
     }
 
     private ScoreAppealResult result(ScoreAppeal a) {
