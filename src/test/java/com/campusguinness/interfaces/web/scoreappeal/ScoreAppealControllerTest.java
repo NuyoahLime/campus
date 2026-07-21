@@ -2,8 +2,10 @@ package com.campusguinness.interfaces.web.scoreappeal;
 
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
+import com.campusguinness.appeal.application.service.ScoreAppealCorrectionService;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.score.internal.domain.ScoreValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -24,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ScoreAppealControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService service;
+    @MockitoBean ScoreAppealCorrectionService correctionService;
     @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
     private final UUID actorId = UUID.randomUUID();
@@ -74,6 +77,17 @@ class ScoreAppealControllerTest {
                 .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isConflict());
     }
+    @Test void correctAndResolveReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
+        doNothing().when(correctionService).correctAndResolve(any(), any(), anyString(), any());
+        mvc.perform(post("/api/v1/score-appeals/" + id + "/correct-and-resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"scoreStorageType\":\"INTEGER\",\"integerValue\":95,\"resolution\":\"corrected\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
         when(service.submit(any(), any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
