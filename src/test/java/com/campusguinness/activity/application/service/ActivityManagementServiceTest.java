@@ -1,8 +1,10 @@
 package com.campusguinness.activity.application.service;
 
 import com.campusguinness.activity.application.command.CreateActivityCommand;
+import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.internal.domain.*;
+import com.campusguinness.project.application.port.ChallengeProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,8 +21,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ActivityManagementServiceTest {
     @Mock ActivityRepository repo;
+    @Mock ActivityProjectPort projectPort;
+    @Mock ChallengeProjectRepository projectRepo;
     ActivityManagementService svc;
-    @BeforeEach void setUp() { svc = new ActivityManagementService(repo); }
+    @BeforeEach void setUp() { svc = new ActivityManagementService(repo, projectPort, projectRepo); }
 
     @Nested class Create {
         @Test void shouldCreate() {
