@@ -100,6 +100,15 @@ public class ScoreAppealApplicationService {
     }
 
     @Transactional(readOnly = true)
+    public ScoreAppeal findDetailById(UUID id) {
+        var a = find(id);
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), a.schoolId());
+        }
+        return a;
+    }
+
+    @Transactional(readOnly = true)
     public List<ScoreAppealResult> findPendingBySchool(UUID schoolId) {
         if (!currentActor.isSuperAdmin()) {
             AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), schoolId);

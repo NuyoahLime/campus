@@ -39,6 +39,15 @@ public class ScoreAppealController {
         return service.findPendingBySchool(schoolId);
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<ScoreAppealDetailResponse> getDetail(@PathVariable UUID id) {
+        var a = service.findDetailById(id);
+        return ResponseEntity.ok(new ScoreAppealDetailResponse(
+                a.id().value(), a.schoolId(), a.studentId(),
+                a.appealType(), a.appealReason(), a.status().name(), a.handlerId()));
+    }
+
     @PostMapping
     public ResponseEntity<ScoreAppealResponse> submit(@Valid @RequestBody SubmitScoreAppealRequest req) {
         ScoreAppealResult r = service.submitAuthorized(currentActor.requireUserId(),

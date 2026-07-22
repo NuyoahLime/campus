@@ -95,6 +95,18 @@ class ScoreAppealControllerTest {
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
     }
 
+    @Test void getDetailReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        var a = ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(id))
+                .schoolId(UUID.randomUUID()).scoreAttemptId(UUID.randomUUID())
+                .studentId(UUID.randomUUID()).appealType("SCORE").appealReason("r"));
+        when(service.findDetailById(id)).thenReturn(a);
+        mvc.perform(get("/api/v1/score-appeals/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"));
+    }
+
     @Test void listPendingReturns200() throws Exception {
         UUID schoolId = UUID.randomUUID();
         when(service.findPendingBySchool(schoolId)).thenReturn(java.util.List.of());

@@ -144,6 +144,32 @@ class ScoreAppealApplicationServiceTest {
     }
 
     @Nested
+    class FindDetailById {
+        @Test void success() {
+            var a=appeal(schoolId, studentId); a.beginProcessing(actorId);
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(membershipResolver.isSchoolAdmin(actorId, schoolId)).thenReturn(true);
+            var r = svc.findDetailById(a.id().value());
+            assertThat(r.status()).isEqualTo(AppealStatus.PROCESSING);
+            assertThat(r.schoolId()).isEqualTo(schoolId);
+        }
+        @Test void successSuperAdmin() {
+            var a=appeal(schoolId, studentId);
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(currentActor.isSuperAdmin()).thenReturn(true);
+            assertThat(svc.findDetailById(a.id().value()).schoolId()).isEqualTo(schoolId);
+            verify(membershipResolver, never()).isSchoolAdmin(any(), any());
+        }
+        @Test void denyCrossSchool() {
+            UUID otherSid=UUID.randomUUID(); var a=appeal(otherSid, studentId);
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(membershipResolver.isSchoolAdmin(actorId, otherSid)).thenReturn(false);
+            assertThatThrownBy(()->svc.findDetailById(a.id().value()))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+    }
+
+    @Nested
     class FindPendingBySchool {
         @Test
         void shouldReturnPendingWhenSchoolAdmin() {
