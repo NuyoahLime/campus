@@ -152,28 +152,4 @@ public class RankingPublicationService {
     }
 
     // ── Fix current query to exclude withdrawn ──
-
-    public Optional<PublicationResult> getCurrent(UUID activityProjectId) {
-        var rows = jdbc.queryForList(
-                "SELECT id, version_number, comparison_direction, ranked_student_count " +
-                "FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
-                "AND withdrawn_at IS NULL ORDER BY version_number DESC LIMIT 1", activityProjectId);
-        if (rows.isEmpty()) return Optional.empty();
-
-        var row = rows.getFirst();
-        UUID versionId = (UUID) row.get("id");
-
-        var entryRows = jdbc.queryForList(
-                "SELECT rank, student_id, score_value FROM ranking_entries WHERE version_id = ? ORDER BY rank, student_id",
-                versionId);
-
-        List<RankingCalculator.RankingEntry> entries = entryRows.stream()
-                .map(r -> new RankingCalculator.RankingEntry(
-                        (int) r.get("rank"), (UUID) r.get("student_id"), null, (String) r.get("score_value")))
-                .toList();
-
-        return Optional.of(new PublicationResult(versionId, activityProjectId,
-                (int) row.get("version_number"), (String) row.get("comparison_direction"),
-                (int) row.get("ranked_student_count"), entries));
-    }
 }
