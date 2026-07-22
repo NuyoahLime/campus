@@ -6,6 +6,7 @@ import com.campusguinness.media.application.result.MediaResult;
 import com.campusguinness.media.internal.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -32,6 +33,29 @@ public class MediaApplicationService {
     public MediaResult approveInternal(UUID id) {
         var m = find(id); m.approveInternal(); repository.save(m);
         return new MediaResult(id, m.internalStatus().name(), m.publicStatus().name());
+    }
+
+    public MediaResult makePublic(UUID id) {
+        var m = find(id);
+        m.platformApprove();
+        m.makePublic();
+        repository.save(m);
+        return new MediaResult(id, m.internalStatus().name(), m.publicStatus().name());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MediaResult> listPublicByActivity(UUID activityId) {
+        return repository.findByActivityId(activityId).stream()
+                .filter(m -> m.publicStatus() == MediaPublicStatus.PUBLIC)
+                .map(m -> new MediaResult(m.id().value(), m.internalStatus().name(), m.publicStatus().name()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MediaResult> listBySchool(UUID schoolId) {
+        return repository.findBySchoolId(schoolId).stream()
+                .map(m -> new MediaResult(m.id().value(), m.internalStatus().name(), m.publicStatus().name()))
+                .toList();
     }
 
     private Media find(UUID id) {
