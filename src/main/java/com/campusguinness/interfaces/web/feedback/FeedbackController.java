@@ -31,6 +31,17 @@ public class FeedbackController {
         return service.listBySchool(schoolId);
     }
 
+    @GetMapping("/mine")
+    public List<FeedbackResult> listMine() {
+        return service.listMine(currentActor.requireUserId());
+    }
+
+    @GetMapping("/mine/{id}")
+    public ResponseEntity<FeedbackResponse> getMine(@PathVariable UUID id) {
+        FeedbackResult r = service.getMine(id, currentActor.requireUserId());
+        return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
+    }
+
     @PostMapping
     public ResponseEntity<FeedbackResponse> submit(@Valid @RequestBody SubmitFeedbackRequest req) {
         FeedbackResult r = service.submit(req.schoolId(), currentActor.requireUserId(), req.feedbackType(), req.content());

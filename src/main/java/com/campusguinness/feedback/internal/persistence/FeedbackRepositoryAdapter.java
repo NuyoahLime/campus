@@ -21,4 +21,12 @@ class FeedbackRepositoryAdapter implements FeedbackRepository {
     public List<Feedback> findBySchoolId(UUID schoolId) {
         return jpa.findBySchoolId(schoolId).stream().map(FeedbackPersistenceMapper::toDomain).toList();
     }
+    @Override @Transactional(readOnly = true)
+    public List<Feedback> findBySubmitterId(UUID submitterId) {
+        return jpa.findBySubmitterId(submitterId).stream().map(FeedbackPersistenceMapper::toDomain).toList();
+    }
+    @Override @Transactional(readOnly = true)
+    public Optional<Feedback> findByIdAndSubmitterId(UUID id, UUID submitterId) {
+        return jpa.findByIdAndSubmitterId(id, submitterId).map(FeedbackPersistenceMapper::toDomain);
+    }
 }
