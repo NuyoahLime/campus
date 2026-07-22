@@ -1,6 +1,9 @@
 package com.campusguinness.ranking.application.service;
 
 import com.campusguinness.activity.application.port.ActivityProjectPort;
+import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.internal.domain.ActivityId;
+import com.campusguinness.activity.internal.domain.ExecutionStatus;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 import com.campusguinness.project.internal.domain.ComparisonDirection;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,13 +18,16 @@ import java.util.*;
 public class RankingPublicationService {
     private final ActivityProjectPort projectPort;
     private final ScoreAttemptRepository scoreAttemptRepo;
+    private final ActivityRepository activityRepository;
     private final JdbcTemplate jdbc;
 
     public RankingPublicationService(ActivityProjectPort projectPort,
                                       ScoreAttemptRepository scoreAttemptRepo,
+                                      ActivityRepository activityRepository,
                                       JdbcTemplate jdbc) {
         this.projectPort = projectPort;
         this.scoreAttemptRepo = scoreAttemptRepo;
+        this.activityRepository = activityRepository;
         this.jdbc = jdbc;
     }
 
@@ -30,8 +36,16 @@ public class RankingPublicationService {
                                      List<RankingCalculator.RankingEntry> entries) {}
 
     public PublicationResult publish(UUID activityProjectId, UUID publishedBy) {
-        projectPort.findById(activityProjectId)
+        var ap = projectPort.findById(activityProjectId)
                 .orElseThrow(() -> new IllegalArgumentException("ActivityProject not found: " + activityProjectId));
+
+        var activity = activityRepository.findById(new ActivityId(ap.activityId()))
+                .orElseThrow(() -> new IllegalArgumentException("Activity not found"));
+
+        var status = activity.executionStatus();
+        if (status != ExecutionStatus.ENDED) {
+            throw new IllegalStateException("Ranking publication not allowed when activity is " + status);
+        }
 
         var approved = scoreAttemptRepo.findApprovedByActivityProjectId(activityProjectId);
         if (approved.isEmpty()) {
@@ -45,14 +59,12 @@ public class RankingPublicationService {
         int vn = nextVersionNumber(activityProjectId);
         Instant now = Instant.now();
 
-        // Create ranking version
         jdbc.update("INSERT INTO ranking_versions (id, definition_id, version_number, comparison_direction, " +
                 "tie_policy, effective_score_rule, ranked_student_count, version_status, published_by, published_at, created_at) " +
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 versionId, activityProjectId, vn, direction.name(), "COMPETITION",
                 "BEST", entries.size(), "PUBLISHED", publishedBy, now, now);
 
-        // Create entries
         for (var e : entries) {
             jdbc.update("INSERT INTO ranking_entries (id, version_id, student_id, rank, score_value, created_at) " +
                     "VALUES (?,?,?,?,?,?)",
