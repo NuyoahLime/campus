@@ -65,7 +65,8 @@ public class ActivityManagementService {
     }
 
     public ActivityProjectPort.ProjectRecord addProject(UUID activityId, UUID projectId) {
-        find(activityId); // validates activity exists
+        var activity = find(activityId);
+        requireNotTerminal(activity);
 
         if (projectPort.existsByActivityAndProject(activityId, projectId)) {
             throw new IllegalArgumentException("Project already added to this activity");
@@ -82,7 +83,8 @@ public class ActivityManagementService {
     }
 
     public void removeProject(UUID activityId, UUID projectId) {
-        find(activityId); // validates activity exists
+        var activity = find(activityId);
+        requireNotTerminal(activity);
 
         if (!projectPort.existsByActivityAndProject(activityId, projectId)) {
             throw new IllegalArgumentException("Project not found on this activity");
@@ -129,6 +131,13 @@ public class ActivityManagementService {
         teacherPort.unassign(ap.id(), membershipId);
     }
 
+    private void requireNotTerminal(Activity activity) {
+        var s = activity.executionStatus();
+        if (s == ExecutionStatus.ENDED || s == ExecutionStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot modify " + s + " activity");
+        }
+    }
+
     private java.util.Map<String, Object> resolveTeacherMembership(UUID activityId, UUID teacherId) {
         var activity = find(activityId);
         var rows = jdbc.queryForList(
@@ -140,5 +149,21 @@ public class ActivityManagementService {
                     "Teacher not found or not an active TEACHER at school " + activity.schoolId());
         }
         return rows.getFirst();
+    }
+
+    // ── Lifecycle ──
+
+    public ActivityResult finish(UUID id) {
+        var act = find(id);
+        act.end();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult cancel(UUID id) {
+        var act = find(id);
+        act.cancel();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
     }
 }

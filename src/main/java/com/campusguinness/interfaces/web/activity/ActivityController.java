@@ -49,6 +49,20 @@ public class ActivityController {
                 .body(new ActivityResponse(r.id(), r.executionStatus(), r.publicStatus()));
     }
 
+    @PostMapping("/{id}/finish")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<ActivityResponse> finish(@PathVariable UUID id) {
+        ActivityResult r = service.finish(id);
+        return ResponseEntity.ok(new ActivityResponse(r.id(), r.executionStatus(), r.publicStatus()));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<ActivityResponse> cancel(@PathVariable UUID id) {
+        ActivityResult r = service.cancel(id);
+        return ResponseEntity.ok(new ActivityResponse(r.id(), r.executionStatus(), r.publicStatus()));
+    }
+
     @PostMapping("/{id}/publish")
     public ResponseEntity<ActivityResponse> publish(@PathVariable UUID id) {
         ActivityResult r = service.publish(id);

@@ -4,6 +4,7 @@ import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
 import com.campusguinness.activity.internal.domain.ActivityId;
+import com.campusguinness.activity.internal.domain.ExecutionStatus;
 import com.campusguinness.score.application.command.SubmitScoreCommand;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 import com.campusguinness.score.application.result.ScoreAttemptResult;
@@ -46,6 +47,12 @@ public class ScoreAttemptApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("Activity not found: " + apRecord.activityId()));
 
         UUID realSchoolId = activity.schoolId();
+
+        // Deny submission for terminal activity states
+        var execStatus = activity.executionStatus();
+        if (execStatus == ExecutionStatus.ENDED || execStatus == ExecutionStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot submit score for " + execStatus + " activity");
+        }
 
         // Verify actor has ACTIVE TEACHER membership at this school
         var rows = jdbc.queryForList(
