@@ -5,7 +5,9 @@ import com.campusguinness.appeal.internal.domain.ScoreAppeal;
 import com.campusguinness.appeal.internal.domain.ScoreAppealId;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class ScoreAppealRepositoryAdapter implements ScoreAppealRepository {
@@ -22,5 +24,16 @@ class ScoreAppealRepositoryAdapter implements ScoreAppealRepository {
     }
     @Override @Transactional(readOnly = true) public Optional<ScoreAppeal> findById(ScoreAppealId id) {
         return jpa.findById(id.value()).map(ScoreAppealPersistenceMapper::toDomain);
+    }
+    @Override @Transactional(readOnly = true)
+    public List<ScoreAppeal> findByStudentId(UUID studentId) {
+        return jpa.findByStudentId(studentId).stream()
+                .map(ScoreAppealPersistenceMapper::toDomain).toList();
+    }
+
+    @Override @Transactional(readOnly = true)
+    public Optional<ScoreAppeal> findByIdAndStudentId(UUID id, UUID studentId) {
+        return jpa.findByIdAndStudentId(id, studentId)
+                .map(ScoreAppealPersistenceMapper::toDomain);
     }
 }

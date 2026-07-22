@@ -2,12 +2,14 @@ package com.campusguinness.interfaces.web.scoreappeal;
 
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -15,9 +17,22 @@ import java.util.UUID;
 public class ScoreAppealController {
 
     private final ScoreAppealApplicationService service;
+    private final CurrentActor currentActor;
 
-    public ScoreAppealController(ScoreAppealApplicationService service) {
+    public ScoreAppealController(ScoreAppealApplicationService service, CurrentActor currentActor) {
         this.service = service;
+        this.currentActor = currentActor;
+    }
+
+    @GetMapping("/mine")
+    public List<ScoreAppealResult> listMine() {
+        return service.listMine(currentActor.requireUserId());
+    }
+
+    @GetMapping("/mine/{id}")
+    public ResponseEntity<ScoreAppealResponse> getMine(@PathVariable UUID id) {
+        ScoreAppealResult r = service.getMine(id, currentActor.requireUserId());
+        return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));
     }
 
     @PostMapping

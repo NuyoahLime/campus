@@ -26,4 +26,17 @@ public class ScoreAppealApplicationService {
     public ScoreAppealResult resolve(UUID id, String resolution) { var a=find(id); a.resolve(resolution); repo.save(a); return result(a); }
     private ScoreAppeal find(UUID id) { return repo.findById(new ScoreAppealId(id)).orElseThrow(()->new IllegalArgumentException("ScoreAppeal not found: "+id)); }
     private ScoreAppealResult result(ScoreAppeal a) { return new ScoreAppealResult(a.id().value(), a.status().name()); }
+
+    @Transactional(readOnly = true)
+    public List<ScoreAppealResult> listMine(UUID studentId) {
+        return repo.findByStudentId(studentId).stream()
+                .map(a -> new ScoreAppealResult(a.id().value(), a.status().name())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ScoreAppealResult getMine(UUID id, UUID studentId) {
+        return repo.findByIdAndStudentId(id, studentId)
+                .map(a -> new ScoreAppealResult(a.id().value(), a.status().name()))
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found: " + id));
+    }
 }
