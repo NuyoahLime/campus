@@ -2,6 +2,7 @@ package com.campusguinness.feedback.application.service;
 
 import com.campusguinness.feedback.application.port.FeedbackRepository;
 import com.campusguinness.feedback.internal.domain.*;
+import com.campusguinness.notification.application.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,8 +17,12 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class FeedbackApplicationServiceTest {
     @Mock FeedbackRepository repo;
+    @Mock NotificationService notificationService;
     FeedbackApplicationService svc;
-    @BeforeEach void setUp() { svc = new FeedbackApplicationService(repo); }
+    @BeforeEach void setUp() {
+        svc = new FeedbackApplicationService(repo, notificationService);
+        lenient().doNothing().when(notificationService).notify(any(), anyString(), anyString(), anyString(), anyString(), any());
+    }
     private Feedback fb() { return Feedback.create(new Feedback.Builder().id(new FeedbackId(UUID.randomUUID())).feedbackType("GENERAL").content("t")); }
 
     @Nested class Submit { @Test void success() { assertThat(svc.submit(UUID.randomUUID(),UUID.randomUUID(),"GENERAL","t").status()).isEqualTo("SUBMITTED"); verify(repo).save(any()); } }

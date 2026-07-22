@@ -7,12 +7,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
+import com.campusguinness.notification.application.service.NotificationService;
 
 @Service
 @Transactional
 public class FeedbackApplicationService {
     private final FeedbackRepository repo;
-    public FeedbackApplicationService(FeedbackRepository r) { this.repo = r; }
+    private final NotificationService notificationService;
+    public FeedbackApplicationService(FeedbackRepository r, NotificationService ns) { this.repo = r; this.notificationService = ns; }
 
     public FeedbackResult submit(UUID schoolId, UUID submitterId, String feedbackType, String content) {
         var f = Feedback.create(new Feedback.Builder().id(new FeedbackId(UUID.randomUUID()))
@@ -28,7 +30,7 @@ public class FeedbackApplicationService {
     }
 
     public Feedback beginProcessing(UUID id, UUID handlerId) { var f=find(id); f.beginProcessing(handlerId); repo.save(f); return f; }
-    public FeedbackResult resolve(UUID id, String reply) { var f=find(id); f.resolve(reply); repo.save(f); return result(f); }
+    public FeedbackResult resolve(UUID id, String reply) { var f=find(id); f.resolve(reply); repo.save(f); notificationService.notify(f.submitterId(), "FEEDBACK_RESOLVED", "Feedback Resolved", "Your feedback has been resolved: " + (reply != null public FeedbackResult resolve(UUID id, String reply) { var f=find(id); f.resolve(reply); repo.save(f); return result(f); }public FeedbackResult resolve(UUID id, String reply) { var f=find(id); f.resolve(reply); repo.save(f); return result(f); } reply.length() > 100 ? reply.substring(0, 100) + "..." : reply), "FEEDBACK", f.id().value()); return result(f); }
     public FeedbackResult close(UUID id, String reason) { var f=find(id); f.close(reason); repo.save(f); return result(f); }
 
     @Transactional(readOnly = true)
