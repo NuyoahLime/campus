@@ -29,6 +29,7 @@ class ActivityApplicationControllerTest {
     @Nested class Submit {
         @Test void shouldReturn201() throws Exception {
             UUID id = UUID.randomUUID();
+            when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
             when(service.submit(any())).thenReturn(new ActivityApplicationResult(id, "SUBMITTED", null));
             mvc.perform(post("/api/v1/activity-applications").contentType(MediaType.APPLICATION_JSON)
                     .content(mapper.writeValueAsString(new SubmitActivityApplicationRequest(UUID.randomUUID(), "t", "d"))))
