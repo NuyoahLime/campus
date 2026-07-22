@@ -37,7 +37,7 @@ public class StudentRankingService {
                 .map(r -> new StudentRankEntry(
                         (int) r.get("rank"), (UUID) r.get("student_id"),
                         (String) r.get("score_value"),
-                        currentStudentId.equals(r.get("student_id"))))
+                        currentStudentId != null && currentStudentId.equals(r.get("student_id"))))
                 .toList();
 
         return Optional.of(new StudentRankingResult(activityProjectId,

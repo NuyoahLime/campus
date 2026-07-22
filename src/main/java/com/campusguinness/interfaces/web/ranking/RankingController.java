@@ -74,6 +74,17 @@ public class RankingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // ── Public ──
+
+    @GetMapping("/public/activity-projects/{activityProjectId}/ranking")
+    public ResponseEntity<PublicRankingResponse> publicGetRanking(@PathVariable UUID activityProjectId) {
+        return studentRankingService.getCurrentRanking(activityProjectId, null)
+                .map(r -> ResponseEntity.ok(new PublicRankingResponse(r.activityProjectId(), r.version(),
+                        r.direction(), r.totalRanked(), r.entries().stream()
+                        .map(e -> new PublicRankEntry(e.rank(), e.scoreValue())).toList())))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     // ── DTOs ──
 
     private RankingResponse toResponse(UUID apId, String dir, int total, List<? extends RankingCalculator.RankingEntry> entries) {
@@ -88,4 +99,7 @@ public class RankingController {
     public record StudentRankEntry(int rank, String scoreValue, boolean isCurrentStudent) {}
     public record StudentOwnRankResponse(UUID activityProjectId, int version, String direction,
                                           int totalRanked, int rank, String scoreValue) {}
+    public record PublicRankingResponse(UUID activityProjectId, int version, String direction,
+                                         int totalRanked, List<PublicRankEntry> entries) {}
+    public record PublicRankEntry(int rank, String scoreValue) {}
 }
