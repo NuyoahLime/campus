@@ -42,6 +42,11 @@ class ActivityProjectAdapter implements ActivityProjectPort {
     }
 
     @Override @Transactional(readOnly = true)
+    public Optional<ProjectRecord> findById(UUID id) {
+        return jpa.findById(id).map(this::toRecord);
+    }
+
+    @Override @Transactional(readOnly = true)
     public boolean existsByActivityAndProject(UUID activityId, UUID projectId) {
         return jpa.existsByActivityIdAndProjectId(activityId, projectId);
     }

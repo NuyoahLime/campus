@@ -10,6 +10,7 @@ public interface ActivityProjectPort {
     ProjectRecord add(UUID activityId, UUID projectId, UUID ruleVersionId);
     List<ProjectRecord> findByActivity(UUID activityId);
     Optional<ProjectRecord> findByActivityAndProject(UUID activityId, UUID projectId);
+    Optional<ProjectRecord> findById(UUID id);
     void remove(UUID activityId, UUID projectId);
     boolean existsByActivityAndProject(UUID activityId, UUID projectId);
 }

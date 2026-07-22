@@ -5,15 +5,16 @@ import com.campusguinness.score.internal.domain.ScoreStorageType;
 import com.campusguinness.score.internal.domain.ScoreValue;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 class ScoreAttemptWebMapper {
     private ScoreAttemptWebMapper() {}
 
-    static SubmitScoreCommand toCommand(SubmitScoreRequest req) {
+    static SubmitScoreCommand toCommand(SubmitScoreRequest req, UUID enteredBy) {
         ScoreStorageType type = ScoreStorageType.valueOf(req.scoreStorageType());
         ScoreValue value = toScoreValue(type, req);
-        return new SubmitScoreCommand(req.schoolId(), req.activityProjectId(), req.studentId(),
-                req.attemptNumber(), type, value, req.scoreBusinessTime(), req.timeSource(), req.enteredBy());
+        return new SubmitScoreCommand(UUID.randomUUID(), req.activityProjectId(), req.studentId(),
+                req.attemptNumber(), type, value, req.scoreBusinessTime(), req.timeSource(), enteredBy);
     }
 
     private static ScoreValue toScoreValue(ScoreStorageType type, SubmitScoreRequest req) {

@@ -7,9 +7,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** scoreStorageType discriminates which value field carries the actual score. */
+/** schoolId and enteredBy are sourced from server-side Activity and CurrentActor, not the client. */
 public record SubmitScoreRequest(
-        @NotNull UUID schoolId,
         @NotNull UUID activityProjectId,
         @NotNull UUID studentId,
         @Positive int attemptNumber,
@@ -19,5 +18,4 @@ public record SubmitScoreRequest(
         @Positive Long durationMs,
         String grade,
         Instant scoreBusinessTime,
-        String timeSource,
-        @NotNull UUID enteredBy) {}
+        String timeSource) {}
