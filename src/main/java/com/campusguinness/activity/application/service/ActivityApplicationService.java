@@ -6,6 +6,7 @@ import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.internal.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,6 +37,20 @@ public class ActivityApplicationService {
     public ActivityApplicationResult withdraw(UUID id) {
         var app = find(id); app.withdraw(); repository.save(app);
         return new ActivityApplicationResult(id, app.status().name(), null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ActivityApplicationResult> listMine(UUID applicantId) {
+        return repository.findByApplicantId(applicantId).stream()
+                .map(a -> new ActivityApplicationResult(a.id().value(), a.status().name(), a.createdActivityId()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ActivityApplicationResult getMine(UUID id, UUID applicantId) {
+        return repository.findByIdAndApplicantId(id, applicantId)
+                .map(a -> new ActivityApplicationResult(a.id().value(), a.status().name(), a.createdActivityId()))
+                .orElseThrow(() -> new IllegalArgumentException("ActivityApplication not found: " + id));
     }
 
     private ActivityApplication find(UUID id) {
