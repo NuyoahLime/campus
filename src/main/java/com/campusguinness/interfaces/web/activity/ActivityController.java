@@ -80,4 +80,34 @@ public class ActivityController {
         service.removeProject(activityId, projectId);
         return ResponseEntity.noContent().build();
     }
+
+    // ── Responsible Teacher Assignment ──
+
+    @GetMapping("/{activityId}/projects/{projectId}/responsible-teachers")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public List<ResponsibleTeacherResponse> listResponsibleTeachers(@PathVariable UUID activityId,
+                                                                     @PathVariable UUID projectId) {
+        return service.listResponsibleTeachers(activityId, projectId).stream()
+                .map(r -> new ResponsibleTeacherResponse(r.activityProjectId(), r.userId(), r.teacherMembershipId()))
+                .toList();
+    }
+
+    @PostMapping("/{activityId}/projects/{projectId}/responsible-teachers")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<ResponsibleTeacherResponse> assignResponsibleTeacher(
+            @PathVariable UUID activityId,
+            @PathVariable UUID projectId,
+            @Valid @RequestBody AssignResponsibleTeacherRequest req) {
+        var r = service.assignResponsibleTeacher(activityId, projectId, req.teacherId());
+        return ResponseEntity.ok(new ResponsibleTeacherResponse(r.activityProjectId(), r.userId(), r.teacherMembershipId()));
+    }
+
+    @DeleteMapping("/{activityId}/projects/{projectId}/responsible-teachers/{teacherId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<Void> unassignResponsibleTeacher(@PathVariable UUID activityId,
+                                                            @PathVariable UUID projectId,
+                                                            @PathVariable UUID teacherId) {
+        service.unassignResponsibleTeacher(activityId, projectId, teacherId);
+        return ResponseEntity.noContent().build();
+    }
 }

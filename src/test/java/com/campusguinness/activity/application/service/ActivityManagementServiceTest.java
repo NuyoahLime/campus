@@ -3,6 +3,7 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
 import com.campusguinness.activity.internal.domain.*;
 import com.campusguinness.project.application.port.ChallengeProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +24,10 @@ class ActivityManagementServiceTest {
     @Mock ActivityRepository repo;
     @Mock ActivityProjectPort projectPort;
     @Mock ChallengeProjectRepository projectRepo;
+    @Mock ResponsibleTeacherPort teacherPort;
+    @Mock org.springframework.jdbc.core.JdbcTemplate jdbc;
     ActivityManagementService svc;
-    @BeforeEach void setUp() { svc = new ActivityManagementService(repo, projectPort, projectRepo); }
+    @BeforeEach void setUp() { svc = new ActivityManagementService(repo, projectPort, projectRepo, teacherPort, jdbc); }
 
     @Nested class Create {
         @Test void shouldCreate() {
