@@ -1,5 +1,6 @@
 package com.campusguinness.ranking.application.service;
 
+import com.campusguinness.achievement.application.service.AchievementRecordService;
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.internal.domain.ActivityId;
@@ -20,15 +21,18 @@ public class RankingPublicationService {
     private final ScoreAttemptRepository scoreAttemptRepo;
     private final ActivityRepository activityRepository;
     private final JdbcTemplate jdbc;
+    private final AchievementRecordService achievementService;
 
     public RankingPublicationService(ActivityProjectPort projectPort,
                                       ScoreAttemptRepository scoreAttemptRepo,
                                       ActivityRepository activityRepository,
-                                      JdbcTemplate jdbc) {
+                                      JdbcTemplate jdbc,
+                                      AchievementRecordService achievementService) {
         this.projectPort = projectPort;
         this.scoreAttemptRepo = scoreAttemptRepo;
         this.activityRepository = activityRepository;
         this.jdbc = jdbc;
+        this.achievementService = achievementService;
     }
 
     public record PublicationResult(UUID versionId, UUID activityProjectId, int versionNumber,
@@ -117,6 +121,7 @@ public class RankingPublicationService {
         UUID versionId = (UUID) rows.getFirst().get("id");
         jdbc.update("UPDATE ranking_versions SET withdrawn_at = now(), withdrawn_by = ?, withdrawal_reason = ? WHERE id = ?",
                 withdrawnBy, reason, versionId);
+        achievementService.revokeByRankingVersion(versionId, withdrawnBy, "Ranking withdrawn: " + reason);
     }
 
     @Transactional(readOnly = true)
