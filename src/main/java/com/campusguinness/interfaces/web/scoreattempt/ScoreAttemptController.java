@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -22,6 +23,12 @@ public class ScoreAttemptController {
     public ScoreAttemptController(ScoreAttemptApplicationService service, CurrentActor currentActor) {
         this.service = service;
         this.currentActor = currentActor;
+    }
+
+    @GetMapping("/mine")
+    public List<ScoreAttemptResult> listMine() {
+        UUID studentId = currentActor.requireUserId();
+        return service.findMyScores(studentId);
     }
 
     @PostMapping

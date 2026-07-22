@@ -113,4 +113,21 @@ class ScoreAttemptApplicationServiceTest {
             verify(repo, never()).save(any());
         }
     }
+
+    @Nested
+    class FindMyScores {
+        @Test void shouldReturnOwnScores() {
+            UUID studentId = UUID.randomUUID();
+            var s = ScoreAttempt.create(new ScoreAttempt.Builder()
+                    .id(new ScoreAttemptId(UUID.randomUUID())).schoolId(schoolId)
+                    .activityProjectId(activityProjectId).studentId(studentId)
+                    .attemptNumber(1).scoreStorageType(ScoreStorageType.INTEGER)
+                    .scoreValue(new ScoreValue.IntegerScore(100))
+                    .scoreBusinessTime(Instant.now()).timeSource("teacher").enteredBy(actorId));
+            s.submit();
+            when(repo.findByStudentId(studentId)).thenReturn(List.of(s));
+            var results = svc.findMyScores(studentId);
+            assertThat(results).hasSize(1);
+        }
+    }
 }

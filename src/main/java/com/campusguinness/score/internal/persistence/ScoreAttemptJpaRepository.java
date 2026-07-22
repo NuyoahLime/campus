@@ -4,4 +4,5 @@ import java.util.List;
 import java.util.UUID;
 public interface ScoreAttemptJpaRepository extends JpaRepository<ScoreAttemptEntity, UUID> {
     List<ScoreAttemptEntity> findByStudentIdAndActivityProjectId(UUID studentId, UUID activityProjectId);
+    List<ScoreAttemptEntity> findByStudentId(UUID studentId);
 }

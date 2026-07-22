@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -71,5 +72,12 @@ public class ScoreAttemptApplicationService {
         s.submit();
         repository.save(s);
         return new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScoreAttemptResult> findMyScores(UUID studentId) {
+        return repository.findByStudentId(studentId).stream()
+                .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
+                .toList();
     }
 }
