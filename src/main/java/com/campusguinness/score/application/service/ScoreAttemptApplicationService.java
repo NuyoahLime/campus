@@ -1,5 +1,8 @@
 package com.campusguinness.score.application.service;
 
+import com.campusguinness.infrastructure.security.AuthorizationPolicy;
+import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.SchoolMembershipResolver;
 import com.campusguinness.score.application.command.SubmitScoreCommand;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 import com.campusguinness.score.application.result.ScoreAttemptResult;
@@ -13,7 +16,16 @@ import java.util.UUID;
 @Transactional
 public class ScoreAttemptApplicationService {
     private final ScoreAttemptRepository repository;
-    public ScoreAttemptApplicationService(ScoreAttemptRepository r) { this.repository = r; }
+    private final CurrentActor currentActor;
+    private final SchoolMembershipResolver membershipResolver;
+
+    public ScoreAttemptApplicationService(ScoreAttemptRepository repository,
+                                           CurrentActor currentActor,
+                                           SchoolMembershipResolver membershipResolver) {
+        this.repository = repository;
+        this.currentActor = currentActor;
+        this.membershipResolver = membershipResolver;
+    }
 
     public ScoreAttemptResult submit(SubmitScoreCommand cmd) {
         var s = ScoreAttempt.create(new ScoreAttempt.Builder()
@@ -32,5 +44,30 @@ public class ScoreAttemptApplicationService {
         return repository.findBySchoolId(schoolId).stream()
                 .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
                 .toList();
+    }
+
+    public ScoreAttemptResult approve(UUID id) {
+        var s = find(id);
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), s.schoolId());
+        }
+        s.approve();
+        repository.save(s);
+        return new ScoreAttemptResult(id, s.status().name(), s.scoreStorageType().name());
+    }
+
+    public ScoreAttemptResult reject(UUID id, String reason) {
+        var s = find(id);
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), s.schoolId());
+        }
+        s.reject(reason);
+        repository.save(s);
+        return new ScoreAttemptResult(id, s.status().name(), s.scoreStorageType().name());
+    }
+
+    private ScoreAttempt find(UUID id) {
+        return repository.findById(new ScoreAttemptId(id))
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAttempt not found: " + id));
     }
 }

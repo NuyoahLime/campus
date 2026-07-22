@@ -56,6 +56,36 @@ class ScoreAttemptControllerTest {
     }
 
     @Nested
+    class Approve {
+        @Test void returns200() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(service.approve(id)).thenReturn(new ScoreAttemptResult(id, "APPROVED", "INTEGER"));
+            mvc.perform(post("/api/v1/score-attempts/" + id + "/approve"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("APPROVED"));
+        }
+    }
+
+    @Nested
+    class Reject {
+        @Test void returns200() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(service.reject(id, "reason")).thenReturn(new ScoreAttemptResult(id, "REJECTED", "INTEGER"));
+            mvc.perform(post("/api/v1/score-attempts/" + id + "/reject")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(new RejectScoreRequest("reason"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("REJECTED"));
+        }
+        @Test void missingReasonReturns400() throws Exception {
+            mvc.perform(post("/api/v1/score-attempts/" + UUID.randomUUID() + "/reject")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
     class Submit {
         @Test void submitIntegerScoreReturns201() throws Exception {
             UUID id = UUID.randomUUID();

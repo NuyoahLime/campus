@@ -49,4 +49,19 @@ public class ScoreAttemptController {
         return ResponseEntity.created(URI.create("/api/v1/score-attempts/" + r.id()))
                 .body(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
     }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<ScoreAttemptResponse> approve(@PathVariable UUID id) {
+        ScoreAttemptResult r = service.approve(id);
+        return ResponseEntity.ok(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<ScoreAttemptResponse> reject(@PathVariable UUID id,
+                                                        @Valid @RequestBody RejectScoreRequest req) {
+        ScoreAttemptResult r = service.reject(id, req.reason());
+        return ResponseEntity.ok(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
+    }
 }
