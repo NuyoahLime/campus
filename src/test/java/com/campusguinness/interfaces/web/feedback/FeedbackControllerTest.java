@@ -80,7 +80,7 @@ class FeedbackControllerTest {
         when(currentActor.requireUserId()).thenReturn(actorId);
         when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),UUID.randomUUID(),"GENERAL","test"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test"))))
                 .andExpect(jsonPath("$.submitterId").doesNotExist()).andExpect(jsonPath("$.content").doesNotExist());
     }
 }
