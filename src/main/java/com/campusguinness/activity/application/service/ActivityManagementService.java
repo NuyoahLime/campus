@@ -103,7 +103,8 @@ public class ActivityManagementService {
     }
 
     public ResponsibleTeacherPort.TeacherRecord assignResponsibleTeacher(UUID activityId, UUID projectId, UUID teacherId) {
-        find(activityId);
+        var activity = find(activityId);
+        requireNotTerminal(activity);
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
@@ -118,7 +119,8 @@ public class ActivityManagementService {
     }
 
     public void unassignResponsibleTeacher(UUID activityId, UUID projectId, UUID teacherId) {
-        find(activityId);
+        var activity = find(activityId);
+        requireNotTerminal(activity);
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
