@@ -5,6 +5,7 @@ import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.internal.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
