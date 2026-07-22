@@ -8,4 +8,5 @@ public interface ScoreAttemptJpaRepository extends JpaRepository<ScoreAttemptEnt
     List<ScoreAttemptEntity> findByStudentId(UUID studentId);
     List<ScoreAttemptEntity> findByStudentIdAndScoreStatus(UUID studentId, String status);
     Optional<ScoreAttemptEntity> findByIdAndStudentIdAndScoreStatus(UUID id, UUID studentId, String status);
+    List<ScoreAttemptEntity> findByActivityProjectIdAndScoreStatus(UUID activityProjectId, String status);
 }

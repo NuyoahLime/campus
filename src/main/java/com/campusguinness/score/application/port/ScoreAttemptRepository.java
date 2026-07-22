@@ -10,4 +10,5 @@ public interface ScoreAttemptRepository {
     List<ScoreAttempt> findByStudentId(UUID studentId);
     List<ScoreAttempt> findApprovedByStudentId(UUID studentId);
     Optional<ScoreAttempt> findApprovedByIdAndStudentId(UUID id, UUID studentId);
+    List<ScoreAttempt> findApprovedByActivityProjectId(UUID activityProjectId);
 }

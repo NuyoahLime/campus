@@ -39,4 +39,9 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
         return jpaRepository.findByIdAndStudentIdAndScoreStatus(id, studentId, "APPROVED")
                 .map(ScoreAttemptPersistenceMapper::toDomain);
     }
+    @Override @Transactional(readOnly = true)
+    public List<ScoreAttempt> findApprovedByActivityProjectId(UUID activityProjectId) {
+        return jpaRepository.findByActivityProjectIdAndScoreStatus(activityProjectId, "APPROVED").stream()
+                .map(ScoreAttemptPersistenceMapper::toDomain).toList();
+    }
 }
