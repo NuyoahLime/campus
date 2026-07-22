@@ -102,4 +102,67 @@ public class ActivityParticipantRosterService {
             default -> null;
         };
     }
+    // ── Student Self-Service ──
+
+    public record MyProjectAssignment(UUID activityProjectId, UUID activityId, UUID applicationId,
+            long attemptCount, boolean hasScoreAttempt, UUID latestAttemptId,
+            String latestAttemptStatus, boolean hasApprovedScore, java.time.Instant assignedAt) {}
+
+    public List<MyProjectAssignment> listMyAssignments(UUID applicantId) {
+        var rows = jdbc.queryForList(
+                "SELECT app.activity_project_id, ap.activity_id, app.activity_application_id, app.assigned_at " +
+                "FROM activity_project_participants app " +
+                "JOIN activity_applications aa ON app.activity_application_id = aa.id " +
+                "WHERE aa.applicant_id = ? AND aa.application_status = 'APPROVED' " +
+                "ORDER BY app.assigned_at DESC", applicantId);
+
+        List<MyProjectAssignment> result = new ArrayList<>();
+        for (var row : rows) {
+            UUID projectId = (UUID) row.get("activity_project_id");
+            UUID appId = (UUID) row.get("activity_application_id");
+            var scores = jdbc.queryForList(
+                    "SELECT id, score_status FROM score_attempts " +
+                    "WHERE activity_project_id = ? AND student_id = ? " +
+                    "ORDER BY COALESCE(submitted_at, created_at) DESC, id DESC",
+                    projectId, applicantId);
+            long count = scores.size();
+            boolean hasAttempt = count > 0;
+            boolean hasApproved = scores.stream().anyMatch(s -> "APPROVED".equals(s.get("score_status")));
+            String latestStatus = hasAttempt ? (String) scores.getFirst().get("score_status") : null;
+            UUID latestId = hasAttempt ? (UUID) scores.getFirst().get("id") : null;
+            java.sql.Timestamp ts = (java.sql.Timestamp) row.get("assigned_at");
+
+            result.add(new MyProjectAssignment(projectId, (UUID) row.get("activity_id"), appId,
+                    count, hasAttempt, latestId, latestStatus, hasApproved,
+                    ts != null ? ts.toInstant() : null));
+        }
+        return result;
+    }
+
+    public Optional<MyProjectAssignment> getMyAssignment(UUID activityProjectId, UUID applicantId) {
+        var rows = jdbc.queryForList(
+                "SELECT app.activity_application_id, ap.activity_id, app.assigned_at " +
+                "FROM activity_project_participants app JOIN activity_projects ap ON app.activity_project_id = ap.id " +
+                "JOIN activity_applications aa ON app.activity_application_id = aa.id " +
+                "WHERE app.activity_project_id = ? AND aa.applicant_id = ? AND aa.application_status = 'APPROVED'",
+                activityProjectId, applicantId);
+        if (rows.isEmpty()) return Optional.empty();
+
+        var row = rows.getFirst();
+        UUID appId = (UUID) row.get("activity_application_id");
+        var scores = jdbc.queryForList(
+                "SELECT id, score_status FROM score_attempts WHERE activity_project_id = ? AND student_id = ? " +
+                "ORDER BY COALESCE(submitted_at, created_at) DESC, id DESC",
+                activityProjectId, applicantId);
+        long count = scores.size();
+        boolean hasAttempt = count > 0;
+        boolean hasApproved = scores.stream().anyMatch(s -> "APPROVED".equals(s.get("score_status")));
+        String latestStatus = hasAttempt ? (String) scores.getFirst().get("score_status") : null;
+        UUID latestId = hasAttempt ? (UUID) scores.getFirst().get("id") : null;
+        java.sql.Timestamp ts = (java.sql.Timestamp) row.get("assigned_at");
+
+        return Optional.of(new MyProjectAssignment(activityProjectId, (UUID) row.get("activity_id"), appId,
+                count, hasAttempt, latestId, latestStatus, hasApproved,
+                ts != null ? ts.toInstant() : null));
+    }
 }

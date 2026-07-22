@@ -55,5 +55,27 @@ public class ParticipantRosterController {
     public record ProjectParticipant(UUID applicationId, UUID studentId, long attemptCount,
             boolean hasScoreAttempt, UUID latestAttemptId, String latestAttemptStatus,
             String latestScoreValue, boolean hasApprovedScore) {}
+    @GetMapping("/activity-projects/mine")
+    @PreAuthorize("hasRole('STUDENT')")
+    public List<MyAssignment> listMyAssignments() {
+        return service.listMyAssignments(currentActor.requireUserId()).stream()
+                .map(a -> new MyAssignment(a.activityProjectId(), a.activityId(),
+                        a.attemptCount(), a.hasScoreAttempt(), a.latestAttemptId(),
+                        a.latestAttemptStatus(), a.hasApprovedScore(), a.assignedAt())).toList();
+    }
+
+    @GetMapping("/activity-projects/mine/{activityProjectId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<MyAssignment> getMyAssignment(@PathVariable UUID activityProjectId) {
+        return service.getMyAssignment(activityProjectId, currentActor.requireUserId())
+                .map(a -> ResponseEntity.ok(new MyAssignment(a.activityProjectId(), a.activityId(),
+                        a.attemptCount(), a.hasScoreAttempt(), a.latestAttemptId(),
+                        a.latestAttemptStatus(), a.hasApprovedScore(), a.assignedAt())))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     public record AssignRequest(UUID applicationId) {}
+    public record MyAssignment(UUID activityProjectId, UUID activityId, long attemptCount,
+            boolean hasScoreAttempt, UUID latestAttemptId, String latestAttemptStatus,
+            boolean hasApprovedScore, java.time.Instant assignedAt) {}
 }
