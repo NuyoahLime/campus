@@ -2,12 +2,15 @@ package com.campusguinness.interfaces.web.feedback;
 
 import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.application.service.FeedbackApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -15,31 +18,42 @@ import java.util.UUID;
 public class FeedbackController {
 
     private final FeedbackApplicationService service;
+    private final CurrentActor currentActor;
 
-    public FeedbackController(FeedbackApplicationService service) {
+    public FeedbackController(FeedbackApplicationService service, CurrentActor currentActor) {
         this.service = service;
+        this.currentActor = currentActor;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public List<FeedbackResult> list(@RequestParam UUID schoolId) {
+        return service.listBySchool(schoolId);
     }
 
     @PostMapping
     public ResponseEntity<FeedbackResponse> submit(@Valid @RequestBody SubmitFeedbackRequest req) {
-        FeedbackResult r = service.submit(req.schoolId(), req.submitterId(), req.feedbackType(), req.content());
+        FeedbackResult r = service.submit(req.schoolId(), currentActor.requireUserId(), req.feedbackType(), req.content());
         return ResponseEntity.created(URI.create("/api/v1/feedbacks/" + r.id()))
                 .body(new FeedbackResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/begin-processing")
-    public ResponseEntity<FeedbackResponse> beginProcessing(@PathVariable UUID id, @Valid @RequestBody BeginProcessingRequest req) {
-        FeedbackResult r = service.beginProcessing(id, req.handlerId());
-        return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<FeedbackResponse> beginProcessing(@PathVariable UUID id) {
+        var f = service.beginProcessing(id, currentActor.requireUserId());
+        return ResponseEntity.ok(new FeedbackResponse(f.id().value(), f.status().name()));
     }
 
     @PostMapping("/{id}/resolve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public ResponseEntity<FeedbackResponse> resolve(@PathVariable UUID id, @Valid @RequestBody ResolveFeedbackRequest req) {
         FeedbackResult r = service.resolve(id, req.reply());
         return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/close")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public ResponseEntity<FeedbackResponse> close(@PathVariable UUID id, @Valid @RequestBody CloseFeedbackRequest req) {
         FeedbackResult r = service.close(id, req.reason());
         return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));

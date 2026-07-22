@@ -5,7 +5,9 @@ import com.campusguinness.feedback.internal.domain.Feedback;
 import com.campusguinness.feedback.internal.domain.FeedbackId;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class FeedbackRepositoryAdapter implements FeedbackRepository {
@@ -14,5 +16,9 @@ class FeedbackRepositoryAdapter implements FeedbackRepository {
     @Override @Transactional public void save(Feedback f) { jpa.save(FeedbackPersistenceMapper.toEntity(f)); }
     @Override @Transactional(readOnly = true) public Optional<Feedback> findById(FeedbackId id) {
         return jpa.findById(id.value()).map(FeedbackPersistenceMapper::toDomain);
+    }
+    @Override @Transactional(readOnly = true)
+    public List<Feedback> findBySchoolId(UUID schoolId) {
+        return jpa.findBySchoolId(schoolId).stream().map(FeedbackPersistenceMapper::toDomain).toList();
     }
 }

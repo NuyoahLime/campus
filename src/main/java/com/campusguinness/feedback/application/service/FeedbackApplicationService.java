@@ -5,6 +5,7 @@ import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.internal.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -19,9 +20,17 @@ public class FeedbackApplicationService {
         repo.save(f);
         return new FeedbackResult(f.id().value(), f.status().name());
     }
-    public FeedbackResult beginProcessing(UUID id, UUID handlerId) { var f=find(id); f.beginProcessing(handlerId); repo.save(f); return result(f); }
+
+    @Transactional(readOnly = true)
+    public List<FeedbackResult> listBySchool(UUID schoolId) {
+        return repo.findBySchoolId(schoolId).stream()
+                .map(f -> new FeedbackResult(f.id().value(), f.status().name())).toList();
+    }
+
+    public Feedback beginProcessing(UUID id, UUID handlerId) { var f=find(id); f.beginProcessing(handlerId); repo.save(f); return f; }
     public FeedbackResult resolve(UUID id, String reply) { var f=find(id); f.resolve(reply); repo.save(f); return result(f); }
     public FeedbackResult close(UUID id, String reason) { var f=find(id); f.close(reason); repo.save(f); return result(f); }
+
     private Feedback find(UUID id) { return repo.findById(new FeedbackId(id)).orElseThrow(()->new IllegalArgumentException("Feedback not found: "+id)); }
     private FeedbackResult result(Feedback f) { return new FeedbackResult(f.id().value(), f.status().name()); }
 }

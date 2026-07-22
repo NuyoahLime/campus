@@ -1,5 +1,7 @@
 package com.campusguinness.feedback.application.port;
 import com.campusguinness.feedback.internal.domain.Feedback;
 import com.campusguinness.feedback.internal.domain.FeedbackId;
+import java.util.List;
 import java.util.Optional;
-public interface FeedbackRepository { void save(Feedback f); Optional<Feedback> findById(FeedbackId id); }
+import java.util.UUID;
+public interface FeedbackRepository { void save(Feedback f); Optional<Feedback> findById(FeedbackId id); List<Feedback> findBySchoolId(UUID schoolId); }
