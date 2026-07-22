@@ -38,7 +38,7 @@ public class ActivityApplicationController {
 
     @PostMapping
     public ResponseEntity<ActivityApplicationResponse> submit(@Valid @RequestBody SubmitActivityApplicationRequest req) {
-        var cmd = new SubmitActivityApplicationCommand(req.schoolId(), req.applicantId(), req.title(), req.description());
+        var cmd = new SubmitActivityApplicationCommand(req.schoolId(), currentActor.requireUserId(), req.title(), req.description());
         ActivityApplicationResult r = service.submit(cmd);
         return ResponseEntity.created(URI.create("/api/v1/activity-applications/" + r.id()))
                 .body(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));

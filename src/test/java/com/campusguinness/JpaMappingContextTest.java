@@ -70,9 +70,9 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("PostgreSQL version is 19.x (as expected)")
-    void postgresVersionIs19() {
+    @DisplayName("PostgreSQL version is 18.x (as defined in application-test.yml)")
+    void postgresVersionIs18() {
         String version = jdbc.queryForObject("SELECT current_setting('server_version')", String.class);
-        assertThat(version).startsWith("19.");
+        assertThat(version).startsWith("18.");
     }
 }

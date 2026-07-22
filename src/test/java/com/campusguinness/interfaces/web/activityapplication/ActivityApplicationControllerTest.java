@@ -2,6 +2,7 @@ package com.campusguinness.interfaces.web.activityapplication;
 
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.application.service.ActivityApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ActivityApplicationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Nested class Submit {
@@ -29,7 +31,7 @@ class ActivityApplicationControllerTest {
             UUID id = UUID.randomUUID();
             when(service.submit(any())).thenReturn(new ActivityApplicationResult(id, "SUBMITTED", null));
             mvc.perform(post("/api/v1/activity-applications").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new SubmitActivityApplicationRequest(UUID.randomUUID(), UUID.randomUUID(), "t", "d"))))
+                    .content(mapper.writeValueAsString(new SubmitActivityApplicationRequest(UUID.randomUUID(), "t", "d"))))
                     .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED"));
         }
     }
