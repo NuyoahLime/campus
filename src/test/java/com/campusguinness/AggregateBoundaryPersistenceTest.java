@@ -73,7 +73,7 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
     @Test
     @DisplayName("Entity metamodel has no cross-module JPA entity associations (all use scalar IDs)")
     void noCrossModuleEntityAssociations() {
-        // All 18 entities use scalar UUID fields for cross-references, not JPA associations.
+        // All 19 entities use scalar UUID fields for cross-references, not JPA associations.
         // This is verified by checking the metamodel — no ManyToOne/OneToMany attributes exist.
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         for (EntityType<?> entity : entities) {
@@ -93,10 +93,10 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("All 18 entities are mapped to known business tables")
+    @DisplayName("All 19 entities are mapped to known business tables")
     void entitiesMappedToCorrectTables() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(18);
+        assertThat(entities).hasSize(19);
 
         Set<String> expectedTableNames = Set.of(
                 "users", "school_memberships",
@@ -111,7 +111,8 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
                 "feedbacks",
                 "notifications",
                 "audit_records",
-                "responsible_teachers"
+                "responsible_teachers",
+                "ranking_versions"
         );
 
         for (EntityType<?> entity : entities) {

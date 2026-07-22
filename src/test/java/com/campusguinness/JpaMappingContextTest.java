@@ -16,8 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Verifies the JPA mapping context is correctly configured:
- * - EntityManagerFactory starts with PostgreSQL 18.4 Testcontainer.
- * - All 18 entities are scanned and mapped.
+ * - EntityManagerFactory starts with PostgreSQL 19.4 Testcontainer.
+ * - All 19 entities are scanned and mapped.
  * - Hibernate ddl-auto is 'none' (verified via configuration).
  * - Flyway executed all 15 migrations.
  */
@@ -36,12 +36,12 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("All 18 entities are scanned by JPA metamodel")
-    void all18EntitiesAreScanned() {
+    @DisplayName("All 19 entities are scanned by JPA metamodel")
+    void all19EntitiesAreScanned() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         assertThat(entities)
-                .as("Expected 18 JPA entities, found %d", entities.size())
-                .hasSize(18);
+                .as("Expected 19 JPA entities, found %d", entities.size())
+                .hasSize(19);
     }
 
     @Test
@@ -70,9 +70,9 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("PostgreSQL version is 18.x (as expected)")
-    void postgresVersionIs18() {
+    @DisplayName("PostgreSQL version is 19.x (as expected)")
+    void postgresVersionIs19() {
         String version = jdbc.queryForObject("SELECT current_setting('server_version')", String.class);
-        assertThat(version).startsWith("18.");
+        assertThat(version).startsWith("19.");
     }
 }

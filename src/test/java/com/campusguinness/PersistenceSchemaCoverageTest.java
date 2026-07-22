@@ -87,7 +87,8 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
                 "score_appeals", "appeal_records",
                 "media", "media_review_records",
                 "activity_results", "result_versions",
-                "feedbacks", "notifications", "audit_records", "task_records"
+                "feedbacks", "notifications", "audit_records",
+                "ranking_versions", "task_records"
         );
 
         List<String> actualTables = jdbc.queryForList(
@@ -129,7 +130,7 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     @DisplayName("Entity count matches known expected count (18)")
     void entityCountIsAsExpected() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(18);
+        assertThat(entities).hasSize(19);
     }
 
     @Test
@@ -152,6 +153,7 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
                 "feedbacks",
                 "notifications",
                 "audit_records",
+                "ranking_versions",
                 "responsible_teachers"
         );
 
