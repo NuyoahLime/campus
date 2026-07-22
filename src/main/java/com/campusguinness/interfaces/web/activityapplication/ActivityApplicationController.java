@@ -3,12 +3,14 @@ package com.campusguinness.interfaces.web.activityapplication;
 import com.campusguinness.activity.application.command.SubmitActivityApplicationCommand;
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.application.service.ActivityApplicationService;
+import com.campusguinness.infrastructure.security.CurrentActor;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -16,9 +18,22 @@ import java.util.UUID;
 public class ActivityApplicationController {
 
     private final ActivityApplicationService service;
+    private final CurrentActor currentActor;
 
-    public ActivityApplicationController(ActivityApplicationService service) {
+    public ActivityApplicationController(ActivityApplicationService service, CurrentActor currentActor) {
         this.service = service;
+        this.currentActor = currentActor;
+    }
+
+    @GetMapping("/mine")
+    public List<ActivityApplicationResult> listMine() {
+        return service.listMine(currentActor.requireUserId());
+    }
+
+    @GetMapping("/mine/{id}")
+    public ResponseEntity<ActivityApplicationResponse> getMine(@PathVariable UUID id) {
+        ActivityApplicationResult r = service.getMine(id, currentActor.requireUserId());
+        return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 
     @PostMapping
