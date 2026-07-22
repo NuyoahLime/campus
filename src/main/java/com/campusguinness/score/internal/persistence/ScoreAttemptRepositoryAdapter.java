@@ -29,4 +29,14 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
         return jpaRepository.findByStudentId(studentId).stream()
                 .map(ScoreAttemptPersistenceMapper::toDomain).toList();
     }
+    @Override @Transactional(readOnly = true)
+    public List<ScoreAttempt> findApprovedByStudentId(UUID studentId) {
+        return jpaRepository.findByStudentIdAndScoreStatus(studentId, "APPROVED").stream()
+                .map(ScoreAttemptPersistenceMapper::toDomain).toList();
+    }
+    @Override @Transactional(readOnly = true)
+    public Optional<ScoreAttempt> findApprovedByIdAndStudentId(UUID id, UUID studentId) {
+        return jpaRepository.findByIdAndStudentIdAndScoreStatus(id, studentId, "APPROVED")
+                .map(ScoreAttemptPersistenceMapper::toDomain);
+    }
 }

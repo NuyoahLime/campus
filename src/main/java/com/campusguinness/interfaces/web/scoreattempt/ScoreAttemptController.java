@@ -26,9 +26,18 @@ public class ScoreAttemptController {
     }
 
     @GetMapping("/mine")
+    @PreAuthorize("hasRole('STUDENT')")
     public List<ScoreAttemptResult> listMine() {
         UUID studentId = currentActor.requireUserId();
-        return service.findMyScores(studentId);
+        return service.findMyApprovedScores(studentId);
+    }
+
+    @GetMapping("/mine/{attemptId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ScoreAttemptResponse> getMine(@PathVariable UUID attemptId) {
+        UUID studentId = currentActor.requireUserId();
+        ScoreAttemptResult r = service.getMyApprovedScore(attemptId, studentId);
+        return ResponseEntity.ok(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
     }
 
     @PostMapping

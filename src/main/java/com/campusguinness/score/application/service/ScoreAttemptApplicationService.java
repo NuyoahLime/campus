@@ -75,9 +75,16 @@ public class ScoreAttemptApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ScoreAttemptResult> findMyScores(UUID studentId) {
-        return repository.findByStudentId(studentId).stream()
+    public List<ScoreAttemptResult> findMyApprovedScores(UUID studentId) {
+        return repository.findApprovedByStudentId(studentId).stream()
                 .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ScoreAttemptResult getMyApprovedScore(UUID attemptId, UUID studentId) {
+        return repository.findApprovedByIdAndStudentId(attemptId, studentId)
+                .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAttempt not found: " + attemptId));
     }
 }

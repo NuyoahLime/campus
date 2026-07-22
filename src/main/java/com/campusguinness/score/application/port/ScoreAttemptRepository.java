@@ -8,4 +8,6 @@ public interface ScoreAttemptRepository {
     void save(ScoreAttempt scoreAttempt);
     Optional<ScoreAttempt> findById(ScoreAttemptId id);
     List<ScoreAttempt> findByStudentId(UUID studentId);
+    List<ScoreAttempt> findApprovedByStudentId(UUID studentId);
+    Optional<ScoreAttempt> findApprovedByIdAndStudentId(UUID id, UUID studentId);
 }

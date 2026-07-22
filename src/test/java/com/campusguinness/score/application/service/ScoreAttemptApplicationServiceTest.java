@@ -115,19 +115,40 @@ class ScoreAttemptApplicationServiceTest {
     }
 
     @Nested
-    class FindMyScores {
-        @Test void shouldReturnOwnScores() {
+    class FindMyApprovedScores {
+        @Test void shouldReturnOnlyApproved() {
             UUID studentId = UUID.randomUUID();
-            var s = ScoreAttempt.create(new ScoreAttempt.Builder()
-                    .id(new ScoreAttemptId(UUID.randomUUID())).schoolId(schoolId)
-                    .activityProjectId(activityProjectId).studentId(studentId)
-                    .attemptNumber(1).scoreStorageType(ScoreStorageType.INTEGER)
-                    .scoreValue(new ScoreValue.IntegerScore(100))
-                    .scoreBusinessTime(Instant.now()).timeSource("teacher").enteredBy(actorId));
-            s.submit();
-            when(repo.findByStudentId(studentId)).thenReturn(List.of(s));
-            var results = svc.findMyScores(studentId);
+            var s = approved(studentId);
+            when(repo.findApprovedByStudentId(studentId)).thenReturn(List.of(s));
+            var results = svc.findMyApprovedScores(studentId);
             assertThat(results).hasSize(1);
         }
+    }
+
+    @Nested
+    class GetMyApprovedScore {
+        @Test void shouldReturnDetail() {
+            UUID sid = UUID.randomUUID(), aid = UUID.randomUUID();
+            var s = approved(sid);
+            when(repo.findApprovedByIdAndStudentId(aid, sid)).thenReturn(Optional.of(s));
+            assertThat(svc.getMyApprovedScore(aid, sid).status()).isEqualTo("APPROVED");
+        }
+        @Test void shouldThrowWhenNotFound() {
+            when(repo.findApprovedByIdAndStudentId(any(), any())).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.getMyApprovedScore(UUID.randomUUID(), UUID.randomUUID()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    private ScoreAttempt approved(UUID studentId) {
+        var s = ScoreAttempt.create(new ScoreAttempt.Builder()
+                .id(new ScoreAttemptId(UUID.randomUUID())).schoolId(schoolId)
+                .activityProjectId(activityProjectId).studentId(studentId)
+                .attemptNumber(1).scoreStorageType(ScoreStorageType.INTEGER)
+                .scoreValue(new ScoreValue.IntegerScore(100))
+                .scoreBusinessTime(Instant.now()).timeSource("teacher").enteredBy(actorId));
+        s.submit();
+        s.approve();
+        return s;
     }
 }

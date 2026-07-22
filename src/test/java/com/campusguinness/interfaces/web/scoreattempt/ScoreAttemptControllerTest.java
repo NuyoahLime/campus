@@ -30,9 +30,28 @@ class ScoreAttemptControllerTest {
 
     @Test void listMineReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(actorId);
-        when(service.findMyScores(actorId)).thenReturn(List.of());
+        when(service.findMyApprovedScores(actorId)).thenReturn(List.of());
         mvc.perform(get("/api/v1/score-attempts/mine"))
                 .andExpect(status().isOk());
+    }
+
+    @Test void getMineReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
+        when(service.getMyApprovedScore(id, actorId))
+                .thenReturn(new ScoreAttemptResult(id, "APPROVED", "INTEGER"));
+        mvc.perform(get("/api/v1/score-attempts/mine/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test void getMineNotFoundReturns404() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(actorId);
+        when(service.getMyApprovedScore(id, actorId))
+                .thenThrow(new IllegalArgumentException("ScoreAttempt not found: " + id));
+        mvc.perform(get("/api/v1/score-attempts/mine/" + id))
+                .andExpect(status().isNotFound());
     }
 
     @Test void submitIntegerScoreReturns201() throws Exception {
