@@ -40,6 +40,21 @@ public class ScoreAttemptController {
         return ResponseEntity.ok(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
     }
 
+    @GetMapping("/mine/review-progress")
+    @PreAuthorize("hasRole('STUDENT')")
+    public List<ScoreAttemptResult> listProgress() {
+        UUID studentId = currentActor.requireUserId();
+        return service.listMyProgress(studentId);
+    }
+
+    @GetMapping("/mine/review-progress/{attemptId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ScoreAttemptResponse> getProgress(@PathVariable UUID attemptId) {
+        UUID studentId = currentActor.requireUserId();
+        ScoreAttemptResult r = service.getMyProgress(attemptId, studentId);
+        return ResponseEntity.ok(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ScoreAttemptResponse> submit(@Valid @RequestBody SubmitScoreRequest req) {

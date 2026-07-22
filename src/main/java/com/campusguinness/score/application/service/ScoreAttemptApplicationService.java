@@ -94,4 +94,18 @@ public class ScoreAttemptApplicationService {
                 .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
                 .orElseThrow(() -> new IllegalArgumentException("ScoreAttempt not found: " + attemptId));
     }
+    @Transactional(readOnly = true)
+    public List<ScoreAttemptResult> listMyProgress(UUID studentId) {
+        return repository.findByStudentId(studentId).stream()
+                .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ScoreAttemptResult getMyProgress(UUID attemptId, UUID studentId) {
+        return repository.findById(new ScoreAttemptId(attemptId))
+                .filter(s -> s.studentId().equals(studentId))
+                .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAttempt not found: " + attemptId));
+    }
 }
