@@ -57,6 +57,9 @@ public class ScoreAppealApplicationService {
 
     public ScoreAppealResult beginProcessing(UUID id, UUID handlerId) {
         var a = find(id);
+        if (!currentActor.isSuperAdmin()) {
+            AuthorizationPolicy.requireSchoolAdmin(membershipResolver, currentActor.requireUserId(), a.schoolId());
+        }
         a.beginProcessing(handlerId);
         repo.save(a);
         return result(a);

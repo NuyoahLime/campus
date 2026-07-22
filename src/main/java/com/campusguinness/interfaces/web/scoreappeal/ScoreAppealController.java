@@ -48,7 +48,7 @@ public class ScoreAppealController {
     }
 
     @PostMapping("/{id}/begin-processing")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
     public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id) {
         ScoreAppealResult r = service.beginProcessing(id, currentActor.requireUserId());
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));

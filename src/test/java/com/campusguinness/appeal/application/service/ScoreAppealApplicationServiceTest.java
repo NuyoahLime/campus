@@ -54,7 +54,9 @@ class ScoreAppealApplicationServiceTest {
 
     @Nested
     class BeginProcessing {
-        @Test void success() { var a=appeal(schoolId, studentId); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.beginProcessing(a.id().value(),UUID.randomUUID()).status()).isEqualTo("PROCESSING"); verify(repo).save(any()); }
+        @Test void success() { var a=appeal(schoolId, studentId); when(repo.findById(any())).thenReturn(Optional.of(a)); when(membershipResolver.isSchoolAdmin(actorId, schoolId)).thenReturn(true); assertThat(svc.beginProcessing(a.id().value(),UUID.randomUUID()).status()).isEqualTo("PROCESSING"); verify(repo).save(any()); }
+        @Test void successSuperAdmin() { var a=appeal(schoolId, studentId); when(repo.findById(any())).thenReturn(Optional.of(a)); when(currentActor.isSuperAdmin()).thenReturn(true); assertThat(svc.beginProcessing(a.id().value(),UUID.randomUUID()).status()).isEqualTo("PROCESSING"); verify(membershipResolver, never()).isSchoolAdmin(any(), any()); }
+        @Test void denyCrossSchool() { UUID otherSid=UUID.randomUUID(); var a=appeal(otherSid, studentId); when(repo.findById(any())).thenReturn(Optional.of(a)); when(membershipResolver.isSchoolAdmin(actorId, otherSid)).thenReturn(false); assertThatThrownBy(()->svc.beginProcessing(a.id().value(),UUID.randomUUID())).isInstanceOf(AccessDeniedException.class); verify(repo,never()).save(any()); }
         @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.beginProcessing(UUID.randomUUID(),UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); verify(repo,never()).save(any()); }
     }
 
