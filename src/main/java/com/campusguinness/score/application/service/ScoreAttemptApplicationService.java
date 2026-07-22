@@ -70,6 +70,17 @@ public class ScoreAttemptApplicationService {
                     "Actor is not assigned as responsible teacher for this activity project");
         }
 
+        // Verify student is assigned to this activity project
+        var assigned = jdbc.queryForList(
+                "SELECT 1 FROM activity_project_participants app " +
+                "JOIN activity_applications aa ON app.activity_application_id = aa.id " +
+                "WHERE app.activity_project_id = ? AND aa.applicant_id = ? AND aa.application_status = 'APPROVED'",
+                cmd.activityProjectId(), cmd.studentId());
+        if (assigned.isEmpty()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Student " + cmd.studentId() + " is not assigned to this activity project");
+        }
+
         var s = ScoreAttempt.create(new ScoreAttempt.Builder()
                 .id(new ScoreAttemptId(UUID.randomUUID())).schoolId(realSchoolId)
                 .activityProjectId(cmd.activityProjectId()).studentId(cmd.studentId())
