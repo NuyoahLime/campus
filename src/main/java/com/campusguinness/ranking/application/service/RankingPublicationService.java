@@ -78,7 +78,7 @@ public class RankingPublicationService {
         var rows = jdbc.queryForList(
                 "SELECT id, version_number, comparison_direction, ranked_student_count " +
                 "FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
-                "ORDER BY version_number DESC LIMIT 1", activityProjectId);
+                "AND withdrawn_at IS NULL ORDER BY version_number DESC LIMIT 1", activityProjectId);
         if (rows.isEmpty()) return Optional.empty();
 
         var row = rows.getFirst();
@@ -103,5 +103,72 @@ public class RankingPublicationService {
                 "SELECT COALESCE(MAX(version_number), 0) + 1 AS next FROM ranking_versions WHERE definition_id = ?",
                 Integer.class, activityProjectId);
         return rows.isEmpty() ? 1 : rows.getFirst();
+    }
+    // ── Withdrawal ──
+
+    public record HistoryItem(UUID versionId, int versionNumber, String status, Instant publishedAt,
+            UUID publishedBy, Instant withdrawnAt, UUID withdrawnBy, String withdrawalReason, int entryCount) {}
+
+    public void withdraw(UUID activityProjectId, UUID withdrawnBy, String reason) {
+        var rows = jdbc.queryForList(
+                "SELECT id FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
+                "AND withdrawn_at IS NULL ORDER BY version_number DESC LIMIT 1", activityProjectId);
+        if (rows.isEmpty()) throw new IllegalArgumentException("No current published ranking to withdraw");
+        UUID versionId = (UUID) rows.getFirst().get("id");
+        jdbc.update("UPDATE ranking_versions SET withdrawn_at = now(), withdrawn_by = ?, withdrawal_reason = ? WHERE id = ?",
+                withdrawnBy, reason, versionId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasCurrent(UUID activityProjectId) {
+        var rows = jdbc.queryForList(
+                "SELECT 1 FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
+                "AND withdrawn_at IS NULL ORDER BY version_number DESC LIMIT 1", activityProjectId);
+        return !rows.isEmpty();
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoryItem> getHistory(UUID activityProjectId) {
+        return jdbc.queryForList(
+                "SELECT rv.id, rv.version_number, rv.published_at, rv.published_by, " +
+                "rv.withdrawn_at, rv.withdrawn_by, rv.withdrawal_reason, " +
+                "(SELECT count(*) FROM ranking_entries WHERE version_id = rv.id) AS entry_count " +
+                "FROM ranking_versions rv WHERE rv.definition_id = ? ORDER BY rv.version_number DESC",
+                activityProjectId).stream()
+                .map(r -> {
+                    boolean withdrawn = r.get("withdrawn_at") != null;
+                    return new HistoryItem((UUID)r.get("id"), (int)r.get("version_number"),
+                            withdrawn ? "WITHDRAWN" : "CURRENT",
+                            (Instant)r.get("published_at"), (UUID)r.get("published_by"),
+                            (Instant)r.get("withdrawn_at"), (UUID)r.get("withdrawn_by"),
+                            (String)r.get("withdrawal_reason"),
+                            ((Number)r.get("entry_count")).intValue());
+                }).toList();
+    }
+
+    // ── Fix current query to exclude withdrawn ──
+
+    public Optional<PublicationResult> getCurrent(UUID activityProjectId) {
+        var rows = jdbc.queryForList(
+                "SELECT id, version_number, comparison_direction, ranked_student_count " +
+                "FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
+                "AND withdrawn_at IS NULL ORDER BY version_number DESC LIMIT 1", activityProjectId);
+        if (rows.isEmpty()) return Optional.empty();
+
+        var row = rows.getFirst();
+        UUID versionId = (UUID) row.get("id");
+
+        var entryRows = jdbc.queryForList(
+                "SELECT rank, student_id, score_value FROM ranking_entries WHERE version_id = ? ORDER BY rank, student_id",
+                versionId);
+
+        List<RankingCalculator.RankingEntry> entries = entryRows.stream()
+                .map(r -> new RankingCalculator.RankingEntry(
+                        (int) r.get("rank"), (UUID) r.get("student_id"), null, (String) r.get("score_value")))
+                .toList();
+
+        return Optional.of(new PublicationResult(versionId, activityProjectId,
+                (int) row.get("version_number"), (String) row.get("comparison_direction"),
+                (int) row.get("ranked_student_count"), entries));
     }
 }

@@ -51,6 +51,20 @@ public class RankingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/activity-projects/{activityProjectId}/ranking-withdraw")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public ResponseEntity<Void> withdraw(@PathVariable UUID activityProjectId,
+                                          @RequestBody WithdrawRequest req) {
+        publicationService.withdraw(activityProjectId, currentActor.requireUserId(), req.reason());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/activity-projects/{activityProjectId}/ranking-history")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    public List<RankingPublicationService.HistoryItem> getHistory(@PathVariable UUID activityProjectId) {
+        return publicationService.getHistory(activityProjectId);
+    }
+
     // ── Student ──
 
     @GetMapping("/student/activity-projects/{activityProjectId}/ranking")
@@ -102,4 +116,5 @@ public class RankingController {
     public record PublicRankingResponse(UUID activityProjectId, int version, String direction,
                                          int totalRanked, List<PublicRankEntry> entries) {}
     public record PublicRankEntry(int rank, String scoreValue) {}
+    public record WithdrawRequest(String reason) {}
 }
