@@ -1,11 +1,13 @@
 package com.campusguinness.infrastructure.security;
 
+import com.campusguinness.identity.application.query.AuthenticationAccount.SchoolMembershipRecord;
+
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,23 +25,31 @@ public final class CampusGuinnessUserDetails implements UserDetails {
     private final String passwordHash;
     private final String accountStatus;
     private final Set<GrantedAuthority> authorities;
+    private final List<SchoolMembershipRecord> schoolMemberships;
 
     public CampusGuinnessUserDetails(
             UUID userId,
             String loginName,
             String passwordHash,
             String accountStatus,
-            Set<GrantedAuthority> authorities) {
+            Set<GrantedAuthority> authorities,
+            List<SchoolMembershipRecord> schoolMemberships) {
         this.userId = userId;
         this.loginName = loginName;
         this.passwordHash = passwordHash;
         this.accountStatus = accountStatus;
         this.authorities = Collections.unmodifiableSet(authorities);
+        this.schoolMemberships = List.copyOf(schoolMemberships);
     }
 
     /** The domain User UUID — the single source of truth for actorId. */
     public UUID getUserId() {
         return userId;
+    }
+
+    /** ACTIVE school memberships with schoolId and roleInSchool. */
+    public List<SchoolMembershipRecord> getSchoolMemberships() {
+        return schoolMemberships;
     }
 
     // ── UserDetails contract ──

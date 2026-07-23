@@ -8,8 +8,14 @@ import router from './router';
 
 const app = createApp(App);
 
-app.use(createPinia());
+const pinia = createPinia();
+app.use(pinia);
 app.use(router);
 app.use(ElementPlus);
+
+// Initialize auth store session restore before mounting
+import { useAuthStore } from '@/stores/auth';
+const auth = useAuthStore();
+auth.restoreSession();
 
 app.mount('#app');

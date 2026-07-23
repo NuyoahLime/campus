@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AxiosError, AxiosInstance } from 'axios';
+import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 export class ApiError extends Error {
   constructor(
@@ -19,6 +19,22 @@ const http: AxiosInstance = axios.create({
   },
 });
 
+// Request interceptor: attach CSRF token to write requests
+http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  const method = (config.method || 'get').toLowerCase();
+  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    try {
+      const { getCsrfToken } = await import('./csrf');
+      const csrf = await getCsrfToken();
+      config.headers.set(csrf.headerName, csrf.token);
+    } catch {
+      // CSRF fetch failed — let request proceed without token (server will reject if required)
+    }
+  }
+  return config;
+});
+
+// Response interceptor: normalize errors and handle 401
 http.interceptors.response.use(
   (response) => response,
   (error: AxiosError<{ message?: string }>) => {
@@ -28,6 +44,15 @@ http.interceptors.response.use(
     const status = error.response.status;
     const serverMessage = error.response.data?.message;
     const message = serverMessage || getDefaultMessage(status);
+
+    // On 401, clear auth state to force re-login
+    if (status === 401) {
+      import('@/stores/auth').then(({ useAuthStore }) => {
+        const store = useAuthStore();
+        store.logout().catch(() => {});
+      });
+    }
+
     throw new ApiError(status, message);
   },
 );

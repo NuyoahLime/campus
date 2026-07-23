@@ -43,7 +43,7 @@ public class AuthController {
             contextRepo.saveContext(ctx, request, response);
 
             CampusGuinnessUserDetails user = (CampusGuinnessUserDetails) auth.getPrincipal();
-            return ResponseEntity.ok(LoginResponse.from(user));
+            return ResponseEntity.ok(AuthContextResponse.from(user));
         } catch (AuthenticationException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiErrorResponse.of("AUTHENTICATION_FAILED",
@@ -59,6 +59,6 @@ public class AuthController {
                     .body(ApiErrorResponse.of("AUTHENTICATION_REQUIRED",
                             "Authentication is required.", "/api/v1/auth/me"));
         }
-        return ResponseEntity.ok(LoginResponse.from(user));
+        return ResponseEntity.ok(AuthContextResponse.from(user));
     }
 }

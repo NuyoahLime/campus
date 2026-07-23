@@ -55,7 +55,7 @@ class AuthSessionFlowIT {
                 .with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"" + username + "\",\"password\":\"" + rawPassword + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
                 .andExpect(jsonPath("$.username").value(username))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
@@ -100,7 +100,7 @@ class AuthSessionFlowIT {
     @Test void contextRepoDirectSaveVerifiesCorrectBehavior() {
         var request = new MockHttpServletRequest();
         var response = new MockHttpServletResponse();
-        var user = new CampusGuinnessUserDetails(userId, username, encoder.encode(rawPassword), "NORMAL", java.util.Set.of());
+        var user = new CampusGuinnessUserDetails(userId, username, encoder.encode(rawPassword), "NORMAL", java.util.Set.of(), java.util.List.of());
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user, null);
         var ctx = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
         ctx.setAuthentication(auth);

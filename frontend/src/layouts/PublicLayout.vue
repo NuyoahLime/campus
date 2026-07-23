@@ -19,7 +19,12 @@
             </el-menu-item>
           </el-menu>
           <div class="header-actions">
-            <el-button type="primary" size="small" @click="$router.push('/login')">
+            <template v-if="auth.authenticated">
+              <span class="header-username">{{ auth.user?.username }}</span>
+              <el-button size="small" @click="goWorkspace">进入工作台</el-button>
+              <el-button size="small" text @click="handleLogout">退出</el-button>
+            </template>
+            <el-button v-else type="primary" size="small" @click="$router.push('/login')">
               登录
             </el-button>
           </div>
@@ -39,9 +44,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const router = useRouter();
+const auth = useAuthStore();
 const currentYear = new Date().getFullYear();
 
 const activeMenu = computed(() => {
@@ -50,6 +58,20 @@ const activeMenu = computed(() => {
   if (path.startsWith('/activities')) return '/activities';
   return path;
 });
+
+function goWorkspace() {
+  const roles = auth.roles;
+  const count = roles.filter((r) => ['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'SUPER_ADMIN'].includes(r)).length;
+  if (count > 1) {
+    router.push('/workspaces');
+  } else {
+    router.push(auth.defaultWorkspaceRoute());
+  }
+}
+
+async function handleLogout() {
+  await auth.logout();
+}
 </script>
 
 <style scoped>

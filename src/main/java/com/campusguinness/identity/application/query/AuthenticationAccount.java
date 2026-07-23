@@ -1,5 +1,6 @@
 package com.campusguinness.identity.application.query;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -14,5 +15,8 @@ public record AuthenticationAccount(
         String loginName,
         String passwordHash,
         String accountStatus,
-        String platformRole
-) {}
+        String platformRole,
+        List<SchoolMembershipRecord> memberships
+) {
+    public record SchoolMembershipRecord(UUID schoolId, String roleInSchool) {}
+}

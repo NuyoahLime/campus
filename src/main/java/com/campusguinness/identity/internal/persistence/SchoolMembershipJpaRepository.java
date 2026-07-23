@@ -12,4 +12,6 @@ public interface SchoolMembershipJpaRepository extends JpaRepository<SchoolMembe
 
     List<SchoolMembershipEntity> findByUserIdAndRoleInSchoolAndStatus(
             UUID userId, String roleInSchool, String status);
+
+    List<SchoolMembershipEntity> findByUserIdAndStatus(UUID userId, String status);
 }

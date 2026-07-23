@@ -30,6 +30,9 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
     /** Known platform roles that map to Spring Security authorities. */
     private static final Set<String> KNOWN_PLATFORM_ROLES = Set.of("SUPER_ADMIN");
 
+    /** Known school roles that map to Spring Security authorities. */
+    private static final Set<String> KNOWN_SCHOOL_ROLES = Set.of("STUDENT", "TEACHER", "SCHOOL_ADMIN");
+
     private final AuthenticationAccountQuery accountQuery;
 
     public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery) {
@@ -43,14 +46,17 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
         AuthenticationAccount account = accountQuery.findByLoginName(normalized)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
 
-        Set<GrantedAuthority> authorities = mapPlatformAuthorities(account);
+        Set<GrantedAuthority> authorities = new HashSet<>();
+        mapPlatformAuthorities(account, authorities);
+        mapSchoolAuthorities(account, authorities);
 
         return new CampusGuinnessUserDetails(
                 account.userId(),
                 account.loginName(),
                 account.passwordHash(),
                 account.accountStatus(),
-                authorities
+                authorities,
+                account.memberships()
         );
     }
 
@@ -65,9 +71,7 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
      * Map platform_role to GrantedAuthority using strict whitelist.
      * Unknown values are rejected with a WARN log.
      */
-    private Set<GrantedAuthority> mapPlatformAuthorities(AuthenticationAccount account) {
-        Set<GrantedAuthority> authorities = new HashSet<>();
-
+    private void mapPlatformAuthorities(AuthenticationAccount account, Set<GrantedAuthority> authorities) {
         String role = account.platformRole();
         if (role != null) {
             if (KNOWN_PLATFORM_ROLES.contains(role)) {
@@ -77,8 +81,22 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
                         role, account.userId());
             }
         }
-        // Note: ROLE_USER is not added by default. Add only if explicitly needed.
+    }
 
-        return authorities;
+    /**
+     * Map school membership roles to GrantedAuthority using strict whitelist.
+     * Only ACTIVE memberships are loaded by the query adapter.
+     * Unknown role_in_school values are logged and not granted.
+     */
+    private void mapSchoolAuthorities(AuthenticationAccount account, Set<GrantedAuthority> authorities) {
+        for (var m : account.memberships()) {
+            String role = m.roleInSchool();
+            if (KNOWN_SCHOOL_ROLES.contains(role)) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            } else {
+                log.warn("Unknown role_in_school '{}' for user {} in school {} — not granting authority",
+                        role, account.userId(), m.schoolId());
+            }
+        }
     }
 }

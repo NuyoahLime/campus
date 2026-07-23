@@ -1,38 +1,49 @@
 package com.campusguinness.identity.internal.persistence;
 
 import com.campusguinness.identity.application.query.AuthenticationAccount;
+import com.campusguinness.identity.application.query.AuthenticationAccount.SchoolMembershipRecord;
 import com.campusguinness.identity.application.query.AuthenticationAccountQuery;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
  * Adapter that implements {@link AuthenticationAccountQuery} using the existing
- * {@link UserJpaRepository}.
+ * {@link UserJpaRepository} and {@link SchoolMembershipJpaRepository}.
  * <p>
- * Only loads authentication-relevant columns. Does not load SchoolMembership.
+ * Loads authentication-relevant columns and ACTIVE school memberships for role mapping.
  */
 @Component
 class AuthenticationQueryAdapter implements AuthenticationAccountQuery {
 
-    private final UserJpaRepository jpa;
+    private final UserJpaRepository userJpa;
+    private final SchoolMembershipJpaRepository membershipJpa;
 
-    AuthenticationQueryAdapter(UserJpaRepository jpa) {
-        this.jpa = jpa;
+    AuthenticationQueryAdapter(UserJpaRepository userJpa, SchoolMembershipJpaRepository membershipJpa) {
+        this.userJpa = userJpa;
+        this.membershipJpa = membershipJpa;
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<AuthenticationAccount> findByLoginName(String loginName) {
-        return jpa.findByUsername(loginName)
-                .map(e -> new AuthenticationAccount(
-                        e.getId(),
-                        e.getUsername(),
-                        e.getPasswordHash(),
-                        e.getAccountStatus(),
-                        e.getPlatformRole()
-                ));
+        return userJpa.findByUsername(loginName)
+                .map(e -> {
+                    var memberships = membershipJpa
+                            .findByUserIdAndStatus(e.getId(), "ACTIVE").stream()
+                            .map(m -> new SchoolMembershipRecord(m.getSchoolId(), m.getRoleInSchool()))
+                            .toList();
+                    return new AuthenticationAccount(
+                            e.getId(),
+                            e.getUsername(),
+                            e.getPasswordHash(),
+                            e.getAccountStatus(),
+                            e.getPlatformRole(),
+                            memberships
+                    );
+                });
     }
 }
