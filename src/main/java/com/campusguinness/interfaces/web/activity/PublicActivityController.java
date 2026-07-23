@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -35,14 +34,16 @@ public class PublicActivityController {
 
     @GetMapping("/activities/{activityId}")
     public ResponseEntity<PublicActivityDetail> getDetail(@PathVariable UUID activityId) {
-        try {
-            Map<String, Object> a = service.getPublicDetail(activityId);
-            var projects = service.getPublicProjects(activityId).stream()
-                    .map(p -> new PublicProject(p.projectId())).toList();
-            return ResponseEntity.ok(new PublicActivityDetail(
-                    (UUID)a.get("id"), (String)a.get("title"), (String)a.get("description"),
-                    (String)a.get("execution_status"), projects));
-        } catch (IllegalArgumentException e) { return ResponseEntity.notFound().build(); }
+        var act = service.findById(activityId);
+        if (!"PUBLIC".equals(act.publicStatus().name())) return ResponseEntity.notFound().build();
+        var exec = act.executionStatus().name();
+        if (!"PUBLISHED".equals(exec) && !"IN_PROGRESS".equals(exec) && !"ENDED".equals(exec))
+            return ResponseEntity.notFound().build();
+
+        var projects = service.listProjects(activityId).stream()
+                .map(p -> new PublicProject(p.projectId())).toList();
+        return ResponseEntity.ok(new PublicActivityDetail(
+                act.id().value(), act.title(), act.description(), exec, projects));
     }
 
     public record PublicActivityItem(UUID id, String title,

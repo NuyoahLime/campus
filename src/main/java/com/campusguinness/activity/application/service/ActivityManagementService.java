@@ -6,10 +6,11 @@ import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
 import com.campusguinness.activity.application.result.ActivityResult;
 import com.campusguinness.activity.internal.domain.*;
+import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
 import com.campusguinness.project.application.port.ChallengeProjectRepository;
 import com.campusguinness.project.internal.domain.ChallengeProjectId;
 import com.campusguinness.project.internal.domain.ProjectStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,19 +24,21 @@ public class ActivityManagementService {
     private final ActivityProjectPort projectPort;
     private final ChallengeProjectRepository projectRepo;
     private final ResponsibleTeacherPort teacherPort;
-    private final JdbcTemplate jdbc;
+    private final SchoolMembershipQueryPort membershipPort;
 
     public ActivityManagementService(ActivityRepository repository,
                                       ActivityProjectPort projectPort,
                                       ChallengeProjectRepository projectRepo,
                                       ResponsibleTeacherPort teacherPort,
-                                      JdbcTemplate jdbc) {
+                                      SchoolMembershipQueryPort membershipPort) {
         this.repository = repository;
         this.projectPort = projectPort;
         this.projectRepo = projectRepo;
         this.teacherPort = teacherPort;
-        this.jdbc = jdbc;
+        this.membershipPort = membershipPort;
     }
+
+    // ── Create ──
 
     public ActivityResult create(CreateActivityCommand cmd) {
         var act = Activity.create(new Activity.Builder()
@@ -46,21 +49,118 @@ public class ActivityManagementService {
         return new ActivityResult(act.id().value(), act.executionStatus().name(), act.publicStatus().name());
     }
 
+    // ── Update DRAFT ──
+
+    public ActivityResult update(UUID activityId, String title, String description,
+                                  java.time.Instant startTime, java.time.Instant endTime,
+                                  String location) {
+        var act = find(activityId);
+        if (title != null) act.updateTitle(title);
+        if (description != null) act.updateDescription(description);
+        if (startTime != null || endTime != null) act.updateTimeRange(startTime, endTime);
+        if (location != null) act.updateLocation(location);
+        repository.save(act);
+        return new ActivityResult(act.id().value(), act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    // ── Execution Lifecycle ──
+
     public ActivityResult publish(UUID id) {
-        var act = find(id); act.publish(); repository.save(act);
+        var act = find(id);
+        requirePublishPrerequisites(act);
+        act.publish();
+        repository.save(act);
         return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
     }
 
-    private Activity find(UUID id) {
-        return repository.findById(new ActivityId(id))
-                .orElseThrow(() -> new IllegalArgumentException("Activity not found: " + id));
+    private void requirePublishPrerequisites(Activity act) {
+        if (act.title() == null || act.title().isBlank())
+            throw new IllegalStateException("Cannot publish: title is required");
+        if (act.startTime() == null)
+            throw new IllegalStateException("Cannot publish: startTime is required");
+        if (act.endTime() == null)
+            throw new IllegalStateException("Cannot publish: endTime is required");
+        if (act.startTime() != null && act.endTime() != null && act.endTime().isBefore(act.startTime()))
+            throw new IllegalStateException("Cannot publish: endTime must not be before startTime");
+        if (act.location() == null || act.location().isBlank())
+            throw new IllegalStateException("Cannot publish: location is required");
+        var projects = projectPort.findByActivity(act.id().value());
+        if (projects.isEmpty())
+            throw new IllegalStateException("Cannot publish: at least one project required");
+    }
+
+    public ActivityResult beginExecution(UUID id) {
+        var act = find(id);
+        act.beginExecution();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult finish(UUID id) {
+        var act = find(id);
+        act.end();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult cancel(UUID id) {
+        var act = find(id);
+        act.cancel();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    // ── Public Review (School) ──
+
+    public ActivityResult submitForPublicReview(UUID id) {
+        var act = find(id);
+        act.submitForReview();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult withdrawPublic(UUID id) {
+        var act = find(id);
+        act.schoolWithdraw();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    // ── Public Review (Platform Admin) ──
+
+    public ActivityResult platformApprove(UUID id) {
+        var act = find(id);
+        act.platformApprove();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult platformReject(UUID id, String reason) {
+        var act = find(id);
+        act.platformReject(reason);
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult makePublic(UUID id) {
+        var act = find(id);
+        act.makePublic();
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
+    }
+
+    public ActivityResult platformTakedown(UUID id, String reason) {
+        var act = find(id);
+        act.platformTakedown(reason);
+        repository.save(act);
+        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
     }
 
     // ── Project Configuration ──
 
     @Transactional(readOnly = true)
     public List<ActivityProjectPort.ProjectRecord> listProjects(UUID activityId) {
-        find(activityId); // validates activity exists
+        find(activityId);
         return projectPort.findByActivity(activityId);
     }
 
@@ -108,9 +208,15 @@ public class ActivityManagementService {
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
-        var membership = resolveTeacherMembership(activityId, teacherId);
+        if (!membershipPort.hasActiveTeacherMembership(teacherId, activity.schoolId())) {
+            throw new IllegalArgumentException(
+                    "Teacher not found or not an active TEACHER at school " + activity.schoolId());
+        }
 
-        UUID membershipId = (UUID) membership.get("id");
+        UUID membershipId = membershipPort.findActiveTeacherMembershipId(teacherId, activity.schoolId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Teacher not found or not an active TEACHER at school " + activity.schoolId()));
+
         if (teacherPort.exists(ap.id(), membershipId)) {
             throw new IllegalArgumentException("Teacher already assigned to this project");
         }
@@ -124,13 +230,26 @@ public class ActivityManagementService {
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
-        var membership = resolveTeacherMembership(activityId, teacherId);
+        UUID membershipId = membershipPort.findActiveTeacherMembershipId(teacherId, activity.schoolId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Teacher not found or not an active TEACHER at school " + activity.schoolId()));
 
-        UUID membershipId = (UUID) membership.get("id");
         if (!teacherPort.exists(ap.id(), membershipId)) {
             throw new IllegalArgumentException("Teacher not assigned to this project");
         }
         teacherPort.unassign(ap.id(), membershipId);
+    }
+
+    // ── Queries ──
+
+    @Transactional(readOnly = true)
+    public Activity findById(UUID id) { return find(id); }
+
+    // ── Internal ──
+
+    private Activity find(UUID id) {
+        return repository.findById(new ActivityId(id))
+                .orElseThrow(() -> new IllegalArgumentException("Activity not found: " + id));
     }
 
     private void requireNotTerminal(Activity activity) {
@@ -138,50 +257,5 @@ public class ActivityManagementService {
         if (s == ExecutionStatus.ENDED || s == ExecutionStatus.CANCELLED) {
             throw new IllegalStateException("Cannot modify " + s + " activity");
         }
-    }
-
-    private java.util.Map<String, Object> resolveTeacherMembership(UUID activityId, UUID teacherId) {
-        var activity = find(activityId);
-        var rows = jdbc.queryForList(
-                "SELECT id, role_in_school, status FROM school_memberships " +
-                        "WHERE user_id = ? AND school_id = ? AND role_in_school = 'TEACHER' AND status = 'ACTIVE'",
-                teacherId, activity.schoolId());
-        if (rows.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Teacher not found or not an active TEACHER at school " + activity.schoolId());
-        }
-        return rows.getFirst();
-    }
-
-    // ── Lifecycle ──
-
-    public ActivityResult finish(UUID id) {
-        var act = find(id);
-        act.end();
-        repository.save(act);
-        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
-    }
-
-    public ActivityResult cancel(UUID id) {
-        var act = find(id);
-        act.cancel();
-        repository.save(act);
-        return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
-    }
-
-    // ── Public Discovery ──
-
-    @Transactional(readOnly = true)
-    public java.util.Map<String, Object> getPublicDetail(UUID activityId) {
-        var rows = jdbc.queryForList(
-                "SELECT id, school_id, title, description, execution_status, start_time, end_time " +
-                "FROM activities WHERE id = ? AND public_status = 'PUBLIC' AND execution_status IN ('PUBLISHED','IN_PROGRESS','ENDED')", activityId);
-        if (rows.isEmpty()) throw new IllegalArgumentException("Activity not found: " + activityId);
-        return rows.getFirst();
-    }
-
-    @Transactional(readOnly = true)
-    public List<ActivityProjectPort.ProjectRecord> getPublicProjects(UUID activityId) {
-        return projectPort.findByActivity(activityId);
     }
 }

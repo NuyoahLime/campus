@@ -4,6 +4,7 @@ import com.campusguinness.identity.application.query.port.SchoolMembershipQueryP
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -18,5 +19,27 @@ class SchoolMembershipQueryAdapter implements SchoolMembershipQueryPort {
     public boolean hasActiveTeacherMembership(UUID userId, UUID schoolId) {
         return jpa.findByUserIdAndSchoolIdAndRoleInSchoolAndStatus(
                 userId, schoolId, "TEACHER", "ACTIVE").isPresent();
+    }
+
+    @Override
+    public boolean hasActiveSchoolAdminMembership(UUID userId, UUID schoolId) {
+        return jpa.findByUserIdAndSchoolIdAndRoleInSchoolAndStatus(
+                userId, schoolId, "SCHOOL_ADMIN", "ACTIVE").isPresent();
+    }
+
+    @Override
+    public Optional<UUID> findActiveSchoolAdminSchoolId(UUID userId) {
+        var memberships = jpa.findByUserIdAndRoleInSchoolAndStatus(
+                userId, "SCHOOL_ADMIN", "ACTIVE");
+        return memberships.stream()
+                .findFirst()
+                .map(SchoolMembershipEntity::getSchoolId);
+    }
+
+    @Override
+    public Optional<UUID> findActiveTeacherMembershipId(UUID userId, UUID schoolId) {
+        return jpa.findByUserIdAndSchoolIdAndRoleInSchoolAndStatus(
+                userId, schoolId, "TEACHER", "ACTIVE")
+                .map(SchoolMembershipEntity::getId);
     }
 }
