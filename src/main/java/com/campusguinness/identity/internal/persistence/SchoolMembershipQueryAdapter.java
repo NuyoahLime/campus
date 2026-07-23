@@ -4,6 +4,8 @@ import com.campusguinness.identity.application.query.port.SchoolMembershipQueryP
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,18 +30,40 @@ class SchoolMembershipQueryAdapter implements SchoolMembershipQueryPort {
     }
 
     @Override
+    public boolean hasActiveStudentMembership(UUID userId, UUID schoolId) {
+        return jpa.findByUserIdAndSchoolIdAndRoleInSchoolAndStatus(
+                userId, schoolId, "STUDENT", "ACTIVE").isPresent();
+    }
+
+    @Override
     public Optional<UUID> findActiveSchoolAdminSchoolId(UUID userId) {
-        var memberships = jpa.findByUserIdAndRoleInSchoolAndStatus(
-                userId, "SCHOOL_ADMIN", "ACTIVE");
-        return memberships.stream()
-                .findFirst()
-                .map(SchoolMembershipEntity::getSchoolId);
+        return jpa.findByUserIdAndRoleInSchoolAndStatus(userId, "SCHOOL_ADMIN", "ACTIVE")
+                .stream().findFirst().map(SchoolMembershipEntity::getSchoolId);
     }
 
     @Override
     public Optional<UUID> findActiveTeacherMembershipId(UUID userId, UUID schoolId) {
         return jpa.findByUserIdAndSchoolIdAndRoleInSchoolAndStatus(
-                userId, schoolId, "TEACHER", "ACTIVE")
-                .map(SchoolMembershipEntity::getId);
+                userId, schoolId, "TEACHER", "ACTIVE").map(SchoolMembershipEntity::getId);
+    }
+
+    @Override
+    public Optional<UUID> findActiveStudentMembershipId(UUID userId, UUID schoolId) {
+        return jpa.findByUserIdAndSchoolIdAndRoleInSchoolAndStatus(
+                userId, schoolId, "STUDENT", "ACTIVE").map(SchoolMembershipEntity::getId);
+    }
+
+    @Override
+    public List<UUID> findActiveStudentMembershipIds(UUID userId) {
+        return jpa.findByUserIdAndRoleInSchoolAndStatus(userId, "STUDENT", "ACTIVE")
+                .stream().map(SchoolMembershipEntity::getId).toList();
+    }
+
+    @Override
+    public Map<UUID, UUID> findUserIdsByMembershipIds(List<UUID> membershipIds) {
+        if (membershipIds.isEmpty()) return Map.of();
+        return jpa.findAllById(membershipIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        SchoolMembershipEntity::getId, SchoolMembershipEntity::getUserId));
     }
 }

@@ -5,7 +5,9 @@ import com.campusguinness.identity.internal.domain.User;
 import com.campusguinness.identity.internal.domain.UserId;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class UserRepositoryAdapter implements UserRepository {
@@ -34,5 +36,14 @@ class UserRepositoryAdapter implements UserRepository {
     @Override
     public boolean existsByUsername(String username) {
         return jpa.existsByUsername(username);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findByIds(List<UserId> ids) {
+        if (ids.isEmpty()) return List.of();
+        var uuids = ids.stream().map(UserId::value).toList();
+        return jpa.findAllById(uuids).stream()
+                .map(UserPersistenceMapper::toDomain).toList();
     }
 }

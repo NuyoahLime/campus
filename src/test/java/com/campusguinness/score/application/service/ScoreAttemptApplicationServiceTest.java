@@ -1,12 +1,16 @@
 package com.campusguinness.score.application.service;
 
+import com.campusguinness.activity.application.port.ActivityProjectParticipantPort;
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
+import com.campusguinness.activity.application.query.model.ParticipantListResult;
+import com.campusguinness.activity.application.query.port.ActivityParticipantQueryPort;
 import com.campusguinness.activity.internal.domain.Activity;
 import com.campusguinness.activity.internal.domain.ActivityId;
 import com.campusguinness.activity.internal.domain.ExecutionStatus;
 import com.campusguinness.activity.internal.domain.PublicStatus;
+import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
 import com.campusguinness.score.application.command.SubmitScoreCommand;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 import com.campusguinness.score.internal.domain.*;
@@ -16,8 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
+
 import java.time.Instant;
 import java.util.*;
 
@@ -26,25 +29,30 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class ScoreAttemptApplicationServiceTest {
     @Mock ScoreAttemptRepository repo;
     @Mock ActivityRepository activityRepo;
     @Mock ActivityProjectPort projectPort;
     @Mock ResponsibleTeacherPort teacherPort;
-    @Mock JdbcTemplate jdbc;
+    @Mock ActivityProjectParticipantPort projectParticipantPort;
+    @Mock ActivityParticipantQueryPort participantQueryPort;
+    @Mock SchoolMembershipQueryPort membershipPort;
     ScoreAttemptApplicationService svc;
 
     private final UUID schoolId = UUID.randomUUID();
     private final UUID activityId = UUID.randomUUID();
     private final UUID activityProjectId = UUID.randomUUID();
     private final UUID actorId = UUID.randomUUID();
-    private final UUID membershipId = UUID.randomUUID();
+    private final UUID teacherMembershipId = UUID.randomUUID();
+    private final UUID studentMembershipId = UUID.randomUUID();
     private final UUID projectId = UUID.randomUUID();
+    private final UUID studentId = UUID.randomUUID();
+    private final UUID participantId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        svc = new ScoreAttemptApplicationService(repo, activityRepo, projectPort, teacherPort, jdbc);
+        svc = new ScoreAttemptApplicationService(repo, activityRepo, projectPort, teacherPort,
+                projectParticipantPort, participantQueryPort, membershipPort);
     }
 
     private void stubHappyPath() {
@@ -56,19 +64,24 @@ class ScoreAttemptApplicationServiceTest {
                 .title("Test").executionStatus(ExecutionStatus.PUBLISHED).publicStatus(PublicStatus.NOT_SUBMITTED));
         when(activityRepo.findById(any())).thenReturn(Optional.of(activity));
 
-        when(jdbc.queryForList(anyString(), eq(UUID.class), eq(actorId), eq(schoolId)))
-                .thenReturn(List.of(membershipId));
+        when(membershipPort.findActiveTeacherMembershipId(actorId, schoolId))
+                .thenReturn(Optional.of(teacherMembershipId));
+        when(teacherPort.exists(activityProjectId, teacherMembershipId)).thenReturn(true);
 
-        when(teacherPort.exists(activityProjectId, membershipId)).thenReturn(true);
-        // Participant check returns non-empty (assigned)
-        lenient().doReturn(List.of(1)).when(jdbc).queryForList(
-                org.mockito.ArgumentMatchers.any(String.class),
-                org.mockito.ArgumentMatchers.any(UUID.class),
-                org.mockito.ArgumentMatchers.any(UUID.class));
+        when(membershipPort.findActiveStudentMembershipId(studentId, schoolId))
+                .thenReturn(Optional.of(studentMembershipId));
+
+        var participantResult = new ParticipantListResult(participantId, activityId, studentMembershipId,
+                studentId, null, null, null, null, 0, false, Instant.now());
+        when(participantQueryPort.findByActivityAndMemberships(activityId, List.of(studentMembershipId)))
+                .thenReturn(Optional.of(participantResult));
+
+        when(projectParticipantPort.existsByProjectAndParticipant(activityProjectId, participantId))
+                .thenReturn(true);
     }
 
     private SubmitScoreCommand cmd() {
-        return new SubmitScoreCommand(UUID.randomUUID(), activityProjectId, UUID.randomUUID(),
+        return new SubmitScoreCommand(UUID.randomUUID(), activityProjectId, studentId,
                 1, ScoreStorageType.INTEGER, new ScoreValue.IntegerScore(100),
                 Instant.now(), "teacher", actorId);
     }
@@ -97,10 +110,10 @@ class ScoreAttemptApplicationServiceTest {
                     .id(new ActivityId(activityId)).schoolId(schoolId).createdBy(UUID.randomUUID())
                     .title("Test").executionStatus(ExecutionStatus.PUBLISHED).publicStatus(PublicStatus.NOT_SUBMITTED));
             when(activityRepo.findById(any())).thenReturn(Optional.of(activity));
-            when(jdbc.queryForList(anyString(), eq(UUID.class), eq(actorId), eq(schoolId)))
-                    .thenReturn(List.of());
+            when(membershipPort.findActiveTeacherMembershipId(actorId, schoolId))
+                    .thenReturn(Optional.empty());
             assertThatThrownBy(() -> svc.submit(cmd()))
-                    .isInstanceOf(AccessDeniedException.class);
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             verify(repo, never()).save(any());
         }
 
@@ -111,11 +124,55 @@ class ScoreAttemptApplicationServiceTest {
                     .id(new ActivityId(activityId)).schoolId(schoolId).createdBy(UUID.randomUUID())
                     .title("Test").executionStatus(ExecutionStatus.PUBLISHED).publicStatus(PublicStatus.NOT_SUBMITTED));
             when(activityRepo.findById(any())).thenReturn(Optional.of(activity));
-            when(jdbc.queryForList(anyString(), eq(UUID.class), eq(actorId), eq(schoolId)))
-                    .thenReturn(List.of(membershipId));
-            when(teacherPort.exists(activityProjectId, membershipId)).thenReturn(false);
+            when(membershipPort.findActiveTeacherMembershipId(actorId, schoolId))
+                    .thenReturn(Optional.of(teacherMembershipId));
+            when(teacherPort.exists(activityProjectId, teacherMembershipId)).thenReturn(false);
             assertThatThrownBy(() -> svc.submit(cmd()))
-                    .isInstanceOf(AccessDeniedException.class);
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            verify(repo, never()).save(any());
+        }
+
+        @Test void shouldDenyWhenStudentNotInActivityRoster() {
+            var apRecord = new ActivityProjectPort.ProjectRecord(activityProjectId, activityId, projectId);
+            when(projectPort.findById(activityProjectId)).thenReturn(Optional.of(apRecord));
+            var activity = Activity.reconstitute(new Activity.Builder()
+                    .id(new ActivityId(activityId)).schoolId(schoolId).createdBy(UUID.randomUUID())
+                    .title("Test").executionStatus(ExecutionStatus.PUBLISHED).publicStatus(PublicStatus.NOT_SUBMITTED));
+            when(activityRepo.findById(any())).thenReturn(Optional.of(activity));
+            when(membershipPort.findActiveTeacherMembershipId(actorId, schoolId))
+                    .thenReturn(Optional.of(teacherMembershipId));
+            when(teacherPort.exists(activityProjectId, teacherMembershipId)).thenReturn(true);
+            when(membershipPort.findActiveStudentMembershipId(studentId, schoolId))
+                    .thenReturn(Optional.of(studentMembershipId));
+            when(participantQueryPort.findByActivityAndMemberships(activityId, List.of(studentMembershipId)))
+                    .thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.submit(cmd()))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                    .hasMessageContaining("not in the activity participant roster");
+            verify(repo, never()).save(any());
+        }
+
+        @Test void shouldDenyWhenStudentNotAssignedToProject() {
+            var apRecord = new ActivityProjectPort.ProjectRecord(activityProjectId, activityId, projectId);
+            when(projectPort.findById(activityProjectId)).thenReturn(Optional.of(apRecord));
+            var activity = Activity.reconstitute(new Activity.Builder()
+                    .id(new ActivityId(activityId)).schoolId(schoolId).createdBy(UUID.randomUUID())
+                    .title("Test").executionStatus(ExecutionStatus.PUBLISHED).publicStatus(PublicStatus.NOT_SUBMITTED));
+            when(activityRepo.findById(any())).thenReturn(Optional.of(activity));
+            when(membershipPort.findActiveTeacherMembershipId(actorId, schoolId))
+                    .thenReturn(Optional.of(teacherMembershipId));
+            when(teacherPort.exists(activityProjectId, teacherMembershipId)).thenReturn(true);
+            when(membershipPort.findActiveStudentMembershipId(studentId, schoolId))
+                    .thenReturn(Optional.of(studentMembershipId));
+            var participantResult = new ParticipantListResult(participantId, activityId, studentMembershipId,
+                    studentId, null, null, null, null, 0, false, Instant.now());
+            when(participantQueryPort.findByActivityAndMemberships(activityId, List.of(studentMembershipId)))
+                    .thenReturn(Optional.of(participantResult));
+            when(projectParticipantPort.existsByProjectAndParticipant(activityProjectId, participantId))
+                    .thenReturn(false);
+            assertThatThrownBy(() -> svc.submit(cmd()))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                    .hasMessageContaining("not assigned to this activity project");
             verify(repo, never()).save(any());
         }
     }
@@ -143,6 +200,24 @@ class ScoreAttemptApplicationServiceTest {
             when(repo.findApprovedByIdAndStudentId(any(), any())).thenReturn(Optional.empty());
             assertThatThrownBy(() -> svc.getMyApprovedScore(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Nested
+    class GetMyProgress {
+        @Test void shouldUseDatabaseOwnerFilter() {
+            UUID sid = UUID.randomUUID(), aid = UUID.randomUUID();
+            var s = approved(sid);
+            when(repo.findByIdAndStudentId(aid, sid)).thenReturn(Optional.of(s));
+            var r = svc.getMyProgress(aid, sid);
+            assertThat(r.status()).isEqualTo("APPROVED");
+            verify(repo).findByIdAndStudentId(aid, sid);
+        }
+        @Test void shouldReturn404ForOthersScore() {
+            when(repo.findByIdAndStudentId(any(), any())).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.getMyProgress(UUID.randomUUID(), UUID.randomUUID()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("ScoreAttempt not found");
         }
     }
 

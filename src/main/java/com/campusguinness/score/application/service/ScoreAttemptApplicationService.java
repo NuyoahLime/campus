@@ -2,14 +2,18 @@ package com.campusguinness.score.application.service;
 
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.application.port.ActivityProjectParticipantPort;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
+import com.campusguinness.activity.application.query.port.ActivityParticipantQueryPort;
 import com.campusguinness.activity.internal.domain.ActivityId;
 import com.campusguinness.activity.internal.domain.ExecutionStatus;
+import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
 import com.campusguinness.score.application.command.SubmitScoreCommand;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 import com.campusguinness.score.application.result.ScoreAttemptResult;
 import com.campusguinness.score.internal.domain.*;
-import org.springframework.jdbc.core.JdbcTemplate;
+
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,18 +27,24 @@ public class ScoreAttemptApplicationService {
     private final ActivityRepository activityRepository;
     private final ActivityProjectPort projectPort;
     private final ResponsibleTeacherPort teacherPort;
-    private final JdbcTemplate jdbc;
+    private final ActivityProjectParticipantPort projectParticipantPort;
+    private final ActivityParticipantQueryPort participantQueryPort;
+    private final SchoolMembershipQueryPort membershipPort;
 
     public ScoreAttemptApplicationService(ScoreAttemptRepository repository,
                                            ActivityRepository activityRepository,
                                            ActivityProjectPort projectPort,
                                            ResponsibleTeacherPort teacherPort,
-                                           JdbcTemplate jdbc) {
+                                           ActivityProjectParticipantPort projectParticipantPort,
+                                           ActivityParticipantQueryPort participantQueryPort,
+                                           SchoolMembershipQueryPort membershipPort) {
         this.repository = repository;
         this.activityRepository = activityRepository;
         this.projectPort = projectPort;
         this.teacherPort = teacherPort;
-        this.jdbc = jdbc;
+        this.projectParticipantPort = projectParticipantPort;
+        this.participantQueryPort = participantQueryPort;
+        this.membershipPort = membershipPort;
     }
 
     public ScoreAttemptResult submit(SubmitScoreCommand cmd) {
@@ -49,35 +59,41 @@ public class ScoreAttemptApplicationService {
         UUID realSchoolId = activity.schoolId();
 
         // Deny submission for terminal activity states
-        var execStatus = activity.executionStatus();
-        if (execStatus == ExecutionStatus.ENDED || execStatus == ExecutionStatus.CANCELLED) {
-            throw new IllegalStateException("Cannot submit score for " + execStatus + " activity");
+        if (activity.executionStatus() == ExecutionStatus.ENDED
+                || activity.executionStatus() == ExecutionStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot submit score for " + activity.executionStatus() + " activity");
         }
 
         // Verify actor has ACTIVE TEACHER membership at this school
-        var rows = jdbc.queryForList(
-                "SELECT id FROM school_memberships WHERE user_id = ? AND school_id = ? AND role_in_school = 'TEACHER' AND status = 'ACTIVE'",
-                UUID.class, cmd.enteredBy(), realSchoolId);
-        if (rows.isEmpty()) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Actor " + cmd.enteredBy() + " is not an ACTIVE TEACHER at school " + realSchoolId);
-        }
-        UUID membershipId = rows.getFirst();
+        UUID teacherMembershipId = membershipPort.findActiveTeacherMembershipId(
+                cmd.enteredBy(), realSchoolId)
+                .orElseThrow(() -> new AccessDeniedException(
+                        "Actor " + cmd.enteredBy() + " is not an ACTIVE TEACHER at school " + realSchoolId));
 
         // Verify responsible teacher assignment
-        if (!teacherPort.exists(apRecord.id(), membershipId)) {
-            throw new org.springframework.security.access.AccessDeniedException(
+        if (!teacherPort.exists(apRecord.id(), teacherMembershipId)) {
+            throw new AccessDeniedException(
                     "Actor is not assigned as responsible teacher for this activity project");
         }
 
-        // Verify student is assigned to this activity project
-        var assigned = jdbc.queryForList(
-                "SELECT 1 FROM activity_project_participants app " +
-                "JOIN activity_applications aa ON app.activity_application_id = aa.id " +
-                "WHERE app.activity_project_id = ? AND aa.applicant_id = ? AND aa.application_status = 'APPROVED'",
-                cmd.activityProjectId(), cmd.studentId());
-        if (assigned.isEmpty()) {
-            throw new org.springframework.security.access.AccessDeniedException(
+        // Verify student is an active STUDENT in this school
+        UUID studentMembershipId = membershipPort.findActiveStudentMembershipId(
+                cmd.studentId(), realSchoolId)
+                .orElseThrow(() -> new AccessDeniedException(
+                        "Student " + cmd.studentId() + " is not an active STUDENT at school " + realSchoolId));
+
+        // Verify student is in the activity participant roster
+        var participantOpt = participantQueryPort.findByActivityAndMemberships(
+                activity.id().value(), List.of(studentMembershipId));
+        if (participantOpt.isEmpty()) {
+            throw new AccessDeniedException(
+                    "Student " + cmd.studentId() + " is not in the activity participant roster");
+        }
+
+        // Verify student is assigned to this specific activity project
+        if (!projectParticipantPort.existsByProjectAndParticipant(
+                apRecord.id(), participantOpt.get().participantId())) {
+            throw new AccessDeniedException(
                     "Student " + cmd.studentId() + " is not assigned to this activity project");
         }
 
@@ -105,6 +121,7 @@ public class ScoreAttemptApplicationService {
                 .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
                 .orElseThrow(() -> new IllegalArgumentException("ScoreAttempt not found: " + attemptId));
     }
+
     @Transactional(readOnly = true)
     public List<ScoreAttemptResult> listMyProgress(UUID studentId) {
         return repository.findByStudentId(studentId).stream()
@@ -114,8 +131,7 @@ public class ScoreAttemptApplicationService {
 
     @Transactional(readOnly = true)
     public ScoreAttemptResult getMyProgress(UUID attemptId, UUID studentId) {
-        return repository.findById(new ScoreAttemptId(attemptId))
-                .filter(s -> s.studentId().equals(studentId))
+        return repository.findByIdAndStudentId(attemptId, studentId)
                 .map(s -> new ScoreAttemptResult(s.id().value(), s.status().name(), s.scoreStorageType().name()))
                 .orElseThrow(() -> new IllegalArgumentException("ScoreAttempt not found: " + attemptId));
     }

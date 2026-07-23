@@ -1,5 +1,7 @@
 package com.campusguinness.identity.application.port;
 import com.campusguinness.identity.internal.domain.User;
 import com.campusguinness.identity.internal.domain.UserId;
+import java.util.List;
 import java.util.Optional;
-public interface UserRepository { void save(User u); Optional<User> findById(UserId id); boolean existsByUsername(String username); }
+import java.util.UUID;
+public interface UserRepository { void save(User u); Optional<User> findById(UserId id); boolean existsByUsername(String username); List<User> findByIds(List<UserId> ids); }

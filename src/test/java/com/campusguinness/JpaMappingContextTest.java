@@ -36,12 +36,12 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("All 19 entities are scanned by JPA metamodel")
+    @DisplayName("All 20 entities are scanned by JPA metamodel")
     void all19EntitiesAreScanned() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         assertThat(entities)
-                .as("Expected 20 JPA entities, found %d", entities.size())
-                .hasSize(20);
+                .as("Expected 21 JPA entities, found %d", entities.size())
+                .hasSize(21);
     }
 
     @Test
@@ -55,13 +55,14 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     void flywayExecutedAll15Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(18);
+        assertThat(count).isEqualTo(19);
     }
 
     @Test
     @DisplayName("Hibernate did not create or alter any tables")
     void hibernateDidNotCreateTables() {
         // 33 business tables + 2 spring_session tables + 1 flyway_schema_history = 36
+        // (activity_participants already existed in V005; V019 drops and recreates activity_project_participants)
         Integer totalTables = jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables " +
                         "WHERE table_schema='public' AND table_type='BASE TABLE'", Integer.class);

@@ -5,6 +5,7 @@ import com.campusguinness.score.internal.domain.ScoreAttempt;
 import com.campusguinness.score.internal.domain.ScoreAttemptId;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,7 @@ import java.util.UUID;
 class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
     private final ScoreAttemptJpaRepository jpaRepository;
     ScoreAttemptRepositoryAdapter(ScoreAttemptJpaRepository r) { this.jpaRepository = r; }
+
     @Override @Transactional public void save(ScoreAttempt s) {
         var existing = jpaRepository.findById(s.id().value());
         if (existing.isPresent()) {
@@ -24,6 +26,11 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
     }
     @Override @Transactional(readOnly = true) public Optional<ScoreAttempt> findById(ScoreAttemptId id) {
         return jpaRepository.findById(id.value()).map(ScoreAttemptPersistenceMapper::toDomain);
+    }
+    @Override @Transactional(readOnly = true)
+    public Optional<ScoreAttempt> findByIdAndStudentId(UUID id, UUID studentId) {
+        return jpaRepository.findByIdAndStudentId(id, studentId)
+                .map(ScoreAttemptPersistenceMapper::toDomain);
     }
     @Override @Transactional(readOnly = true) public List<ScoreAttempt> findByStudentId(UUID studentId) {
         return jpaRepository.findByStudentId(studentId).stream()
@@ -43,5 +50,15 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
     public List<ScoreAttempt> findApprovedByActivityProjectId(UUID activityProjectId) {
         return jpaRepository.findByActivityProjectIdAndScoreStatus(activityProjectId, "APPROVED").stream()
                 .map(ScoreAttemptPersistenceMapper::toDomain).toList();
+    }
+    @Override @Transactional(readOnly = true)
+    public boolean existsByActivityProjectIdAndStudentId(UUID activityProjectId, UUID studentId) {
+        return jpaRepository.existsByActivityProjectIdAndStudentId(activityProjectId, studentId);
+    }
+    @Override @Transactional(readOnly = true)
+    public List<ScoreAttempt> findByActivityProjectIdAndStudentIds(UUID activityProjectId, List<UUID> studentIds) {
+        if (studentIds.isEmpty()) return List.of();
+        return jpaRepository.findByActivityProjectIdAndStudentIdIn(activityProjectId, studentIds)
+                .stream().map(ScoreAttemptPersistenceMapper::toDomain).toList();
     }
 }
