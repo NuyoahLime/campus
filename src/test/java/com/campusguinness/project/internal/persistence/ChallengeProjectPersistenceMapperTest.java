@@ -17,6 +17,10 @@ class ChallengeProjectPersistenceMapperTest {
         e.setScoreStorageType("INTEGER"); e.setScoreIndicatorType("NUMERIC");
         e.setComparisonDirection("HIGHER_BETTER"); e.setEffectiveScoreRule("BEST");
         e.setAllowTie(false); e.setProjectStatus(status);
+        e.setDescription("desc text");
+        e.setVenueRequirements("needs venue");
+        e.setEquipmentRequirements("needs equipment");
+        e.setRulesText("rules here");
         e.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
         e.setUpdatedAt(Instant.parse("2026-06-01T00:00:00Z"));
         return e;
@@ -45,6 +49,15 @@ class ChallengeProjectPersistenceMapperTest {
             assertThat(domain.status()).isEqualTo(ProjectStatus.ARCHIVED);
             assertThat(domain.domainEvents()).isEmpty();
         }
+        @Test @DisplayName("restores content fields correctly")
+        void shouldRestoreContentFields() {
+            var entity = buildEntity("DRAFT");
+            var domain = ChallengeProjectPersistenceMapper.toDomain(entity);
+            assertThat(domain.description()).isEqualTo("desc text");
+            assertThat(domain.venueRequirements()).isEqualTo("needs venue");
+            assertThat(domain.equipmentRequirements()).isEqualTo("needs equipment");
+            assertThat(domain.scoreConfig().rulesText()).isEqualTo("rules here");
+        }
     }
 
     @Nested @DisplayName("Domain → Entity")
@@ -55,10 +68,13 @@ class ChallengeProjectPersistenceMapperTest {
                     new ProjectName("test"), new ProjectCategory("MATH"),
                     new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
                             ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false),
-                    "desc");
+                    "desc", "needs venue", "needs equipment");
             var entity = ChallengeProjectPersistenceMapper.toEntity(domain);
             assertThat(entity.getId()).isEqualTo(domain.id().value());
             assertThat(entity.getProjectStatus()).isEqualTo("DRAFT");
+            assertThat(entity.getDescription()).isEqualTo("desc");
+            assertThat(entity.getVenueRequirements()).isEqualTo("needs venue");
+            assertThat(entity.getEquipmentRequirements()).isEqualTo("needs equipment");
         }
     }
 }

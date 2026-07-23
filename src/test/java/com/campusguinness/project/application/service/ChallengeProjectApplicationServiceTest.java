@@ -41,7 +41,7 @@ class ChallengeProjectApplicationServiceTest {
                 "校园数学挑战赛", "MATH", "INTEGER", "NUMERIC",
                 "HIGHER_BETTER", "BEST", false,
                 "次", null, null, null,
-                "面向全校的数学竞赛活动");
+                "面向全校的数学竞赛活动", null, null);
     }
 
     @Nested
@@ -74,11 +74,31 @@ class ChallengeProjectApplicationServiceTest {
             var cmd = new CreateChallengeProjectCommand(
                     "valid name", "valid category", "INVALID_TYPE", "NUMERIC",
                     "HIGHER_BETTER", "BEST", false,
-                    null, null, null, null, "desc");
+                    null, null, null, null, "desc", null, null);
 
             assertThatThrownBy(() -> service.create(cmd))
                     .isInstanceOf(IllegalArgumentException.class);
             verify(repository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("persists content fields correctly")
+        void shouldPersistContentFields() {
+            var cmd = new CreateChallengeProjectCommand(
+                    "测试项目", "SPEED", "INTEGER", "NUMERIC",
+                    "HIGHER_BETTER", "BEST", false,
+                    "秒", null, null, "比赛规则文本",
+                    "描述", "需要跑道", "需要计时器");
+
+            ArgumentCaptor<ChallengeProject> captor = ArgumentCaptor.forClass(ChallengeProject.class);
+            service.create(cmd);
+
+            verify(repository).save(captor.capture());
+            ChallengeProject saved = captor.getValue();
+            assertThat(saved.description()).isEqualTo("描述");
+            assertThat(saved.venueRequirements()).isEqualTo("需要跑道");
+            assertThat(saved.equipmentRequirements()).isEqualTo("需要计时器");
+            assertThat(saved.scoreConfig().rulesText()).isEqualTo("比赛规则文本");
         }
     }
 
@@ -109,7 +129,7 @@ class ChallengeProjectApplicationServiceTest {
                     new ChallengeProjectId(id), new ProjectName("测试"), new ProjectCategory("SCIENCE"),
                     new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
                             ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false),
-                    "desc");
+                    "desc", null, null);
             when(repository.findById(any())).thenReturn(Optional.of(project));
 
             ChallengeProjectResult result = service.publish(id);

@@ -1,6 +1,7 @@
 package com.campusguinness.project.application.query;
 
 import com.campusguinness.project.application.query.model.ChallengeProjectListResult;
+import com.campusguinness.project.application.query.model.PublicProjectListFilter;
 import com.campusguinness.project.application.query.model.QueryPage;
 import com.campusguinness.project.application.query.port.ChallengeProjectQueryPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,5 +34,32 @@ class ChallengeProjectQueryServiceTest {
         var r = svc.listPublic(0, 20);
         assertThat(r.items()).isEmpty();
         assertThat(r.totalElements()).isEqualTo(0);
+    }
+
+    @Test void delegatesFilteredPage() {
+        List<ChallengeProjectListResult> items = Collections.emptyList();
+        var filter = new PublicProjectListFilter("math", "MATH", "INTEGER", "venue", "equip");
+        when(port.findPublished(filter, 1, 10)).thenReturn(new QueryPage<>(items, 1, 10, 0));
+        svc.listPublic(filter, 1, 10);
+        verify(port).findPublished(filter, 1, 10);
+    }
+    @Test void rejectsNegativePageWithFilter() {
+        var filter = new PublicProjectListFilter(null, null, null, null, null);
+        assertThatThrownBy(() -> svc.listPublic(filter, -1, 20)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void rejectsNullFilter() {
+        assertThatThrownBy(() -> svc.listPublic(null, 0, 20)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void rejectsInvalidScoreStorageType() {
+        var filter = new PublicProjectListFilter(null, null, "INVALID", null, null);
+        assertThatThrownBy(() -> svc.listPublic(filter, 0, 20))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid scoreStorageType");
+    }
+    @Test void acceptsValidScoreStorageType() {
+        var filter = new PublicProjectListFilter(null, null, "DECIMAL", null, null);
+        when(port.findPublished(filter, 0, 20)).thenReturn(new QueryPage<>(Collections.emptyList(), 0, 20, 0));
+        svc.listPublic(filter, 0, 20);
+        verify(port).findPublished(filter, 0, 20);
     }
 }

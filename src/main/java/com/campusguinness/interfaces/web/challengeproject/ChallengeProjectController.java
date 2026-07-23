@@ -32,7 +32,7 @@ public class ChallengeProjectController {
             @RequestParam(defaultValue = "20") int size) {
         var result = queryService.listPublic(page, size);
         var items = result.items().stream()
-                .map(r -> new ChallengeProjectListItem(r.id(), r.name(), r.category(),
+                .map(r -> new ChallengeProjectListItem(r.projectId(), r.name(), r.category(),
                         r.scoreStorageType(), r.comparisonDirection(), r.projectStatus(), r.createdAt()))
                 .toList();
         return ResponseEntity.ok(PageResponse.of(items, result.page(), result.size(), result.totalElements()));
@@ -44,7 +44,8 @@ public class ChallengeProjectController {
         var cmd = new CreateChallengeProjectCommand(
                 req.name(), req.category(), req.scoreStorageType(), req.scoreIndicatorType(),
                 req.comparisonDirection(), req.effectiveScoreRule(), req.allowTie(),
-                req.scoreUnit(), req.decimalPlaces(), req.gradeOrder(), req.rulesText(), req.description());
+                req.scoreUnit(), req.decimalPlaces(), req.gradeOrder(), req.rulesText(), req.description(),
+                req.venueRequirements(), req.equipmentRequirements());
         ChallengeProjectResult result = service.create(cmd);
         return ResponseEntity.created(URI.create("/api/v1/challenge-projects/" + result.id()))
                 .body(new ChallengeProjectResponse(result.id(), result.name(), result.status()));

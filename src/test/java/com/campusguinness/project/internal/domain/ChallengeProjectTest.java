@@ -111,12 +111,46 @@ class ChallengeProjectTest {
                     ScoreStorageType.DECIMAL, ScoreIndicatorType.NUMERIC,
                     ComparisonDirection.HIGHER_BETTER, "米", 2, "BEST", null, null, true);
 
-            ChallengeProject project = ChallengeProject.create(id, name, category, scoreConfig, null);
+            ChallengeProject project = ChallengeProject.create(id, name, category, scoreConfig, null, null, null);
 
             assertThat(project.status()).isEqualTo(ProjectStatus.DRAFT);
             assertThat(project.name()).isEqualTo(name);
             assertThat(project.domainEvents()).hasSize(1);
             assertThat(project.domainEvents().getFirst()).isInstanceOf(ChallengeProjectCreated.class);
+        }
+
+        @Test
+        @DisplayName("CG-PROJECT-001: create with content fields stores them correctly")
+        void shouldStoreContentFields() {
+            var id = new ChallengeProjectId(UUID.randomUUID());
+            var name = new ProjectName("短跑比赛");
+            var category = new ProjectCategory("SPEED");
+            var scoreConfig = new ScoreConfig(
+                    ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
+                    ComparisonDirection.LOWER_BETTER, "秒", null, "BEST", null, null, true);
+
+            ChallengeProject project = ChallengeProject.create(id, name, category, scoreConfig,
+                    "描述内容", "需要塑胶跑道", "需要秒表");
+
+            assertThat(project.description()).isEqualTo("描述内容");
+            assertThat(project.venueRequirements()).isEqualTo("需要塑胶跑道");
+            assertThat(project.equipmentRequirements()).isEqualTo("需要秒表");
+        }
+
+        @Test
+        @DisplayName("CG-PROJECT-001: create with null content fields is allowed")
+        void shouldAllowNullContentFields() {
+            var id = new ChallengeProjectId(UUID.randomUUID());
+            var name = new ProjectName("测试");
+            var category = new ProjectCategory("MATH");
+            var scoreConfig = new ScoreConfig(
+                    ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
+                    ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, true);
+
+            ChallengeProject project = ChallengeProject.create(id, name, category, scoreConfig, null, null, null);
+
+            assertThat(project.venueRequirements()).isNull();
+            assertThat(project.equipmentRequirements()).isNull();
         }
     }
 
@@ -133,7 +167,7 @@ class ChallengeProjectTest {
                     new ProjectCategory("SPEED"),
                     new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
                             ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, true),
-                    null);
+                    null, null, null);
         }
 
         @Test
@@ -206,7 +240,7 @@ class ChallengeProjectTest {
                     new ProjectCategory("SPEED"),
                     new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
                             ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, true),
-                    null);
+                    null, null, null);
             assertThatThrownBy(() -> project.domainEvents().clear())
                     .isInstanceOf(UnsupportedOperationException.class);
         }

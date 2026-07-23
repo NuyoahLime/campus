@@ -28,7 +28,7 @@ class ChallengeProjectRepositoryAdapterTest {
                 new ProjectCategory("MATH"),
                 new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
                         ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false),
-                "desc");
+                "desc", null, null);
     }
 
     @Nested @DisplayName("save")

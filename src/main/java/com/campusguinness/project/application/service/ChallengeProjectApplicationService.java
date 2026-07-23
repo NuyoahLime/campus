@@ -37,7 +37,8 @@ public class ChallengeProjectApplicationService {
                 cmd.scoreUnit(), cmd.decimalPlaces(), cmd.effectiveScoreRule(),
                 cmd.gradeOrder(), cmd.rulesText(), cmd.allowTie());
 
-        ChallengeProject project = ChallengeProject.create(id, name, category, scoreConfig, cmd.description());
+        ChallengeProject project = ChallengeProject.create(id, name, category, scoreConfig,
+                cmd.description(), cmd.venueRequirements(), cmd.equipmentRequirements());
         repository.save(project);
 
         return new ChallengeProjectResult(id.value(), cmd.name(), project.status().name());

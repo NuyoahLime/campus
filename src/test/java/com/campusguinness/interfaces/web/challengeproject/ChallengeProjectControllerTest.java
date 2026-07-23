@@ -44,7 +44,7 @@ class ChallengeProjectControllerTest {
         @Test void shouldReturn400WhenNameBlank() throws Exception {
             mvc.perform(post("/api/v1/challenge-projects")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new CreateChallengeProjectRequest("","MATH","INTEGER","NUMERIC","HIGHER_BETTER","BEST",false,null,null,null,null,null))))
+                    .content(mapper.writeValueAsString(new CreateChallengeProjectRequest("","MATH","INTEGER","NUMERIC","HIGHER_BETTER","BEST",false,null,null,null,null,null,null,null))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
@@ -54,7 +54,7 @@ class ChallengeProjectControllerTest {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
             var project = ChallengeProject.create(new ChallengeProjectId(id), new ProjectName("test"), new ProjectCategory("MATH"),
-                    new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC, ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false), "desc");
+                    new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC, ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false), "desc", null, null);
             when(service.findById(id)).thenReturn(project);
             mvc.perform(get("/api/v1/challenge-projects/" + id))
                     .andExpect(status().isOk())
@@ -97,9 +97,10 @@ class ChallengeProjectControllerTest {
             mvc.perform(get("/api/v1/challenge-projects?size=101")).andExpect(status().isBadRequest());
         }
         @Test void listItemExcludesInternalFields() throws Exception {
-            var result = new ChallengeProjectListResult(UUID.randomUUID(), "t", "MATH", "INTEGER", "HIGHER_BETTER", "PUBLISHED", java.time.Instant.now());
+            var result = new ChallengeProjectListResult(UUID.randomUUID(), "t", "MATH", "summary", "INTEGER", "HIGHER_BETTER", "次", "PUBLISHED", java.time.Instant.now());
             when(queryService.listPublic(0, 20)).thenReturn(new com.campusguinness.project.application.query.model.QueryPage<>(java.util.List.of(result), 0, 20, 1));
             mvc.perform(get("/api/v1/challenge-projects"))
+                    .andExpect(jsonPath("$.items[0].id").exists())
                     .andExpect(jsonPath("$.items[0].description").doesNotExist())
                     .andExpect(jsonPath("$.items[0].version").doesNotExist())
                     .andExpect(jsonPath("$.items[0].rulesText").doesNotExist())
@@ -110,6 +111,6 @@ class ChallengeProjectControllerTest {
     }
 
     private CreateChallengeProjectRequest validRequest() {
-        return new CreateChallengeProjectRequest("校园数学挑战赛","MATH","INTEGER","NUMERIC","HIGHER_BETTER","BEST",false,"次",null,null,null,"desc");
+        return new CreateChallengeProjectRequest("校园数学挑战赛","MATH","INTEGER","NUMERIC","HIGHER_BETTER","BEST",false,"次",null,null,null,"desc",null,null);
     }
 }

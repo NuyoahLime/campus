@@ -13,7 +13,9 @@ public record CreateChallengeProjectCommand(
         Integer decimalPlaces,
         String gradeOrder,
         String rulesText,
-        String description) {
+        String description,
+        String venueRequirements,
+        String equipmentRequirements) {
     public CreateChallengeProjectCommand {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("name required");
         if (category == null || category.isBlank()) throw new IllegalArgumentException("category required");

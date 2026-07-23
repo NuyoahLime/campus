@@ -15,4 +15,6 @@ public record CreateChallengeProjectRequest(
         Integer decimalPlaces,
         String gradeOrder,
         String rulesText,
-        String description) {}
+        String description,
+        String venueRequirements,
+        String equipmentRequirements) {}

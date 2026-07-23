@@ -14,6 +14,8 @@ final class ChallengeProjectPersistenceMapper {
         e.setName(domain.name().value());
         e.setCategory(domain.category().value());
         e.setDescription(domain.description());
+        e.setVenueRequirements(domain.venueRequirements());
+        e.setEquipmentRequirements(domain.equipmentRequirements());
         e.setScoreStorageType(domain.scoreConfig().storageType().name());
         e.setScoreIndicatorType(domain.scoreConfig().indicatorType().name());
         e.setComparisonDirection(domain.scoreConfig().comparisonDirection().name());
@@ -45,6 +47,8 @@ final class ChallengeProjectPersistenceMapper {
                         entity.getRulesText(),
                         entity.isAllowTie()),
                 entity.getDescription(),
+                entity.getVenueRequirements(),
+                entity.getEquipmentRequirements(),
                 ProjectStatus.valueOf(entity.getProjectStatus()));
     }
 }
