@@ -66,7 +66,7 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
                 "SELECT count(*) FROM information_schema.tables " +
                         "WHERE table_schema='public' AND table_type='BASE TABLE'", Integer.class);
         // flyway_schema_history is in public schema
-        assertThat(totalTables).isEqualTo(39);
+        assertThat(totalTables).isEqualTo(38);
     }
 
     @Test

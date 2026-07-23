@@ -112,6 +112,7 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
                 "notifications",
                 "audit_records",
                 "responsible_teachers",
+                "activity_project_participants",
                 "ranking_versions"
         );
 

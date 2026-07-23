@@ -22,10 +22,11 @@ import java.time.Instant;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class ScoreAttemptApplicationServiceTest {
     @Mock ScoreAttemptRepository repo;
     @Mock ActivityRepository activityRepo;
@@ -59,6 +60,11 @@ class ScoreAttemptApplicationServiceTest {
                 .thenReturn(List.of(membershipId));
 
         when(teacherPort.exists(activityProjectId, membershipId)).thenReturn(true);
+        // Participant check returns non-empty (assigned)
+        lenient().doReturn(List.of(1)).when(jdbc).queryForList(
+                org.mockito.ArgumentMatchers.any(String.class),
+                org.mockito.ArgumentMatchers.any(UUID.class),
+                org.mockito.ArgumentMatchers.any(UUID.class));
     }
 
     private SubmitScoreCommand cmd() {

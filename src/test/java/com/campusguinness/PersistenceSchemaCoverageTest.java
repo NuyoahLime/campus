@@ -79,7 +79,8 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
                 "student_profiles", "teacher_profiles",
                 "challenge_projects", "project_rule_versions", "project_rule_compatibilities",
                 "activity_applications", "activities", "activity_projects",
-                "responsible_teachers", "activity_participants",
+                "responsible_teachers",
+                "activity_project_participants", "activity_participants",
                 "score_attempts", "score_review_records", "score_correction_records",
                 "abnormal_score_entries",
                 "ranking_definitions", "ranking_versions", "ranking_entries",
@@ -154,7 +155,8 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
                 "notifications",
                 "audit_records",
                 "ranking_versions",
-                "responsible_teachers"
+                "responsible_teachers",
+                "activity_project_participants"
         );
 
         assertThat(actualTableNames).containsExactlyInAnyOrderElementsOf(expectedTables);

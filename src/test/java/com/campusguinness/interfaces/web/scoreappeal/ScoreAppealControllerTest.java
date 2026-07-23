@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.scoreappeal;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ScoreAppealControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService service;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Test void submitReturns201() throws Exception {
