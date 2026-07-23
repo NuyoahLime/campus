@@ -2,10 +2,14 @@ package com.campusguinness.activity.application.service;
 
 import com.campusguinness.activity.application.command.SubmitActivityApplicationCommand;
 import com.campusguinness.activity.application.port.ActivityApplicationRepository;
+import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.internal.domain.*;
+import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -13,48 +17,125 @@ import java.util.UUID;
 @Transactional
 public class ActivityApplicationService {
     private final ActivityApplicationRepository repository;
-    public ActivityApplicationService(ActivityApplicationRepository r) { this.repository = r; }
+    private final ActivityRepository activityRepository;
+    private final SchoolMembershipQueryPort membershipQueryPort;
 
-    public ActivityApplicationResult submit(SubmitActivityApplicationCommand cmd) {
+    public ActivityApplicationService(ActivityApplicationRepository repository,
+                                       ActivityRepository activityRepository,
+                                       SchoolMembershipQueryPort membershipQueryPort) {
+        this.repository = repository;
+        this.activityRepository = activityRepository;
+        this.membershipQueryPort = membershipQueryPort;
+    }
+
+    /** Submit a new application as a TEACHER with active membership in the school. */
+    public ActivityApplicationResult submit(SubmitActivityApplicationCommand cmd, UUID applicantId) {
+        if (!membershipQueryPort.hasActiveTeacherMembership(applicantId, cmd.schoolId())) {
+            throw new IllegalStateException("No active TEACHER membership for this school");
+        }
+
         var app = ActivityApplication.create(new ActivityApplication.Builder()
-                .id(new ActivityApplicationId(UUID.randomUUID())).schoolId(cmd.schoolId())
-                .applicantId(cmd.applicantId()).title(cmd.title()).description(cmd.description()));
+                .id(new ActivityApplicationId(UUID.randomUUID()))
+                .schoolId(cmd.schoolId())
+                .applicantId(applicantId)
+                .title(cmd.title())
+                .description(cmd.description()));
         app.submit();
         repository.save(app);
-        return new ActivityApplicationResult(app.id().value(), app.status().name(), null);
+        return ActivityApplicationResult.fromDomain(app);
     }
 
-    public ActivityApplicationResult approve(UUID id, UUID reviewerId, UUID activityId) {
-        var app = find(id); app.approve(reviewerId, activityId); repository.save(app);
-        return new ActivityApplicationResult(id, app.status().name(), activityId);
+    /** Approve a SUBMITTED application: create Activity + approve in same transaction. */
+    public ActivityApplicationResult approve(UUID id, UUID reviewerId) {
+        var app = findById(id);
+
+        if (app.createdActivityId() != null) {
+            throw new IllegalStateException("Application already has a created Activity");
+        }
+
+        // Generate activity ID and validate state transition before creating Activity
+        UUID activityId = UUID.randomUUID();
+        app.approve(reviewerId, activityId);
+
+        // Create Activity with DRAFT + NOT_SUBMITTED in same transaction
+        var activity = Activity.create(new Activity.Builder()
+                .id(new ActivityId(activityId))
+                .schoolId(app.schoolId())
+                .title(app.title())
+                .description(app.description())
+                .createdBy(app.applicantId()));
+        activityRepository.save(activity);
+
+        repository.save(app);
+        return ActivityApplicationResult.fromDomain(app);
     }
 
+    /** Reject a SUBMITTED application. */
     public ActivityApplicationResult reject(UUID id, UUID reviewerId, String reason) {
-        var app = find(id); app.reject(reviewerId, reason); repository.save(app);
-        return new ActivityApplicationResult(id, app.status().name(), null);
+        var app = findById(id);
+        app.reject(reviewerId, reason);
+        repository.save(app);
+        return ActivityApplicationResult.fromDomain(app);
     }
 
-    public ActivityApplicationResult withdraw(UUID id) {
-        var app = find(id); app.withdraw(); repository.save(app);
-        return new ActivityApplicationResult(id, app.status().name(), null);
+    /** Withdraw own SUBMITTED application. */
+    public ActivityApplicationResult withdraw(UUID id, UUID applicantId) {
+        var app = findByIdAndApplicantId(id, applicantId);
+        app.withdraw();
+        repository.save(app);
+        return ActivityApplicationResult.fromDomain(app);
     }
+
+    /** Return REJECTED application to DRAFT (own only). */
+    public ActivityApplicationResult returnToDraft(UUID id, UUID applicantId) {
+        var app = findByIdAndApplicantId(id, applicantId);
+        app.returnToDraft();
+        repository.save(app);
+        return ActivityApplicationResult.fromDomain(app);
+    }
+
+    /** Re-submit a DRAFT application (own only). */
+    public ActivityApplicationResult resubmit(UUID id, UUID applicantId) {
+        var app = findByIdAndApplicantId(id, applicantId);
+        app.submit();
+        repository.save(app);
+        return ActivityApplicationResult.fromDomain(app);
+    }
+
+    // ── Query methods ──
 
     @Transactional(readOnly = true)
     public List<ActivityApplicationResult> listMine(UUID applicantId) {
         return repository.findByApplicantId(applicantId).stream()
-                .map(a -> new ActivityApplicationResult(a.id().value(), a.status().name(), a.createdActivityId()))
+                .map(ActivityApplicationResult::fromDomain)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public ActivityApplicationResult getMine(UUID id, UUID applicantId) {
-        return repository.findByIdAndApplicantId(id, applicantId)
-                .map(a -> new ActivityApplicationResult(a.id().value(), a.status().name(), a.createdActivityId()))
+        return findByIdAndApplicantIdAsResult(id, applicantId);
+    }
+
+    @Transactional(readOnly = true)
+    public ActivityApplicationResult getById(UUID id) {
+        return repository.findById(new ActivityApplicationId(id))
+                .map(ActivityApplicationResult::fromDomain)
                 .orElseThrow(() -> new IllegalArgumentException("ActivityApplication not found: " + id));
     }
 
-    private ActivityApplication find(UUID id) {
+    // ── Internal helpers ──
+
+    private ActivityApplication findById(UUID id) {
         return repository.findById(new ActivityApplicationId(id))
                 .orElseThrow(() -> new IllegalArgumentException("ActivityApplication not found: " + id));
+    }
+
+    private ActivityApplication findByIdAndApplicantId(UUID id, UUID applicantId) {
+        return repository.findByIdAndApplicantId(id, applicantId)
+                .orElseThrow(() -> new IllegalArgumentException("ActivityApplication not found: " + id));
+    }
+
+    private ActivityApplicationResult findByIdAndApplicantIdAsResult(UUID id, UUID applicantId) {
+        return ActivityApplicationResult.fromDomain(findByIdAndApplicantId(id, applicantId));
     }
 }

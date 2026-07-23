@@ -7,6 +7,7 @@ import com.campusguinness.infrastructure.security.CurrentActor;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -25,40 +26,48 @@ public class ActivityApplicationController {
         this.currentActor = currentActor;
     }
 
+    @PostMapping
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ActivityApplicationResponse> submit(@Valid @RequestBody SubmitActivityApplicationRequest req) {
+        var cmd = new SubmitActivityApplicationCommand(req.schoolId(), req.title(), req.description());
+        ActivityApplicationResult r = service.submit(cmd, currentActor.requireUserId());
+        return ResponseEntity.created(URI.create("/api/v1/activity-applications/" + r.applicationId()))
+                .body(ActivityApplicationResponse.from(r));
+    }
+
     @GetMapping("/mine")
-    public List<ActivityApplicationResult> listMine() {
-        return service.listMine(currentActor.requireUserId());
+    @PreAuthorize("hasRole('TEACHER')")
+    public List<ActivityApplicationResponse> listMine() {
+        return service.listMine(currentActor.requireUserId()).stream()
+                .map(ActivityApplicationResponse::from)
+                .toList();
     }
 
     @GetMapping("/mine/{id}")
+    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ActivityApplicationResponse> getMine(@PathVariable UUID id) {
         ActivityApplicationResult r = service.getMine(id, currentActor.requireUserId());
-        return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
+        return ResponseEntity.ok(ActivityApplicationResponse.from(r));
     }
 
-    @PostMapping
-    public ResponseEntity<ActivityApplicationResponse> submit(@Valid @RequestBody SubmitActivityApplicationRequest req) {
-        var cmd = new SubmitActivityApplicationCommand(req.schoolId(), currentActor.requireUserId(), req.title(), req.description());
-        ActivityApplicationResult r = service.submit(cmd);
-        return ResponseEntity.created(URI.create("/api/v1/activity-applications/" + r.id()))
-                .body(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
-    }
-
-    @PostMapping("/{id}/approve")
-    public ResponseEntity<ActivityApplicationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveActivityApplicationRequest req) {
-        ActivityApplicationResult r = service.approve(id, req.reviewerId(), req.activityId());
-        return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
-    }
-
-    @PostMapping("/{id}/reject")
-    public ResponseEntity<ActivityApplicationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectActivityApplicationRequest req) {
-        ActivityApplicationResult r = service.reject(id, req.reviewerId(), req.reason());
-        return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
-    }
-
-    @PostMapping("/{id}/withdraw")
+    @PostMapping("/mine/{id}/withdraw")
+    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ActivityApplicationResponse> withdraw(@PathVariable UUID id) {
-        ActivityApplicationResult r = service.withdraw(id);
-        return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
+        ActivityApplicationResult r = service.withdraw(id, currentActor.requireUserId());
+        return ResponseEntity.ok(ActivityApplicationResponse.from(r));
+    }
+
+    @PostMapping("/mine/{id}/return-to-draft")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ActivityApplicationResponse> returnToDraft(@PathVariable UUID id) {
+        ActivityApplicationResult r = service.returnToDraft(id, currentActor.requireUserId());
+        return ResponseEntity.ok(ActivityApplicationResponse.from(r));
+    }
+
+    @PostMapping("/mine/{id}/submit")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ActivityApplicationResponse> resubmit(@PathVariable UUID id) {
+        ActivityApplicationResult r = service.resubmit(id, currentActor.requireUserId());
+        return ResponseEntity.ok(ActivityApplicationResponse.from(r));
     }
 }

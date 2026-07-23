@@ -45,8 +45,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(IllegalStateException ex, HttpServletRequest req) {
+        String msg = ex.getMessage();
+        if (msg != null && (msg.contains("membership") || msg.contains("No active"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiErrorResponse.of("FORBIDDEN", msg, req.getRequestURI()));
+        }
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiErrorResponse.of("CONFLICT", ex.getMessage(), req.getRequestURI()));
+                .body(ApiErrorResponse.of("CONFLICT", msg, req.getRequestURI()));
     }
 
     @ExceptionHandler(com.campusguinness.score.internal.persistence.ScoreValuePersistenceException.class)
