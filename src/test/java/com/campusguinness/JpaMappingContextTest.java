@@ -40,8 +40,8 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     void all19EntitiesAreScanned() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         assertThat(entities)
-                .as("Expected 19 JPA entities, found %d", entities.size())
-                .hasSize(19);
+                .as("Expected 20 JPA entities, found %d", entities.size())
+                .hasSize(20);
     }
 
     @Test
@@ -55,7 +55,7 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     void flywayExecutedAll15Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(15);
+        assertThat(count).isEqualTo(18);
     }
 
     @Test
@@ -66,7 +66,7 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
                 "SELECT count(*) FROM information_schema.tables " +
                         "WHERE table_schema='public' AND table_type='BASE TABLE'", Integer.class);
         // flyway_schema_history is in public schema
-        assertThat(totalTables).isEqualTo(36);
+        assertThat(totalTables).isEqualTo(39);
     }
 
     @Test

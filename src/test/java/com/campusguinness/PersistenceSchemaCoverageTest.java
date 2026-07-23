@@ -123,14 +123,14 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     void flywayExecuted15Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(15);
+        assertThat(count).isEqualTo(18);
     }
 
     @Test
     @DisplayName("Entity count matches known expected count (18)")
     void entityCountIsAsExpected() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(19);
+        assertThat(entities).hasSize(20);
     }
 
     @Test
