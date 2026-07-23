@@ -22,6 +22,7 @@ final class ChallengeProjectPersistenceMapper {
         e.setGradeOrder(domain.scoreConfig().gradeOrder());
         e.setAllowTie(domain.scoreConfig().allowTie());
         e.setEffectiveScoreRule(domain.scoreConfig().effectiveScoreRule());
+        e.setRulesText(domain.scoreConfig().rulesText());
         e.setProjectStatus(domain.status().name());
         e.setCreatedAt(Instant.now());
         e.setUpdatedAt(Instant.now());
