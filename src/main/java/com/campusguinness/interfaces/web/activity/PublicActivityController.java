@@ -25,9 +25,9 @@ public class PublicActivityController {
     public ResponseEntity<PageResponse<PublicActivityItem>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        var result = queryService.listPublic(page, size);
+        var result = queryService.listPublicPublished(page, size);
         var items = result.items().stream()
-                .map(r -> new PublicActivityItem(r.id(), r.schoolId(), r.title(),
+                .map(r -> new PublicActivityItem(r.id(), r.title(),
                         r.startTime(), r.endTime(), r.location(), r.executionStatus()))
                 .toList();
         return ResponseEntity.ok(PageResponse.of(items, result.page(), result.size(), result.totalElements()));
@@ -38,15 +38,15 @@ public class PublicActivityController {
         try {
             Map<String, Object> a = service.getPublicDetail(activityId);
             var projects = service.getPublicProjects(activityId).stream()
-                    .map(p -> new PublicProject(p.id(), p.projectId())).toList();
+                    .map(p -> new PublicProject(p.projectId())).toList();
             return ResponseEntity.ok(new PublicActivityDetail(
                     (UUID)a.get("id"), (String)a.get("title"), (String)a.get("description"),
                     (String)a.get("execution_status"), projects));
         } catch (IllegalArgumentException e) { return ResponseEntity.notFound().build(); }
     }
 
-    public record PublicActivityItem(UUID id, UUID schoolId, String title,
+    public record PublicActivityItem(UUID id, String title,
             java.time.Instant startTime, java.time.Instant endTime, String location, String status) {}
     public record PublicActivityDetail(UUID id, String title, String description, String status, List<PublicProject> projects) {}
-    public record PublicProject(UUID id, UUID projectId) {}
+    public record PublicProject(UUID projectId) {}
 }

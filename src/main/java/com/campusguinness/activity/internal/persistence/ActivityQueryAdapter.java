@@ -22,6 +22,17 @@ class ActivityQueryAdapter implements ActivityQueryPort {
     public QueryPage<ActivityListResult> findPublic(int page, int size, List<String> statuses) {
         var pageable = PageRequest.of(page, size, Sort.by("startTime").descending().and(Sort.by("id").descending()));
         var result = jpa.findByExecutionStatusIn(statuses, pageable);
+        return toPage(result);
+    }
+
+    @Override
+    public QueryPage<ActivityListResult> findPublicPublished(int page, int size, List<String> executionStatuses) {
+        var pageable = PageRequest.of(page, size, Sort.by("startTime").descending().and(Sort.by("id").descending()));
+        var result = jpa.findByExecutionStatusInAndPublicStatus(executionStatuses, "PUBLIC", pageable);
+        return toPage(result);
+    }
+
+    private QueryPage<ActivityListResult> toPage(org.springframework.data.domain.Page<ActivityEntity> result) {
         var items = result.getContent().stream()
                 .map(e -> new ActivityListResult(e.getId(), e.getSchoolId(), e.getTitle(),
                         e.getStartTime(), e.getEndTime(), e.getLocation(), e.getExecutionStatus()))

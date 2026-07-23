@@ -175,7 +175,7 @@ public class ActivityManagementService {
     public java.util.Map<String, Object> getPublicDetail(UUID activityId) {
         var rows = jdbc.queryForList(
                 "SELECT id, school_id, title, description, execution_status, start_time, end_time " +
-                "FROM activities WHERE id = ? AND execution_status IN ('PUBLISHED','IN_PROGRESS','ENDED')", activityId);
+                "FROM activities WHERE id = ? AND public_status = 'PUBLIC' AND execution_status IN ('PUBLISHED','IN_PROGRESS','ENDED')", activityId);
         if (rows.isEmpty()) throw new IllegalArgumentException("Activity not found: " + activityId);
         return rows.getFirst();
     }

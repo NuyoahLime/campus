@@ -6,5 +6,6 @@ import com.campusguinness.project.application.query.model.QueryPage;
 import java.util.List;
 
 public interface ActivityQueryPort {
-    QueryPage<ActivityListResult> findPublic(int page, int size, List<String> statuses);
+    QueryPage<ActivityListResult> findPublic(int page, int size, List<String> executionStatuses);
+    QueryPage<ActivityListResult> findPublicPublished(int page, int size, List<String> executionStatuses);
 }

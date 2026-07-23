@@ -4,4 +4,5 @@ import java.util.List;
 import java.util.UUID;
 public interface ActivityJpaRepository extends JpaRepository<ActivityEntity, UUID> {
     org.springframework.data.domain.Page<ActivityEntity> findByExecutionStatusIn(List<String> statuses, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<ActivityEntity> findByExecutionStatusInAndPublicStatus(List<String> executionStatuses, String publicStatus, org.springframework.data.domain.Pageable pageable);
 }
