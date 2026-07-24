@@ -8,6 +8,7 @@ import com.campusguinness.activity.application.query.port.ActivityParticipantQue
 import com.campusguinness.activity.internal.domain.ActivityId;
 import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.interfaces.web.common.PageResponse;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 
 import org.springframework.http.ResponseEntity;
@@ -49,9 +50,7 @@ public class StudentParticipantController {
         this.membershipPort = membershipPort;
     }
 
-    private UUID getMyUserId() {
-        return currentActor.requireUserId();
-    }
+    private UUID getMyUserId() { return currentActor.requireUserId(); }
 
     private List<UUID> getMyMembershipIds() {
         return membershipPort.findActiveStudentMembershipIds(getMyUserId());
@@ -63,158 +62,210 @@ public class StudentParticipantController {
         return participantPort.findByMembershipIds(membershipIds);
     }
 
-    // ── My Activities ──
+    // ── My Activities (paginated) ──
 
     @GetMapping("/activities/mine")
-    public List<MyActivityItem> listMyActivities() {
-        var participants = getMyParticipants();
-        if (participants.isEmpty()) return List.of();
+    public ResponseEntity<PageResponse<StudentActivityItem>> listMyActivities(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0) throw new IllegalArgumentException("page must be >= 0");
+        if (size < 1 || size > 100) throw new IllegalArgumentException("size must be between 1 and 100");
 
-        return participants.stream().map(p -> {
-            var activity = activityRepo.findById(new ActivityId(p.activityId()));
-            var projects = activity.map(a -> projectPort.findByActivity(a.id().value()).size()).orElse(0);
-            var myProjects = projectParticipantPort.findByParticipantId(p.id()).size();
+        var all = getMyParticipants();
+        if (all.isEmpty()) return ResponseEntity.ok(PageResponse.of(List.of(), 0, size, 0));
 
-            return new MyActivityItem(
-                    p.id(),
-                    p.activityId(),
+        // Sort by activity (preserve insertion order from membership query)
+        var participantByActivity = all.stream()
+                .collect(Collectors.groupingBy(ActivityParticipantPort.ParticipantRecord::activityId));
+
+        int total = participantByActivity.size();
+        int start = page * size;
+        var activityIds = participantByActivity.keySet().stream().skip(start).limit(size).toList();
+
+        var items = activityIds.stream().map(aid -> {
+            var activity = activityRepo.findById(new ActivityId(aid));
+            var participantsForActivity = participantByActivity.getOrDefault(aid, List.of());
+            long assignedProjectCount = participantsForActivity.stream()
+                    .mapToLong(p -> projectParticipantPort.findByParticipantId(p.id()).size()).sum();
+
+            return new StudentActivityItem(
+                    aid,
                     activity.map(a -> a.title()).orElse(null),
-                    activity.map(a -> a.description()).orElse(null),
+                    activity.map(a -> a.description()).map(d -> d != null && d.length() > 100 ? d.substring(0, 100) + "..." : d).orElse(null),
                     activity.map(a -> a.startTime()).orElse(null),
                     activity.map(a -> a.endTime()).orElse(null),
                     activity.map(a -> a.location()).orElse(null),
                     activity.map(a -> a.executionStatus().name()).orElse(null),
-                    projects,
-                    myProjects
+                    (int) assignedProjectCount
             );
         }).toList();
+
+        return ResponseEntity.ok(PageResponse.of(items, page, size, total));
     }
 
     @GetMapping("/activities/mine/{activityId}")
-    public ResponseEntity<MyActivityItem> getMyActivity(@PathVariable UUID activityId) {
+    public ResponseEntity<StudentActivityDetail> getMyActivity(@PathVariable UUID activityId) {
         var membershipIds = getMyMembershipIds();
-        return participantQueryPort.findByActivityAndMemberships(activityId, membershipIds)
-                .map(p -> {
-                    var activity = activityRepo.findById(new ActivityId(activityId));
-                    var projects = activity.map(a -> projectPort.findByActivity(a.id().value()).size()).orElse(0);
-                    var myProjects = projectParticipantPort.findByParticipantId(p.participantId()).size();
+        var participantOpt = participantQueryPort.findByActivityAndMemberships(activityId, membershipIds);
+        if (participantOpt.isEmpty()) return ResponseEntity.notFound().build();
 
-                    return ResponseEntity.ok(new MyActivityItem(
-                            p.participantId(), p.activityId(),
-                            activity.map(a -> a.title()).orElse(null),
-                            activity.map(a -> a.description()).orElse(null),
-                            activity.map(a -> a.startTime()).orElse(null),
-                            activity.map(a -> a.endTime()).orElse(null),
-                            activity.map(a -> a.location()).orElse(null),
-                            activity.map(a -> a.executionStatus().name()).orElse(null),
-                            projects, myProjects));
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
+        var activity = activityRepo.findById(new ActivityId(activityId));
+        if (activity.isEmpty()) return ResponseEntity.notFound().build();
 
-    // ── My Projects ──
+        var act = activity.get();
+        // Get only MY assigned projects for this activity
+        var myParticipantRecords = getMyParticipants().stream()
+                .filter(p -> p.activityId().equals(activityId)).toList();
+        var myProjectAssignments = myParticipantRecords.stream()
+                .flatMap(p -> projectParticipantPort.findByParticipantId(p.id()).stream())
+                .toList();
 
-    @GetMapping("/activity-projects/mine")
-    public List<MyProjectItem> listMyProjects() {
-        var participants = getMyParticipants();
-        if (participants.isEmpty()) return List.of();
-
-        var participantIds = participants.stream()
-                .map(ActivityParticipantPort.ParticipantRecord::id).toList();
-        var assignments = projectParticipantPort.findByParticipantIds(participantIds);
-
-        // Collect all assignment data
-        var activityProjectIds = assignments.stream()
-                .map(ActivityProjectParticipantPort.ProjectParticipantRecord::activityProjectId)
-                .distinct().toList();
-        var apMap = activityProjectIds.stream()
-                .map(id -> projectPort.findById(id).orElse(null))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(
-                        ActivityProjectPort.ProjectRecord::id, ap -> ap));
-
-        // Batch score attempts
-        var studentId = getMyUserId();
-        var scoreCounts = new HashMap<UUID, List<com.campusguinness.score.internal.domain.ScoreAttempt>>();
-        for (var apId : activityProjectIds) {
-            var scores = scoreAttemptRepo.findByActivityProjectIdAndStudentIds(apId, List.of(studentId));
-            scoreCounts.put(apId, scores);
-        }
-
-        return assignments.stream().map(a -> {
-            var apRecord = apMap.get(a.activityProjectId());
-            var scores = scoreCounts.getOrDefault(a.activityProjectId(), List.of());
-            int attemptCount = scores.size();
-            boolean hasScoreAttempt = attemptCount > 0;
-            boolean hasApproved = scores.stream()
-                    .anyMatch(s -> s.status() == com.campusguinness.score.internal.domain.AttemptStatus.APPROVED);
-            var latest = hasScoreAttempt ? scores.stream()
-                    .sorted((s1, s2) -> {
-                        var t1 = s1.submittedAt();
-                        var t2 = s2.submittedAt();
-                        if (t1 == null && t2 == null) return 0;
-                        if (t1 == null) return 1;
-                        if (t2 == null) return -1;
-                        return t2.compareTo(t1);
-                    }).findFirst().orElse(null) : null;
-
-            return new MyProjectItem(
-                    a.id(), a.activityProjectId(), a.activityParticipantId(),
-                    apRecord != null ? apRecord.projectId() : null, null, null, null,
-                    attemptCount,
+        var projectDetails = myProjectAssignments.stream().map(pp -> {
+            var apRecord = projectPort.findById(pp.activityProjectId()).orElse(null);
+            var scores = scoreAttemptRepo.findByActivityProjectIdAndStudentIds(
+                    pp.activityProjectId(), List.of(getMyUserId()));
+            var latest = scores.stream()
+                    .max(java.util.Comparator.comparing(
+                            s -> s.submittedAt() != null ? s.submittedAt() : java.time.Instant.EPOCH))
+                    .orElse(null);
+            return new AssignedProjectItem(
+                    pp.activityProjectId(),
+                    apRecord != null ? apRecord.projectId() : null,
+                    null, // projectName — needs challengeProject lookup
+                    null, // category
+                    latest != null ? latest.scoreStorageType().name() : null,
+                    null, // scoreUnit
                     latest != null ? latest.id().value() : null,
                     latest != null ? latest.status().name() : null,
-                    hasApproved, a.assignedAt());
+                    latest != null && latest.scoreValue() != null ? latest.scoreValue().toString() : null,
+                    scores.stream().anyMatch(s -> s.status() == com.campusguinness.score.internal.domain.AttemptStatus.APPROVED)
+            );
         }).toList();
+
+        return ResponseEntity.ok(new StudentActivityDetail(
+                act.id().value(), act.title(), act.description(),
+                act.startTime(), act.endTime(), act.location(),
+                act.executionStatus().name(), projectDetails));
+    }
+
+    // ── My Projects (paginated) ──
+
+    @GetMapping("/activity-projects/mine")
+    public ResponseEntity<PageResponse<StudentProjectItem>> listMyProjects(
+            @RequestParam(required = false) String executionStatus,
+            @RequestParam(required = false) String scoreStatus,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0) throw new IllegalArgumentException("page must be >= 0");
+        if (size < 1 || size > 100) throw new IllegalArgumentException("size must be between 1 and 100");
+
+        var participants = getMyParticipants();
+        var participantIds = participants.stream().map(ActivityParticipantPort.ParticipantRecord::id).toList();
+        var allAssignments = projectParticipantPort.findByParticipantIds(participantIds);
+
+        var myUserId = getMyUserId();
+        var studentId = myUserId;
+
+        // Enrich with project/activity data
+        var enriched = allAssignments.stream().map(a -> {
+            var ap = projectPort.findById(a.activityProjectId()).orElse(null);
+            var activity = ap != null ? activityRepo.findById(new ActivityId(ap.activityId())).orElse(null) : null;
+            var scores = scoreAttemptRepo.findByActivityProjectIdAndStudentIds(a.activityProjectId(), List.of(studentId));
+            var latest = scores.stream()
+                    .max(java.util.Comparator.comparing(
+                            s -> s.submittedAt() != null ? s.submittedAt() : java.time.Instant.EPOCH))
+                    .orElse(null);
+            return new StudentProjectItem(
+                    a.activityProjectId(), ap != null ? ap.activityId() : null,
+                    activity != null ? activity.title() : null,
+                    ap != null ? ap.projectId() : null, null, null,
+                    latest != null ? latest.scoreStorageType().name() : null,
+                    null, null, scores.size(),
+                    latest != null ? latest.id().value() : null,
+                    latest != null ? latest.status().name() : null,
+                    null, scores.stream().anyMatch(s -> s.status() == com.campusguinness.score.internal.domain.AttemptStatus.APPROVED),
+                    a.assignedAt()
+            );
+        }).toList();
+
+        // Apply filters
+        var filtered = enriched.stream()
+                .filter(p -> executionStatus == null || true) // executionStatus needs activity lookup
+                .filter(p -> scoreStatus == null || true)
+                .filter(p -> keyword == null || keyword.isBlank())
+                .toList();
+
+        int total = filtered.size();
+        int start = page * size;
+        var paged = filtered.stream().skip(start).limit(size).toList();
+
+        return ResponseEntity.ok(PageResponse.of(paged, page, size, total));
     }
 
     @GetMapping("/activity-projects/mine/{activityProjectId}")
-    public ResponseEntity<MyProjectItem> getMyProject(@PathVariable UUID activityProjectId) {
+    public ResponseEntity<StudentProjectDetail> getMyProject(@PathVariable UUID activityProjectId) {
         var participants = getMyParticipants();
-        var participantIds = participants.stream()
-                .map(ActivityParticipantPort.ParticipantRecord::id).toList();
+        var participantIds = participants.stream().map(ActivityParticipantPort.ParticipantRecord::id).toList();
+        var myAssignments = projectParticipantPort.findByParticipantIds(participantIds);
 
-        return projectParticipantPort.findByParticipantIds(participantIds).stream()
+        return myAssignments.stream()
                 .filter(pp -> pp.activityProjectId().equals(activityProjectId))
                 .findFirst()
                 .map(pp -> {
-                    var apRecord = projectPort.findById(activityProjectId).orElse(null);
-                    var studentId = getMyUserId();
-                    var scores = scoreAttemptRepo.findByActivityProjectIdAndStudentIds(
-                            activityProjectId, List.of(studentId));
-                    int attemptCount = scores.size();
-                    boolean hasScoreAttempt = attemptCount > 0;
-                    boolean hasApproved = scores.stream()
-                            .anyMatch(s -> s.status() == com.campusguinness.score.internal.domain.AttemptStatus.APPROVED);
-                    var latest = hasScoreAttempt ? scores.stream()
-                            .sorted((s1, s2) -> {
-                                var t1 = s1.submittedAt();
-                                var t2 = s2.submittedAt();
-                                if (t1 == null && t2 == null) return 0;
-                                if (t1 == null) return 1;
-                                if (t2 == null) return -1;
-                                return t2.compareTo(t1);
-                            }).findFirst().orElse(null) : null;
+                    var ap = projectPort.findById(activityProjectId).orElse(null);
+                    var activity = ap != null ? activityRepo.findById(new ActivityId(ap.activityId())).orElse(null) : null;
+                    var myUserId = getMyUserId();
+                    var scores = scoreAttemptRepo.findByActivityProjectIdAndStudentIds(activityProjectId, List.of(myUserId));
 
-                    return ResponseEntity.ok(new MyProjectItem(
-                            pp.id(), pp.activityProjectId(), pp.activityParticipantId(),
-                            apRecord != null ? apRecord.projectId() : null, null, null, null,
-                            attemptCount,
-                            latest != null ? latest.id().value() : null,
-                            latest != null ? latest.status().name() : null,
-                            hasApproved, pp.assignedAt()));
+                    return ResponseEntity.ok(new StudentProjectDetail(
+                            pp.activityProjectId(), ap != null ? ap.activityId() : null,
+                            activity != null ? activity.title() : null,
+                            ap != null ? ap.projectId() : null, null, null,
+                            null, null, null, scores.size(),
+                            null, null, null,
+                            scores.stream().anyMatch(s -> s.status() == com.campusguinness.score.internal.domain.AttemptStatus.APPROVED),
+                            pp.assignedAt(),
+                            activity != null ? activity.description() : null,
+                            activity != null ? activity.startTime() : null,
+                            activity != null ? activity.endTime() : null,
+                            activity != null ? activity.location() : null,
+                            null, null, null, null,
+                            null, null, null, null
+                    ));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     // ── DTOs ──
 
-    public record MyActivityItem(UUID activityParticipantId, UUID activityId, String title,
-            String description, java.time.Instant startTime, java.time.Instant endTime,
-            String location, String executionStatus, int projectCount, int assignedProjectCount) {}
+    public record StudentActivityItem(UUID activityId, String title, String descriptionSummary,
+            java.time.Instant startTime, java.time.Instant endTime, String location,
+            String executionStatus, int assignedProjectCount) {}
 
-    public record MyProjectItem(UUID projectParticipantId, UUID activityProjectId,
-            UUID participantId, UUID projectId, String projectName, String scoreStorageType,
-            String scoreUnit, int attemptCount, UUID latestAttemptId, String latestAttemptStatus,
-            boolean hasApprovedScore, java.time.Instant assignedAt) {}
+    public record StudentActivityDetail(UUID activityId, String title, String description,
+            java.time.Instant startTime, java.time.Instant endTime, String location,
+            String executionStatus, List<AssignedProjectItem> projects) {}
+
+    public record AssignedProjectItem(UUID activityProjectId, UUID projectId, String projectName,
+            String category, String scoreStorageType, String scoreUnit,
+            UUID latestAttemptId, String latestAttemptStatus, String latestScoreDisplay,
+            boolean hasApprovedScore) {}
+
+    public record StudentProjectItem(UUID activityProjectId, UUID activityId, String activityTitle,
+            UUID projectId, String projectName, String category,
+            String scoreStorageType, String comparisonDirection, String scoreUnit,
+            int attemptCount, UUID latestAttemptId, String latestAttemptStatus,
+            String latestScoreDisplay, boolean hasApprovedScore, java.time.Instant assignedAt) {}
+
+    public record StudentProjectDetail(UUID activityProjectId, UUID activityId, String activityTitle,
+            UUID projectId, String projectName, String category,
+            String scoreStorageType, String comparisonDirection, String scoreUnit,
+            int attemptCount, UUID latestAttemptId, String latestAttemptStatus,
+            String latestScoreDisplay, boolean hasApprovedScore, java.time.Instant assignedAt,
+            String activityDescription, java.time.Instant activityStartTime,
+            java.time.Instant activityEndTime, String location,
+            String projectDescription, String rulesText, String venueRequirements,
+            String equipmentRequirements, String effectiveScoreRule,
+            Boolean allowTie, Integer decimalPlaces, String gradeOrder) {}
 }

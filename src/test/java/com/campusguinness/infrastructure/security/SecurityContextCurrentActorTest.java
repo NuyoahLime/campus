@@ -25,7 +25,7 @@ class SecurityContextCurrentActorTest {
 
     @Test void returnsUserIdFromAuthenticatedPrincipal() {
         UUID userId = UUID.randomUUID();
-        var principal = new CampusGuinnessUserDetails(userId, "u", "h", "NORMAL", Set.of());
+        var principal = new CampusGuinnessUserDetails(userId, "u", "h", "NORMAL", Set.of(), java.util.List.of());
         var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
         SecurityContextHolder.getContext().setAuthentication(auth);
 
