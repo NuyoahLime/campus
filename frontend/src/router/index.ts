@@ -58,7 +58,7 @@ const router = createRouter({
     // Student workbench
     {
       path: '/student',
-      component: () => import('@/layouts/WorkbenchLayout.vue'),
+      component: () => import('@/layouts/StudentWorkbenchLayout.vue'),
       meta: { requiresAuth: true, roles: ['STUDENT'] },
       children: [
         { path: '', name: 'student-home', component: () => import('@/views/workbench/StudentDashboard.vue') },
