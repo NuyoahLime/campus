@@ -5,6 +5,8 @@ import com.campusguinness.score.application.query.model.StudentScoreDetail;
 import com.campusguinness.score.application.query.model.StudentScoreItem;
 import com.campusguinness.score.application.query.port.StudentScoreQueryPort;
 
+import com.campusguinness.score.application.query.ScoreDisplayFormatter;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
@@ -34,7 +36,8 @@ class StudentScoreQueryAdapter implements StudentScoreQueryPort {
                     (UUID) arr[0], (UUID) arr[1], (String) arr[2],
                     (UUID) arr[3], (UUID) arr[4], (String) arr[5],
                     ((Number) arr[6]).intValue(), (String) arr[7],
-                    formatScoreDisplay((String) arr[7], arr[8], arr[9] != null ? ((Number) arr[9]).longValue() : null, (String) arr[10]),
+                    ScoreDisplayFormatter.format((String) arr[7], arr[8],
+                            arr[9] != null ? ((Number) arr[9]).longValue() : null, (String) arr[10], null),
                     (String) arr[11], (Boolean) arr[12],
                     arr[13] != null ? ((java.sql.Timestamp) arr[13]).toInstant() : null,
                     arr[14] != null ? ((java.sql.Timestamp) arr[14]).toInstant() : null,
@@ -56,7 +59,8 @@ class StudentScoreQueryAdapter implements StudentScoreQueryPort {
                             (UUID) arr[0], (UUID) arr[1], (String) arr[2],
                             (UUID) arr[3], (UUID) arr[4], (String) arr[5],
                             ((Number) arr[6]).intValue(), (String) arr[7],
-                            formatScoreDisplay((String) arr[7], arr[8], arr[9] != null ? ((Number) arr[9]).longValue() : null, (String) arr[10]),
+                            ScoreDisplayFormatter.format((String) arr[7], arr[8],
+                                    arr[9] != null ? ((Number) arr[9]).longValue() : null, (String) arr[10], null),
                             (String) arr[11], (Boolean) arr[12],
                             arr[13] != null ? ((java.sql.Timestamp) arr[13]).toInstant() : null,
                             arr[14] != null ? ((java.sql.Timestamp) arr[14]).toInstant() : null,
@@ -69,28 +73,5 @@ class StudentScoreQueryAdapter implements StudentScoreQueryPort {
                             arr[21] != null ? ((java.sql.Timestamp) arr[21]).toInstant() : null
                     );
                 });
-    }
-
-    private String formatScoreDisplay(String storageType, Object scoreValue, Long durationMs, String grade) {
-        if (storageType == null) return null;
-        return switch (storageType) {
-            case "INTEGER" -> scoreValue != null ? scoreValue.toString() : null;
-            case "DECIMAL" -> scoreValue != null ? scoreValue.toString() : null;
-            case "DURATION" -> durationMs != null ? formatDuration(durationMs) : null;
-            case "GRADE" -> grade;
-            default -> null;
-        };
-    }
-
-    private String formatDuration(long ms) {
-        if (ms < 1000) return ms + "ms";
-        long seconds = ms / 1000;
-        if (seconds < 60) return seconds + "秒";
-        long minutes = seconds / 60;
-        seconds = seconds % 60;
-        if (minutes < 60) return String.format("%d分%d秒", minutes, seconds);
-        long hours = minutes / 60;
-        minutes = minutes % 60;
-        return String.format("%d时%d分%d秒", hours, minutes, seconds);
     }
 }
