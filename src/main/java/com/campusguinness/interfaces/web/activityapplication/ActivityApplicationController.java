@@ -70,4 +70,29 @@ public class ActivityApplicationController {
         ActivityApplicationResult r = service.resubmit(id, currentActor.requireUserId());
         return ResponseEntity.ok(ActivityApplicationResponse.from(r));
     }
+
+    @PutMapping("/mine/{id}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ActivityApplicationResponse> updateDraft(
+            @PathVariable UUID id, @Valid @RequestBody UpdateActivityApplicationRequest req) {
+        ActivityApplicationResult r = service.updateDraft(id, currentActor.requireUserId(),
+                req.title(), req.description());
+        return ResponseEntity.ok(ActivityApplicationResponse.from(r));
+    }
+
+    @GetMapping("/mine/page")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<com.campusguinness.interfaces.web.common.PageResponse<ActivityApplicationResponse>> listMinePage(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID schoolId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0) throw new IllegalArgumentException("page must be >= 0");
+        if (size < 1 || size > 100) throw new IllegalArgumentException("size must be between 1 and 100");
+        var result = service.listMinePage(currentActor.requireUserId(), status, schoolId, keyword, page, size);
+        var items = result.items().stream().map(ActivityApplicationResponse::from).toList();
+        return ResponseEntity.ok(com.campusguinness.interfaces.web.common.PageResponse.of(
+                items, result.page(), result.size(), result.totalElements()));
+    }
 }

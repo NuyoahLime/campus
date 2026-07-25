@@ -3,9 +3,11 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.SubmitActivityApplicationCommand;
 import com.campusguinness.activity.application.port.ActivityApplicationRepository;
 import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.application.query.port.TeacherApplicationQueryPort;
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.internal.domain.*;
 import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
+import com.campusguinness.project.application.query.model.QueryPage;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,13 +21,16 @@ public class ActivityApplicationService {
     private final ActivityApplicationRepository repository;
     private final ActivityRepository activityRepository;
     private final SchoolMembershipQueryPort membershipQueryPort;
+    private final TeacherApplicationQueryPort teacherQueryPort;
 
     public ActivityApplicationService(ActivityApplicationRepository repository,
                                        ActivityRepository activityRepository,
-                                       SchoolMembershipQueryPort membershipQueryPort) {
+                                       SchoolMembershipQueryPort membershipQueryPort,
+                                       TeacherApplicationQueryPort teacherQueryPort) {
         this.repository = repository;
         this.activityRepository = activityRepository;
         this.membershipQueryPort = membershipQueryPort;
+        this.teacherQueryPort = teacherQueryPort;
     }
 
     /** Submit a new application as a TEACHER with active membership in the school. */
@@ -94,6 +99,21 @@ public class ActivityApplicationService {
         return ActivityApplicationResult.fromDomain(app);
     }
 
+    /** Update title/description of a DRAFT application (own only). */
+    public ActivityApplicationResult updateDraft(UUID id, UUID applicantId, String title, String description) {
+        if (!membershipQueryPort.hasActiveTeacherMembership(applicantId,
+                repository.findById(new ActivityApplicationId(id))
+                        .orElseThrow(() -> new IllegalArgumentException("ActivityApplication not found: " + id))
+                        .schoolId())) {
+            throw new IllegalStateException("No active TEACHER membership for this school");
+        }
+        var app = findByIdAndApplicantId(id, applicantId);
+        if (title != null) app.updateTitle(title);
+        if (description != null) app.updateDescription(description);
+        repository.save(app);
+        return ActivityApplicationResult.fromDomain(app);
+    }
+
     /** Re-submit a DRAFT application (own only). */
     public ActivityApplicationResult resubmit(UUID id, UUID applicantId) {
         var app = findByIdAndApplicantId(id, applicantId);
@@ -114,6 +134,12 @@ public class ActivityApplicationService {
     @Transactional(readOnly = true)
     public ActivityApplicationResult getMine(UUID id, UUID applicantId) {
         return findByIdAndApplicantIdAsResult(id, applicantId);
+    }
+
+    @Transactional(readOnly = true)
+    public QueryPage<ActivityApplicationResult> listMinePage(UUID applicantId, String status,
+            UUID schoolId, String keyword, int page, int size) {
+        return teacherQueryPort.findMine(applicantId, status, schoolId, keyword, page, size);
     }
 
     @Transactional(readOnly = true)

@@ -21,18 +21,21 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.campusguinness.activity.application.query.port.TeacherApplicationQueryPort;
+
 @ExtendWith(MockitoExtension.class)
 class ActivityApplicationServiceTest {
     @Mock ActivityApplicationRepository appRepo;
     @Mock ActivityRepository activityRepo;
     @Mock SchoolMembershipQueryPort membershipPort;
+    @Mock TeacherApplicationQueryPort teacherQueryPort;
     ActivityApplicationService svc;
 
     UUID userId = UUID.randomUUID();
     UUID schoolId = UUID.randomUUID();
 
     @BeforeEach void setUp() {
-        svc = new ActivityApplicationService(appRepo, activityRepo, membershipPort);
+        svc = new ActivityApplicationService(appRepo, activityRepo, membershipPort, teacherQueryPort);
     }
 
     @Nested class Submit {

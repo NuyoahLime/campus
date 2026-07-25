@@ -75,8 +75,8 @@ class AdminActivityApplicationControllerTest {
     }
 
     @Test void getByIdReturns200() throws Exception {
-        var result = new ActivityApplicationResult(appId, schoolId, "title", "desc",
-                "SUBMITTED", null, null, null, null, 1);
+        var result = new ActivityApplicationResult(appId, schoolId, null, "title", "desc",
+                "SUBMITTED", null, null, null, null, 1, null, null);
         when(queryPort.findById(appId)).thenReturn(Optional.of(result));
 
         mvc.perform(get("/api/v1/admin/activity-applications/" + appId))
@@ -94,8 +94,8 @@ class AdminActivityApplicationControllerTest {
     @Test void approveReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(reviewerId);
         when(service.approve(appId, reviewerId))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "APPROVED",
-                        UUID.randomUUID(), null, null, null, 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "APPROVED",
+                        UUID.randomUUID(), null, null, null, 1, null, null));
 
         mvc.perform(post("/api/v1/admin/activity-applications/" + appId + "/approve"))
                 .andExpect(status().isOk())
@@ -107,8 +107,8 @@ class AdminActivityApplicationControllerTest {
         // Send body with reviewerId and activityId — they should be ignored
         when(currentActor.requireUserId()).thenReturn(reviewerId);
         when(service.approve(appId, reviewerId))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "APPROVED",
-                        UUID.randomUUID(), null, null, null, 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "APPROVED",
+                        UUID.randomUUID(), null, null, null, 1, null, null));
 
         mvc.perform(post("/api/v1/admin/activity-applications/" + appId + "/approve")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -128,8 +128,8 @@ class AdminActivityApplicationControllerTest {
     @Test void rejectReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(reviewerId);
         when(service.reject(appId, reviewerId, "需要修改"))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "REJECTED",
-                        null, null, null, "需要修改", 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "REJECTED",
+                        null, null, null, "需要修改", 1, null, null));
 
         mvc.perform(post("/api/v1/admin/activity-applications/" + appId + "/reject")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -142,8 +142,8 @@ class AdminActivityApplicationControllerTest {
     @Test void rejectDoesNotAcceptReviewerId() throws Exception {
         when(currentActor.requireUserId()).thenReturn(reviewerId);
         when(service.reject(appId, reviewerId, "reason"))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "REJECTED",
-                        null, null, null, "reason", 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "REJECTED",
+                        null, null, null, "reason", 1, null, null));
 
         mvc.perform(post("/api/v1/admin/activity-applications/" + appId + "/reject")
                 .contentType(MediaType.APPLICATION_JSON)

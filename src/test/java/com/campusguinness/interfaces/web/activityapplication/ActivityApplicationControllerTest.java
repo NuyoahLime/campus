@@ -36,7 +36,7 @@ class ActivityApplicationControllerTest {
     @Test void submitReturns201() throws Exception {
         when(currentActor.requireUserId()).thenReturn(userId);
         when(service.submit(any(), eq(userId)))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "SUBMITTED", null, null, null, null, 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "SUBMITTED", null, null, null, null, 1, null, null));
 
         mvc.perform(post("/api/v1/activity-applications")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -65,7 +65,7 @@ class ActivityApplicationControllerTest {
     @Test void getMineReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(userId);
         when(service.getMine(appId, userId))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "SUBMITTED", null, null, null, null, 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "SUBMITTED", null, null, null, null, 1, null, null));
 
         mvc.perform(get("/api/v1/activity-applications/mine/" + appId))
                 .andExpect(status().isOk())
@@ -85,7 +85,7 @@ class ActivityApplicationControllerTest {
     @Test void withdrawReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(userId);
         when(service.withdraw(appId, userId))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "WITHDRAWN", null, null, null, null, 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "WITHDRAWN", null, null, null, null, 1, null, null));
 
         mvc.perform(post("/api/v1/activity-applications/mine/" + appId + "/withdraw"))
                 .andExpect(status().isOk())
@@ -104,7 +104,7 @@ class ActivityApplicationControllerTest {
     @Test void returnToDraftReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(userId);
         when(service.returnToDraft(appId, userId))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "DRAFT", null, null, null, null, 2));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "DRAFT", null, null, null, null, 2, null, null));
 
         mvc.perform(post("/api/v1/activity-applications/mine/" + appId + "/return-to-draft"))
                 .andExpect(status().isOk())
@@ -114,7 +114,7 @@ class ActivityApplicationControllerTest {
     @Test void resubmitReturns200() throws Exception {
         when(currentActor.requireUserId()).thenReturn(userId);
         when(service.resubmit(appId, userId))
-                .thenReturn(new ActivityApplicationResult(appId, schoolId, "t", "d", "SUBMITTED", null, null, null, null, 1));
+                .thenReturn(new ActivityApplicationResult(appId, schoolId, null, "t", "d", "SUBMITTED", null, null, null, null, 1, null, null));
 
         mvc.perform(post("/api/v1/activity-applications/mine/" + appId + "/submit"))
                 .andExpect(status().isOk())
