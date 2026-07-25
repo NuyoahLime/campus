@@ -7,6 +7,7 @@ import com.campusguinness.interfaces.web.common.PageResponse;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -112,7 +113,7 @@ public class AdminApplicationReviewController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    public record RejectRequest(@NotBlank String reason) {}
+    public record RejectRequest(@NotBlank @Size(max = 500) String reason) {}
 
     public record AdminApplicationItem(UUID applicationId, UUID schoolId, String schoolName,
             UUID applicantUserId, String applicantName, String title, String descriptionSummary,
