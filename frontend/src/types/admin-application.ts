@@ -14,7 +14,7 @@ export interface AdminApplicationDetail extends AdminApplicationItem {
 }
 
 export interface AdminApplicationStats {
-  total: number; draft: number; submitted: number; approved: number; rejected: number; withdrawn: number;
+  total: number; draft: number; submitted: number; approved: number; rejected: number; withdrawn: number; createdToday: number;
 }
 
 export interface AdminSchoolOption { schoolId: string; schoolName: string; }

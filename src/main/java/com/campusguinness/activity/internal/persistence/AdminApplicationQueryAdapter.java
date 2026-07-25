@@ -91,8 +91,8 @@ public class AdminApplicationQueryAdapter implements AdminApplicationQueryPort {
 
     @Override
     public ApplicationStats getStats() {
-        var row = jdbc.queryForMap("SELECT count(*) FILTER (WHERE application_status='DRAFT') AS draft, count(*) FILTER (WHERE application_status='SUBMITTED') AS submitted, count(*) FILTER (WHERE application_status='APPROVED') AS approved, count(*) FILTER (WHERE application_status='REJECTED') AS rejected, count(*) FILTER (WHERE application_status='WITHDRAWN') AS withdrawn, count(*) AS total FROM activity_applications");
-        return new ApplicationStats(((Number)row.get("total")).intValue(), ((Number)row.get("draft")).intValue(), ((Number)row.get("submitted")).intValue(), ((Number)row.get("approved")).intValue(), ((Number)row.get("rejected")).intValue(), ((Number)row.get("withdrawn")).intValue());
+        var row = jdbc.queryForMap("SELECT count(*) FILTER (WHERE application_status='DRAFT') AS draft, count(*) FILTER (WHERE application_status='SUBMITTED') AS submitted, count(*) FILTER (WHERE application_status='APPROVED') AS approved, count(*) FILTER (WHERE application_status='REJECTED') AS rejected, count(*) FILTER (WHERE application_status='WITHDRAWN') AS withdrawn, count(*) FILTER (WHERE created_at::date = CURRENT_DATE) AS created_today, count(*) AS total FROM activity_applications");
+        return new ApplicationStats(((Number)row.get("total")).intValue(), ((Number)row.get("draft")).intValue(), ((Number)row.get("submitted")).intValue(), ((Number)row.get("approved")).intValue(), ((Number)row.get("rejected")).intValue(), ((Number)row.get("withdrawn")).intValue(), ((Number)row.get("created_today")).intValue());
     }
 
     @Override

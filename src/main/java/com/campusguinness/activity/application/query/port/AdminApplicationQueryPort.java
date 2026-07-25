@@ -23,7 +23,7 @@ public interface AdminApplicationQueryPort {
             Instant reviewedAt, String reviewComment, String rejectReason,
             Instant createdAt, Instant updatedAt) {}
 
-    record ApplicationStats(int total, int draft, int submitted, int approved, int rejected, int withdrawn) {}
+    record ApplicationStats(int total, int draft, int submitted, int approved, int rejected, int withdrawn, int createdToday) {}
     ApplicationStats getStats();
 
     record SchoolOption(UUID schoolId, String schoolName) {}

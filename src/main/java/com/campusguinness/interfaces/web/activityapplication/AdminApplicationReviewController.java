@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -33,6 +34,9 @@ public class AdminApplicationReviewController {
         this.currentActor = currentActor;
     }
 
+    private static final Set<String> VALID_STATUSES = Set.of("DRAFT","SUBMITTED","APPROVED","REJECTED","WITHDRAWN");
+    private static final Set<String> VALID_SORTS = Set.of("updated_desc","updated_asc","created_desc","created_asc");
+
     @GetMapping
     public ResponseEntity<PageResponse<AdminApplicationItem>> list(
             @RequestParam(required = false) String status,
@@ -45,6 +49,11 @@ public class AdminApplicationReviewController {
             @RequestParam(defaultValue = "20") int size) {
         if (page < 0) throw new IllegalArgumentException("page >= 0");
         if (size < 1 || size > 100) throw new IllegalArgumentException("size 1-100");
+        if (status != null && !VALID_STATUSES.contains(status))
+            throw new IllegalArgumentException("invalid status: " + status);
+        if (sort != null && !VALID_SORTS.contains(sort))
+            throw new IllegalArgumentException("invalid sort: " + sort);
+        if (keyword != null && keyword.length() > 200) throw new IllegalArgumentException("keyword too long");
         if (submittedFrom != null && submittedTo != null && submittedFrom.isAfter(submittedTo))
             throw new IllegalArgumentException("submittedFrom > submittedTo");
         var result = queryPort.findApplications(status, schoolId, keyword, submittedFrom, submittedTo, sort, page, size);
@@ -68,9 +77,9 @@ public class AdminApplicationReviewController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<Map<String,Integer>> getStats() {
+    public ResponseEntity<AdminStatsResponse> getStats() {
         var s = queryPort.getStats();
-        return ResponseEntity.ok(Map.of("total",s.total(),"draft",s.draft(),"submitted",s.submitted(),"approved",s.approved(),"rejected",s.rejected(),"withdrawn",s.withdrawn()));
+        return ResponseEntity.ok(new AdminStatsResponse(s.total(),s.draft(),s.submitted(),s.approved(),s.rejected(),s.withdrawn(),s.createdToday()));
     }
 
     @GetMapping("/schools")
@@ -117,4 +126,5 @@ public class AdminApplicationReviewController {
             Instant createdAt, Instant updatedAt) {}
 
     public record SchoolOption(UUID schoolId, String schoolName) {}
+    public record AdminStatsResponse(int total, int draft, int submitted, int approved, int rejected, int withdrawn, int createdToday) {}
 }
