@@ -25,7 +25,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { fetchMyApplications } from '@/api/teacher-application';
+import { fetchMyApplications, fetchMyStats } from '@/api/teacher-application';
 import { appStatusLabel, appStatusTagType } from '@/utils/application-status';
 import type { TeacherActivityApplicationItem } from '@/types/teacher-application';
 
@@ -35,13 +35,12 @@ const recent = ref<TeacherActivityApplicationItem[]>([]);
 
 onMounted(async () => {
   try {
-    const r = await fetchMyApplications({ size: 5 });
+    const [r, s] = await Promise.all([fetchMyApplications({ size: 5 }), fetchMyStats()]);
     recent.value = r.items;
-    stats.total = r.totalElements;
-    const all = r.totalElements > 5 ? (await fetchMyApplications({ size: 100 })).items : r.items;
-    stats.pending = all.filter((a) => a.status === 'SUBMITTED').length;
-    stats.approved = all.filter((a) => a.status === 'APPROVED').length;
-    stats.rejected = all.filter((a) => a.status === 'REJECTED').length;
+    stats.total = s.total;
+    stats.pending = s.submitted;
+    stats.approved = s.approved;
+    stats.rejected = s.rejected;
   } catch { /* silent */ }
 });
 

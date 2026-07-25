@@ -159,6 +159,7 @@ class ActivityApplicationServiceTest {
             app.reject(UUID.randomUUID(), "reason");
             app.returnToDraft();
             when(appRepo.findByIdAndApplicantId(app.id().value(), userId)).thenReturn(Optional.of(app));
+            when(membershipPort.hasActiveTeacherMembership(userId, schoolId)).thenReturn(true);
 
             var r = svc.resubmit(app.id().value(), userId);
             assertThat(r.status()).isEqualTo("SUBMITTED");

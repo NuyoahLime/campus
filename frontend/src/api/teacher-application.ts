@@ -50,3 +50,21 @@ export async function resubmitApplication(id: string): Promise<TeacherActivityAp
   const res = await http.post<TeacherActivityApplicationItem>(`/v1/activity-applications/mine/${id}/submit`);
   return res.data;
 }
+
+export interface ApplicationStats {
+  total: number; draft: number; submitted: number; approved: number; rejected: number; withdrawn: number;
+}
+
+export async function fetchMyStats(): Promise<ApplicationStats> {
+  const res = await http.get<ApplicationStats>('/v1/teacher/applications/stats');
+  return res.data;
+}
+
+export interface TeacherSchoolItem {
+  schoolId: string; schoolName: string;
+}
+
+export async function fetchTeacherSchools(): Promise<TeacherSchoolItem[]> {
+  const res = await http.get<TeacherSchoolItem[]>('/v1/teacher/schools');
+  return res.data;
+}

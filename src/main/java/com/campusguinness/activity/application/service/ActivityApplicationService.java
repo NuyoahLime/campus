@@ -114,9 +114,12 @@ public class ActivityApplicationService {
         return ActivityApplicationResult.fromDomain(app);
     }
 
-    /** Re-submit a DRAFT application (own only). */
+    /** Re-submit a DRAFT application (own only) — requires ACTIVE TEACHER membership. */
     public ActivityApplicationResult resubmit(UUID id, UUID applicantId) {
         var app = findByIdAndApplicantId(id, applicantId);
+        if (!membershipQueryPort.hasActiveTeacherMembership(applicantId, app.schoolId())) {
+            throw new IllegalStateException("No active TEACHER membership for this school");
+        }
         app.submit();
         repository.save(app);
         return ActivityApplicationResult.fromDomain(app);
