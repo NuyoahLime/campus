@@ -14,8 +14,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -43,8 +44,8 @@ public class AdminApplicationReviewController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID schoolId,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant submittedFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant submittedTo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
             @RequestParam(required = false, defaultValue = "updated_desc") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -55,9 +56,12 @@ public class AdminApplicationReviewController {
         if (sort != null && !VALID_SORTS.contains(sort))
             throw new IllegalArgumentException("invalid sort: " + sort);
         if (keyword != null && keyword.length() > 200) throw new IllegalArgumentException("keyword too long");
-        if (submittedFrom != null && submittedTo != null && submittedFrom.isAfter(submittedTo))
-            throw new IllegalArgumentException("submittedFrom > submittedTo");
-        var result = queryPort.findApplications(status, schoolId, keyword, submittedFrom, submittedTo, sort, page, size);
+        if (createdFrom != null && createdTo != null && createdFrom.isAfter(createdTo))
+            throw new IllegalArgumentException("createdFrom must be <= createdTo");
+        ZoneId zone = ZoneId.of("Asia/Shanghai");
+        Instant fromInstant = createdFrom != null ? createdFrom.atStartOfDay(zone).toInstant() : null;
+        Instant toInstant = createdTo != null ? createdTo.plusDays(1).atStartOfDay(zone).toInstant() : null;
+        var result = queryPort.findApplications(status, schoolId, keyword, fromInstant, toInstant, sort, page, size);
         return ResponseEntity.ok(PageResponse.of(
                 result.items().stream().map(a -> new AdminApplicationItem(a.applicationId(), a.schoolId(),
                         a.schoolName(), a.applicantUserId(), a.applicantName(), a.title(),

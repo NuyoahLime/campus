@@ -78,16 +78,16 @@ class AdminApplicationReviewControllerTest {
         when(queryPort.findApplications(any(),any(),any(),any(),any(),any(),eq(0),eq(20)))
                 .thenReturn(new com.campusguinness.project.application.query.model.QueryPage<>(List.of(),0,20,0));
         mvc.perform(get("/api/v1/admin/activity-applications")
-                .param("submittedFrom","2026-01-01T00:00:00Z")
-                .param("submittedTo","2026-12-31T23:59:59Z")
+                .param("createdFrom","2026-01-01")
+                .param("createdTo","2026-12-31")
                 .param("page","0").param("size","20"))
                 .andExpect(status().isOk());
     }
 
     @Test void listInvalidDateRangeReturns400() throws Exception {
         mvc.perform(get("/api/v1/admin/activity-applications")
-                .param("submittedFrom","2026-12-31T00:00:00Z")
-                .param("submittedTo","2026-01-01T00:00:00Z"))
+                .param("createdFrom","2026-12-31")
+                .param("createdTo","2026-01-01"))
                 .andExpect(status().isBadRequest());
     }
 }
