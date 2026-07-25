@@ -112,9 +112,10 @@ const router = createRouter({
       component: () => import('@/layouts/WorkbenchLayout.vue'),
       meta: { requiresAuth: true, roles: ['SUPER_ADMIN'] },
       children: [
-        { path: '', name: 'admin-home', component: () => import('@/views/workbench/AdminHomeView.vue') },
+        { path: '', name: 'admin-home', component: () => import('@/views/workbench/AdminDashboard.vue') },
+        { path: 'applications', name: 'admin-applications', component: () => import('@/views/workbench/AdminApplicationList.vue') },
+        { path: 'applications/:applicationId', name: 'admin-app-detail', component: () => import('@/views/workbench/AdminApplicationDetail.vue') },
         { path: 'projects', name: 'admin-projects', component: () => import('@/views/NotImplementedView.vue') },
-        { path: 'applications', name: 'admin-applications', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'public-review', name: 'admin-public-review', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'schools', name: 'admin-schools', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'operations', name: 'admin-operations', component: () => import('@/views/NotImplementedView.vue') },

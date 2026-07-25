@@ -5,7 +5,7 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <el-form-item label="所属学校" prop="schoolId">
           <div v-if="schoolsLoading"><el-skeleton :rows="1" /></div>
-          <div v-else-if="schoolsError">{{ schoolsError }} <el-button size="small" @click="onMounted">重试</el-button></div>
+          <div v-else-if="schoolsError">{{ schoolsError }} <el-button size="small" @click="loadSchools">重试</el-button></div>
           <div v-else-if="schools.length===0">当前账号没有可提交申请的教师学校身份。</div>
           <el-select v-else v-model="form.schoolId" placeholder="请选择学校" style="width:100%">
             <el-option v-for="s in schools" :key="s.schoolId" :label="s.schoolName || '学校名称暂不可用'" :value="s.schoolId" />

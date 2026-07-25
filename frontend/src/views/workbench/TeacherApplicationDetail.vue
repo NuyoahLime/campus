@@ -28,15 +28,16 @@
         <el-alert v-if="app.rejectReason" title="驳回原因" :description="app.rejectReason" type="error" show-icon :closable="false" class="mt-8" />
       </section>
       <div class="actions">
+        <el-alert v-if="actionError" :title="actionError" type="error" show-icon :closable="false" style="margin-bottom:12px" />
         <template v-if="app.status === 'DRAFT'">
           <el-button type="primary" @click="$router.push(`/teacher/applications/${app.applicationId}/edit`)">编辑</el-button>
-          <el-button type="success" @click="handleResubmit">提交审核</el-button>
+          <el-button type="success" :loading="resubmitting" :disabled="resubmitting" @click="handleResubmit">提交审核</el-button>
         </template>
         <template v-else-if="app.status === 'SUBMITTED'">
-          <el-button type="warning" @click="handleWithdraw">撤回申请</el-button>
+          <el-button type="warning" :loading="withdrawing" :disabled="withdrawing" @click="handleWithdraw">撤回申请</el-button>
         </template>
         <template v-else-if="app.status === 'REJECTED'">
-          <el-button type="primary" @click="handleRevise">修改并重新提交</el-button>
+          <el-button type="primary" :loading="revising" :disabled="revising" @click="handleRevise">修改并重新提交</el-button>
         </template>
       </div>
     </template>
@@ -60,6 +61,16 @@ const app = ref<TeacherActivityApplicationItem | null>(null);
 const loading = ref(true); const notFound = ref(false);
 const loadError = ref<string|null>(null);
 const withdrawing = ref(false); const revising = ref(false); const resubmitting = ref(false);
+const actionError = ref<string | null>(null);
+
+function handleActionError(e: unknown, action: string) {
+  if (e instanceof ApiError) {
+    if (e.status === 403) { router.push('/forbidden'); return; }
+    if (e.status === 409) { actionError.value = '当前状态不能执行此操作'; return; }
+    if (e.status >= 400 && e.status < 500) { actionError.value = e.message; return; }
+  }
+  actionError.value = action + '失败，请重试';
+}
 
 async function load() {
   if (invalidId) { loading.value = false; return; }
@@ -71,22 +82,22 @@ async function load() {
 
 async function handleWithdraw() {
   try { await ElMessageBox.confirm('撤回后该申请将结束，不能再次提交。', '确认撤回', { type: 'warning' }); } catch { return; }
-  withdrawing.value = true;
-  try { app.value = await withdrawApplication(applicationId!); } catch { /* keep state */ }
+  withdrawing.value = true; actionError.value = null;
+  try { app.value = await withdrawApplication(applicationId!); } catch (e) { handleActionError(e, '撤回'); }
   finally { withdrawing.value = false; }
 }
 
 async function handleRevise() {
   try { await ElMessageBox.confirm('将退回草稿状态，修改后可重新提交。', '确认', { type: 'info' }); } catch { return; }
-  revising.value = true;
-  try { await returnToDraft(applicationId!); router.push(`/teacher/applications/${applicationId}/edit`); } catch { /* keep state */ }
+  revising.value = true; actionError.value = null;
+  try { await returnToDraft(applicationId!); router.push(`/teacher/applications/${applicationId}/edit`); } catch (e) { handleActionError(e, '退回草稿'); }
   finally { revising.value = false; }
 }
 
 async function handleResubmit() {
   try { await ElMessageBox.confirm('确认提交审核？', '确认', { type: 'warning' }); } catch { return; }
-  resubmitting.value = true;
-  try { app.value = await resubmitApplication(applicationId!); } catch { /* keep state */ }
+  resubmitting.value = true; actionError.value = null;
+  try { app.value = await resubmitApplication(applicationId!); } catch (e) { handleActionError(e, '重新提交'); }
   finally { resubmitting.value = false; }
 }
 
