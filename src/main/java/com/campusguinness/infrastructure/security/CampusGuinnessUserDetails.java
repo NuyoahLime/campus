@@ -1,6 +1,7 @@
 package com.campusguinness.infrastructure.security;
 
 import com.campusguinness.identity.application.query.AuthenticationAccount.SchoolMembershipRecord;
+import com.campusguinness.infrastructure.security.PrimaryIdentityResolver.ResolvedIdentity;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,6 +27,7 @@ public final class CampusGuinnessUserDetails implements UserDetails {
     private final String accountStatus;
     private final Set<GrantedAuthority> authorities;
     private final List<SchoolMembershipRecord> schoolMemberships;
+    private final ResolvedIdentity resolvedIdentity;
 
     public CampusGuinnessUserDetails(
             UUID userId,
@@ -33,14 +35,19 @@ public final class CampusGuinnessUserDetails implements UserDetails {
             String passwordHash,
             String accountStatus,
             Set<GrantedAuthority> authorities,
-            List<SchoolMembershipRecord> schoolMemberships) {
+            List<SchoolMembershipRecord> schoolMemberships,
+            ResolvedIdentity resolvedIdentity) {
         this.userId = userId;
         this.loginName = loginName;
         this.passwordHash = passwordHash;
         this.accountStatus = accountStatus;
         this.authorities = Collections.unmodifiableSet(authorities);
         this.schoolMemberships = List.copyOf(schoolMemberships);
+        this.resolvedIdentity = resolvedIdentity;
     }
+
+    /** The resolved primary identity (role + school) for this user. */
+    public ResolvedIdentity getResolvedIdentity() { return resolvedIdentity; }
 
     /** The domain User UUID — the single source of truth for actorId. */
     public UUID getUserId() {

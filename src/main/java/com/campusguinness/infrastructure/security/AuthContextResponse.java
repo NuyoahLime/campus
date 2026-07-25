@@ -35,15 +35,10 @@ public record AuthContextResponse(
                 .map(m -> new SchoolMembershipItem(m.schoolId(), m.roleInSchool()))
                 .toList();
 
-        // Resolve primary identity
-        String primaryRole = null;
-        UUID primarySchoolId = null;
-        if (platformRole != null) {
-            if (memberships.isEmpty()) { primaryRole = "SUPER_ADMIN"; primarySchoolId = null; }
-        } else if (memberships.size() == 1) {
-            primaryRole = memberships.getFirst().roleInSchool();
-            primarySchoolId = memberships.getFirst().schoolId();
-        }
+        // Use PrimaryIdentityResolver result via user details
+        var identity = user.getResolvedIdentity();
+        String primaryRole = identity != null ? identity.primaryRole() : null;
+        UUID primarySchoolId = identity != null ? identity.primarySchoolId() : null;
 
         return new AuthContextResponse(
                 user.getUserId(), user.getUsername(),

@@ -27,6 +27,8 @@
           <el-alert :title="errorMsg" type="error" show-icon :closable="false" />
         </div>
         <div class="login-footer">
+          <p class="note">学生和老师账号由所在学校管理员创建。<br>学校管理员账号由平台管理员创建。</p>
+          <el-button text type="primary" @click="$router.push('/activate-account')">首次使用？激活账号</el-button>
           <el-button text @click="$router.push('/')">返回首页</el-button>
         </div>
       </el-card>

@@ -50,13 +50,18 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
         mapPlatformAuthorities(account, authorities);
         mapSchoolAuthorities(account, authorities);
 
+        // Resolve primary identity
+        var resolver = new PrimaryIdentityResolver();
+        var identity = resolver.resolve(account);
+
         return new CampusGuinnessUserDetails(
                 account.userId(),
                 account.loginName(),
                 account.passwordHash(),
                 account.accountStatus(),
                 authorities,
-                account.memberships()
+                account.memberships(),
+                identity
         );
     }
 
