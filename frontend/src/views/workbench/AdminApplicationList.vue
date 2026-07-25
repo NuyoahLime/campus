@@ -57,7 +57,7 @@ function search(){page.value=1;const q:Record<string,string>={};if(f.status)q.st
 async function load(){
   const seq=++requestSeq;loading.value=true;error.value=null;
   try{
-    const r=await fetchAdminApplications({status:f.status||undefined,schoolId:f.schoolId||undefined,keyword:f.keyword||undefined,sort:f.sort,page:page.value-1,size:20,submittedFrom:f.createdFrom||undefined,submittedTo:f.createdTo||undefined});
+    const r=await fetchAdminApplications({status:f.status||undefined,schoolId:f.schoolId||undefined,keyword:f.keyword||undefined,sort:f.sort,page:page.value-1,size:20,createdFrom:f.createdFrom||undefined,createdTo:f.createdTo||undefined});
     if(seq!==requestSeq)return;
     items.value=r.items;total.value=r.totalElements;loading.value=false
   } catch(e){if(seq!==requestSeq)return;error.value=e instanceof ApiError?e.message:'加载失败';}

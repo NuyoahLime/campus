@@ -3,7 +3,16 @@ import type { PageResponse } from '@/types/api';
 import type { AdminApplicationItem, AdminApplicationDetail, AdminApplicationStats, AdminSchoolOption, AdminListParams } from '@/types/admin-application';
 
 export async function fetchAdminApplications(params: AdminListParams = {}): Promise<PageResponse<AdminApplicationItem>> {
-  const res = await http.get<PageResponse<AdminApplicationItem>>('/v1/admin/activity-applications', { params: params as Record<string,unknown> });
+  const query: Record<string,unknown> = {};
+  if (params.status) query.status = params.status;
+  if (params.schoolId) query.schoolId = params.schoolId;
+  if (params.keyword) query.keyword = params.keyword;
+  if (params.createdFrom) query.createdFrom = params.createdFrom;
+  if (params.createdTo) query.createdTo = params.createdTo;
+  if (params.sort) query.sort = params.sort;
+  if (params.page !== undefined) query.page = params.page;
+  if (params.size !== undefined) query.size = params.size;
+  const res = await http.get<PageResponse<AdminApplicationItem>>('/v1/admin/activity-applications', { params: query });
   return res.data;
 }
 

@@ -21,6 +21,6 @@ export interface AdminSchoolOption { schoolId: string; schoolName: string; }
 
 export interface AdminListParams {
   status?: string; schoolId?: string; keyword?: string;
-  submittedFrom?: string; submittedTo?: string; sort?: string;
+  createdFrom?: string; createdTo?: string; sort?: string;
   page?: number; size?: number;
 }
