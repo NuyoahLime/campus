@@ -3,6 +3,8 @@ package com.campusguinness.infrastructure.security;
 import java.util.List;
 import java.util.UUID;
 
+import com.campusguinness.identity.application.query.AuthenticationAccount.SchoolMembershipRecord;
+
 /**
  * Unified authentication context response returned by /auth/login and /auth/me.
  * Contains user identity, platform role, all granted authorities, and ACTIVE school memberships.
