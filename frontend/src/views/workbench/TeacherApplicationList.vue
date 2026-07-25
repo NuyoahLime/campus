@@ -4,7 +4,7 @@
     <el-card class="filter-card">
       <el-form :inline="true">
         <el-form-item label="状态"><el-select v-model="f.status" placeholder="全部" clearable @change="search"><el-option v-for="o in statusOpts" :key="o.v" :label="o.l" :value="o.v" /></el-select></el-form-item>
-        <el-form-item label="学校"><el-input v-model="f.schoolId" placeholder="学校ID" clearable @change="search" /></el-form-item>
+        <el-form-item label="学校"><el-select v-model="f.schoolId" placeholder="全部学校" clearable @change="search" style="width:200px"><el-option v-for="s in teacherSchools" :key="s.schoolId" :label="s.schoolName || '学校名称暂不可用'" :value="s.schoolId" /></el-select></el-form-item>
         <el-form-item label="关键词"><el-input v-model="f.keyword" placeholder="申请标题" clearable @change="search" /></el-form-item>
       </el-form>
     </el-card>
@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchMyApplications } from '@/api/teacher-application';
+import { fetchMyApplications, fetchTeacherSchools, type TeacherSchoolItem } from '@/api/teacher-application';
 import { ApiError } from '@/api/http';
 import { appStatusLabel, appStatusTagType } from '@/utils/application-status';
 import type { TeacherActivityApplicationItem } from '@/types/teacher-application';
@@ -37,6 +37,18 @@ const loading = ref(true); const error = ref<string|null>(null);
 const page = ref(1); const total = ref(0);
 const f = reactive({ status: '', schoolId: '', keyword: '' });
 const statusOpts = [{ v: 'DRAFT', l: '草稿' }, { v: 'SUBMITTED', l: '待审核' }, { v: 'APPROVED', l: '已通过' }, { v: 'REJECTED', l: '已驳回' }, { v: 'WITHDRAWN', l: '已撤回' }];
+const teacherSchools = ref<TeacherSchoolItem[]>([]);
+
+onMounted(async () => {
+  try { teacherSchools.value = await fetchTeacherSchools(); } catch { /* non-blocking */ }
+  // Restore filters from URL
+  f.status = (route.query.status as string) || '';
+  const qs = route.query.schoolId as string | undefined;
+  if (qs && teacherSchools.value.some(s => s.schoolId === qs)) f.schoolId = qs;
+  f.keyword = (route.query.keyword as string) || '';
+  page.value = Number(route.query.page) || 1;
+  load();
+});
 
 function buildQuery() {
   const q: Record<string, string> = {};

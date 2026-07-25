@@ -4,8 +4,11 @@
     <el-card>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <el-form-item label="所属学校" prop="schoolId">
-          <el-select v-model="form.schoolId" placeholder="请选择学校" style="width:100%">
-            <el-option v-for="m in teacherSchools" :key="m.schoolId" :label="m.schoolId" :value="m.schoolId" />
+          <div v-if="schoolsLoading"><el-skeleton :rows="1" /></div>
+          <div v-else-if="schoolsError">{{ schoolsError }} <el-button size="small" @click="onMounted">重试</el-button></div>
+          <div v-else-if="schools.length===0">当前账号没有可提交申请的教师学校身份。</div>
+          <el-select v-else v-model="form.schoolId" placeholder="请选择学校" style="width:100%">
+            <el-option v-for="s in schools" :key="s.schoolId" :label="s.schoolName || '学校名称暂不可用'" :value="s.schoolId" />
           </el-select>
         </el-form-item>
         <el-form-item label="活动名称" prop="title">
@@ -24,28 +27,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
-import { createApplication } from '@/api/teacher-application';
-import { ApiError } from '@/api/http';
+import { createApplication, fetchTeacherSchools, type TeacherSchoolItem } from '@/api/teacher-application';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessageBox } from 'element-plus';
 
 const router = useRouter();
-const auth = useAuthStore();
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
-
-const teacherSchools = computed(() =>
-  auth.schoolMemberships.filter((m) => m.roleInSchool === 'TEACHER'),
-);
+const schools = ref<TeacherSchoolItem[]>([]);
+const schoolsLoading = ref(true);
+const schoolsError = ref<string | null>(null);
 
 const form = reactive({ schoolId: '', title: '', description: '' });
 const rules: FormRules = {
   schoolId: [{ required: true, message: '请选择学校', trigger: 'blur' }],
   title: [{ required: true, message: '请输入活动名称', trigger: 'blur' }, { max: 200, message: '最多200字', trigger: 'blur' }],
 };
+
+onMounted(async () => {
+  try {
+    schools.value = await fetchTeacherSchools();
+    if (schools.value.length === 1) form.schoolId = schools.value[0].schoolId;
+  } catch { schoolsError.value = '加载学校列表失败'; }
+  finally { schoolsLoading.value = false; }
+});
 
 async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false);
@@ -57,14 +64,8 @@ async function handleSubmit() {
   try {
     const r = await createApplication({ schoolId: form.schoolId, title: form.title, description: form.description || undefined });
     router.replace(`/teacher/applications/${r.applicationId}`);
-  } catch (e) {
-    if (e instanceof ApiError) { /* keep form data */ return; }
-  } finally { submitting.value = false; }
-}
-
-// Auto-select single school
-if (teacherSchools.value.length === 1) {
-  form.schoolId = teacherSchools.value[0].schoolId;
+  } catch { /* keep form data */ }
+  finally { submitting.value = false; }
 }
 </script>
 

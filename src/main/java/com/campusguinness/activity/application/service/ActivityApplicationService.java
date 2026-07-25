@@ -99,17 +99,20 @@ public class ActivityApplicationService {
         return ActivityApplicationResult.fromDomain(app);
     }
 
-    /** Update title/description of a DRAFT application (own only). */
+    /** Update title/description of a DRAFT application (own only — owner check first). */
     public ActivityApplicationResult updateDraft(UUID id, UUID applicantId, String title, String description) {
-        if (!membershipQueryPort.hasActiveTeacherMembership(applicantId,
-                repository.findById(new ActivityApplicationId(id))
-                        .orElseThrow(() -> new IllegalArgumentException("ActivityApplication not found: " + id))
-                        .schoolId())) {
+        var app = findByIdAndApplicantId(id, applicantId);
+        if (!membershipQueryPort.hasActiveTeacherMembership(applicantId, app.schoolId())) {
             throw new IllegalStateException("No active TEACHER membership for this school");
         }
-        var app = findByIdAndApplicantId(id, applicantId);
-        if (title != null) app.updateTitle(title);
-        if (description != null) app.updateDescription(description);
+        if (title != null) {
+            String trimmed = title.trim();
+            if (trimmed.isEmpty()) throw new IllegalArgumentException("title must not be blank");
+            app.updateTitle(trimmed);
+        }
+        if (description != null) {
+            app.updateDescription(description.isEmpty() ? null : description);
+        }
         repository.save(app);
         return ActivityApplicationResult.fromDomain(app);
     }
