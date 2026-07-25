@@ -3,8 +3,11 @@
     <el-card class="fc"><el-form :inline="true">
       <el-form-item label="状态"><el-select v-model="f.status" placeholder="全部" clearable @change="search"><el-option v-for="o in statusOpts" :key="o.v" :label="o.l" :value="o.v" /></el-select></el-form-item>
       <el-form-item label="学校"><el-select v-model="f.schoolId" placeholder="全部" clearable @change="search"><el-option v-for="s in schools" :key="s.schoolId" :label="s.schoolName" :value="s.schoolId" /></el-select></el-form-item>
+      <el-form-item label="创建时间"><el-date-picker v-model="f.createdFrom" type="date" placeholder="开始" @change="search" value-format="YYYY-MM-DD" style="width:140px" /></el-form-item>
+      <el-form-item label="至"><el-date-picker v-model="f.createdTo" type="date" placeholder="结束" @change="search" value-format="YYYY-MM-DD" style="width:140px" /></el-form-item>
       <el-form-item label="关键词"><el-input v-model="f.keyword" placeholder="标题/学校/申请人" clearable @change="search" /></el-form-item>
       <el-form-item><el-select v-model="f.sort" @change="search"><el-option v-for="o in sortOpts" :key="o.v" :label="o.l" :value="o.v" /></el-select></el-form-item>
+      <div v-if="schoolsErr" style="width:100%"><el-alert :title="schoolsErr" type="warning" show-icon :closable="false" /><el-button size="small" @click="loadSchools">重试</el-button></div>
     </el-form></el-card>
     <div v-if="loading"><el-skeleton :rows="5" animated /></div>
     <div v-else-if="error"><el-result icon="error" title="加载失败" :sub-title="error"><template #extra><el-button type="primary" @click="load">重试</el-button></template></el-result></div>
@@ -32,23 +35,32 @@ import type { AdminApplicationItem, AdminSchoolOption } from '@/types/admin-appl
 
 const route=useRoute(); const router=useRouter();
 const items=ref<AdminApplicationItem[]>([]); const loading=ref(true); const error=ref<string|null>(null);
-const page=ref(1); const total=ref(0); const schools=ref<AdminSchoolOption[]>([]);
-const f=reactive({status:'',schoolId:'',keyword:'',sort:'updated_desc'});
+const page=ref(1); const total=ref(0); const schools=ref<AdminSchoolOption[]>([]); const schoolsErr=ref<string|null>(null);
+const f=reactive({status:'',schoolId:'',keyword:'',sort:'updated_desc',createdFrom:'',createdTo:''});
 const statusOpts=[{v:'SUBMITTED',l:'待审核'},{v:'DRAFT',l:'草稿'},{v:'APPROVED',l:'已通过'},{v:'REJECTED',l:'已驳回'},{v:'WITHDRAWN',l:'已撤回'}];
-const sortOpts=[{v:'updated_desc',l:'最新更新'},{v:'updated_asc',l:'最早更新'},{v:'created_desc',l:'最新创建'}];
+const sortOpts=[{v:'updated_desc',l:'最新更新'},{v:'updated_asc',l:'最早更新'},{v:'created_desc',l:'最新创建'},{v:'created_asc',l:'最早创建'}];
+let requestSeq=0;
+
+async function loadSchools(){try{schools.value=await fetchAdminSchools()}catch{schoolsErr.value='加载学校失败'}}
 
 onMounted(async()=>{
-  try{schools.value=await fetchAdminSchools()}catch{}
+  await loadSchools();
   f.status=String(route.query.status||'');f.schoolId=String(route.query.schoolId||'');f.keyword=String(route.query.keyword||'');
-  f.sort=String(route.query.sort||'updated_desc');page.value=Number(route.query.page)||1;load();
+  f.sort=String(route.query.sort||'updated_desc');f.createdFrom=String(route.query.createdFrom||'');f.createdTo=String(route.query.createdTo||'');
+  if(f.schoolId&&schools.value.length>0&&!schools.value.some(s=>s.schoolId===f.schoolId)){f.schoolId='';const q={...route.query};delete q.schoolId;router.replace({query:q})}
+  const qp=Number(route.query.page);page.value=Number.isFinite(qp)&&qp>=1?qp:1;
+  load();
 });
 
-function search(){page.value=1;const q:Record<string,string>={};if(f.status)q.status=f.status;if(f.schoolId)q.schoolId=f.schoolId;if(f.keyword)q.keyword=f.keyword;if(f.sort!=='updated_desc')q.sort=f.sort;if(page.value>1)q.page=String(page.value);router.replace({query:q});load();}
+function search(){page.value=1;const q:Record<string,string>={};if(f.status)q.status=f.status;if(f.schoolId)q.schoolId=f.schoolId;if(f.keyword)q.keyword=f.keyword;if(f.sort!=='updated_desc')q.sort=f.sort;if(f.createdFrom)q.createdFrom=f.createdFrom;if(f.createdTo)q.createdTo=f.createdTo;if(page.value>1)q.page=String(page.value);router.replace({query:q});load();}
 
 async function load(){
-  loading.value=true;error.value=null;
-  try{const r=await fetchAdminApplications({status:f.status||undefined,schoolId:f.schoolId||undefined,keyword:f.keyword||undefined,sort:f.sort,page:page.value-1,size:20});items.value=r.items;total.value=r.totalElements}
-  catch(e){error.value=e instanceof ApiError?e.message:'加载失败'}finally{loading.value=false}
+  const seq=++requestSeq;loading.value=true;error.value=null;
+  try{
+    const r=await fetchAdminApplications({status:f.status||undefined,schoolId:f.schoolId||undefined,keyword:f.keyword||undefined,sort:f.sort,page:page.value-1,size:20,submittedFrom:f.createdFrom||undefined,submittedTo:f.createdTo||undefined});
+    if(seq!==requestSeq)return;
+    items.value=r.items;total.value=r.totalElements;loading.value=false
+  } catch(e){if(seq!==requestSeq)return;error.value=e instanceof ApiError?e.message:'加载失败';}
 }
 function fmt(iso:string|null){return iso?new Date(iso).toLocaleDateString('zh-CN'):''}
 </script>

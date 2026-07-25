@@ -34,9 +34,9 @@ public class AdminApplicationQueryAdapter implements AdminApplicationQueryPort {
         if (submittedTo != null) { where.append(" AND aa.created_at <= ?"); params.add(Timestamp.from(submittedTo)); }
 
         String orderBy = switch (sort != null ? sort : "updated_desc") {
-            case "created_asc" -> "aa.created_at ASC, aa.id DESC";
+            case "created_asc" -> "aa.created_at ASC, aa.id ASC";
             case "created_desc" -> "aa.created_at DESC, aa.id DESC";
-            case "updated_asc" -> "aa.updated_at ASC, aa.id DESC";
+            case "updated_asc" -> "aa.updated_at ASC, aa.id ASC";
             default -> "aa.updated_at DESC, aa.id DESC";
         };
 
