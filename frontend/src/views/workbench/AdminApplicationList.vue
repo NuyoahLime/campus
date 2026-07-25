@@ -20,7 +20,7 @@
         <el-table-column label="状态"><template #default="{row}"><el-tag :type="appStatusTagType(row.status)" size="small">{{ appStatusLabel(row.status) }}</el-tag></template></el-table-column>
         <el-table-column label="时间"><template #default="{row}">{{ fmt(row.createdAt) }}</template></el-table-column>
       </el-table>
-      <div class="pager"><el-pagination layout="total,prev,pager,next" :total="total" :page-size="20" v-model:current-page="page" @current-change="load" /></div>
+      <div class="pager"><el-pagination layout="total,prev,pager,next" :total="total" :page-size="20" v-model:current-page="page" @current-change="handlePageChange" /></div>
     </template>
   </div>
 </template>
@@ -31,6 +31,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { fetchAdminApplications, fetchAdminSchools } from '@/api/admin-application';
 import { ApiError } from '@/api/http';
 import { appStatusLabel, appStatusTagType } from '@/utils/application-status';
+import { validateStatus, validateSort, validatePage, validateDate, validateSchoolId } from '@/utils/admin-application-filter';
 import type { AdminApplicationItem, AdminSchoolOption } from '@/types/admin-application';
 
 const route=useRoute(); const router=useRouter();
@@ -45,14 +46,59 @@ async function loadSchools(){try{schools.value=await fetchAdminSchools()}catch{s
 
 onMounted(async()=>{
   await loadSchools();
-  f.status=String(route.query.status||'');f.schoolId=String(route.query.schoolId||'');f.keyword=String(route.query.keyword||'');
-  f.sort=String(route.query.sort||'updated_desc');f.createdFrom=String(route.query.createdFrom||'');f.createdTo=String(route.query.createdTo||'');
-  if(f.schoolId&&schools.value.length>0&&!schools.value.some(s=>s.schoolId===f.schoolId)){f.schoolId='';const q={...route.query};delete q.schoolId;router.replace({query:q})}
-  const qp=Number(route.query.page);page.value=Number.isFinite(qp)&&qp>=1?qp:1;
+  // Use filter utilities to validate URL query params
+  f.status = validateStatus(route.query.status) || '';
+  f.schoolId = validateSchoolId(route.query.schoolId, new Set(schools.value.map(s=>s.schoolId))) || '';
+  f.keyword = String(route.query.keyword || '').trim();
+  f.sort = validateSort(route.query.sort) || 'updated_desc';
+  f.createdFrom = validateDate(route.query.createdFrom) || '';
+  f.createdTo = validateDate(route.query.createdTo) || '';
+  page.value = validatePage(route.query.page);
+  // Clean invalid params from URL
+  const clean: Record<string,string> = {};
+  if (f.status) clean.status = f.status;
+  if (f.schoolId) clean.schoolId = f.schoolId;
+  if (f.keyword) clean.keyword = f.keyword;
+  if (f.sort !== 'updated_desc') clean.sort = f.sort;
+  if (f.createdFrom) clean.createdFrom = f.createdFrom;
+  if (f.createdTo) clean.createdTo = f.createdTo;
+  if (page.value > 1) clean.page = String(page.value);
+  router.replace({ query: clean });
   load();
 });
 
-function search(){page.value=1;const q:Record<string,string>={};if(f.status)q.status=f.status;if(f.schoolId)q.schoolId=f.schoolId;if(f.keyword)q.keyword=f.keyword;if(f.sort!=='updated_desc')q.sort=f.sort;if(f.createdFrom)q.createdFrom=f.createdFrom;if(f.createdTo)q.createdTo=f.createdTo;if(page.value>1)q.page=String(page.value);router.replace({query:q});load();}
+function handlePageChange(p: number) {
+  page.value = p;
+  const q: Record<string,string> = {};
+  if (f.status) q.status = f.status;
+  if (f.schoolId) q.schoolId = f.schoolId;
+  if (f.keyword) q.keyword = f.keyword;
+  if (f.sort !== 'updated_desc') q.sort = f.sort;
+  if (f.createdFrom) q.createdFrom = f.createdFrom;
+  if (f.createdTo) q.createdTo = f.createdTo;
+  if (p > 1) q.page = String(p);
+  router.replace({ query: q });
+  load();
+}
+
+function search() {
+  // Validate date range before requesting
+  if (f.createdFrom && f.createdTo && f.createdFrom > f.createdTo) {
+    error.value = '开始日期不能晚于结束日期';
+    return;
+  }
+  page.value = 1;
+  const q: Record<string,string> = {};
+  if (f.status) q.status = f.status;
+  if (f.schoolId) q.schoolId = f.schoolId;
+  if (f.keyword) q.keyword = f.keyword;
+  if (f.sort !== 'updated_desc') q.sort = f.sort;
+  if (f.createdFrom) q.createdFrom = f.createdFrom;
+  if (f.createdTo) q.createdTo = f.createdTo;
+  router.replace({ query: q });
+  load();
+}
+
 
 async function load(){
   const seq=++requestSeq;loading.value=true;error.value=null;

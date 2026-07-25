@@ -24,8 +24,8 @@
       </section>
       <div v-if="app.status==='SUBMITTED'" class="actions">
         <el-alert v-if="actionErr" :title="actionErr" type="error" show-icon :closable="false" style="margin-bottom:12px" />
-        <el-button type="success" :loading="approving" :disabled="approving" @click="handleApprove">批准</el-button>
-        <el-button type="danger" :loading="rejecting" :disabled="rejecting" @click="showRejectDialog=true">驳回</el-button>
+        <el-button type="success" :loading="approving" :disabled="reviewing" @click="handleApprove">批准</el-button>
+        <el-button type="danger" :disabled="reviewing" @click="showRejectDialog=true">驳回</el-button>
       </div>
 
       <!-- Reject Dialog -->
@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchAdminApplicationById, approveApplication, rejectApplication } from '@/api/admin-application';
 import { ApiError } from '@/api/http';
@@ -54,6 +54,7 @@ const invalidId=appId===null;
 const app=ref<AdminApplicationDetail|null>(null);
 const loading=ref(true);const notFound=ref(false);const loadErr=ref<string|null>(null);
 const approving=ref(false);const rejecting=ref(false);const actionErr=ref<string|null>(null);
+const reviewing = computed(() => approving.value || rejecting.value);
 const showRejectDialog=ref(false);const rejectReason=ref('');
 
 async function load(){
