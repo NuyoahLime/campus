@@ -36,13 +36,23 @@ public class AuthController {
         try {
             var token = UsernamePasswordAuthenticationToken.unauthenticated(req.username(), req.password());
             Authentication auth = authManager.authenticate(token);
+            CampusGuinnessUserDetails user = (CampusGuinnessUserDetails) auth.getPrincipal();
+
+            // Check primary identity before creating session
+            var identity = user.getResolvedIdentity();
+            if (identity != null && identity.isError()) {
+                SecurityContextHolder.clearContext();
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(ApiErrorResponse.of(identity.errorCode(),
+                                "Account identity error: " + identity.errorCode(), "/api/v1/auth/login"));
+            }
+
             SecurityContext ctx = SecurityContextHolder.createEmptyContext();
             ctx.setAuthentication(auth);
             SecurityContextHolder.setContext(ctx);
-            request.getSession(true); // create session so saveContext has a session to write to
+            request.getSession(true);
             contextRepo.saveContext(ctx, request, response);
 
-            CampusGuinnessUserDetails user = (CampusGuinnessUserDetails) auth.getPrincipal();
             return ResponseEntity.ok(AuthContextResponse.from(user));
         } catch (AuthenticationException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

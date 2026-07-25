@@ -34,9 +34,12 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
     private static final Set<String> KNOWN_SCHOOL_ROLES = Set.of("STUDENT", "TEACHER", "SCHOOL_ADMIN");
 
     private final AuthenticationAccountQuery accountQuery;
+    private final PrimaryIdentityResolver identityResolver;
 
-    public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery) {
+    public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery,
+            PrimaryIdentityResolver identityResolver) {
         this.accountQuery = accountQuery;
+        this.identityResolver = identityResolver;
     }
 
     @Override
@@ -51,8 +54,7 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
         mapSchoolAuthorities(account, authorities);
 
         // Resolve primary identity
-        var resolver = new PrimaryIdentityResolver();
-        var identity = resolver.resolve(account);
+        var identity = identityResolver.resolve(account);
 
         return new CampusGuinnessUserDetails(
                 account.userId(),
