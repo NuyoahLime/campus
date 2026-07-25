@@ -109,6 +109,7 @@ const router = createRouter({
         { path: 'teachers', name: 'school-admin-teachers', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'scores', name: 'school-admin-scores', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'rankings', name: 'school-admin-rankings', component: () => import('@/views/NotImplementedView.vue') },
+        { path: 'accounts', name: 'school-admin-accounts', component: () => import('@/views/workbench/SchoolAdminAccounts.vue') },
       ],
     },
     // Super admin workbench
@@ -123,6 +124,7 @@ const router = createRouter({
         { path: 'projects', name: 'admin-projects', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'public-review', name: 'admin-public-review', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'schools', name: 'admin-schools', component: () => import('@/views/NotImplementedView.vue') },
+        { path: 'schools/:schoolId/administrators', name: 'admin-school-admins', component: () => import('@/views/workbench/AdminSchoolAdministrators.vue') },
         { path: 'operations', name: 'admin-operations', component: () => import('@/views/NotImplementedView.vue') },
       ],
     },

@@ -4,9 +4,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import com.campusguinness.infrastructure.security.AccountActivationService;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -15,12 +15,10 @@ import java.util.Map;
 @RequestMapping("/api/v1/auth")
 public class AccountActivationController {
 
-    private final JdbcTemplate jdbc;
-    private final PasswordEncoder encoder;
+    private final AccountActivationService service;
 
-    public AccountActivationController(JdbcTemplate jdbc, PasswordEncoder encoder) {
-        this.jdbc = jdbc;
-        this.encoder = encoder;
+    public AccountActivationController(AccountActivationService service) {
+        this.service = service;
     }
 
     @PostMapping("/activate")
@@ -34,20 +32,12 @@ public class AccountActivationController {
             return ResponseEntity.badRequest().body(Map.of("code","PASSWORD_SAME_AS_TEMP","message","新密码不能与临时密码相同"));
         }
 
-        // Verify credentials
-        var rows = jdbc.queryForList("SELECT id, username, password_hash, account_status FROM users WHERE username = ? AND account_status = 'PENDING_ACTIVATION'", req.username());
-        if (rows.isEmpty()) {
-            return ResponseEntity.status(401).body(Map.of("code","ACTIVATION_CREDENTIALS_INVALID","message","用户名或临时密码错误"));
+        var result = service.activate(req.username(), req.temporaryPassword(), req.newPassword());
+        if (!result.success()) {
+            int status = "ACCOUNT_ALREADY_ACTIVATED".equals(result.code()) ? 409 : 401;
+            return ResponseEntity.status(status).body(Map.of("code", result.code(), "message", result.message()));
         }
-        var row = rows.getFirst();
-        String hash = (String) row.get("password_hash");
-        if (!encoder.matches(req.temporaryPassword(), hash)) {
-            return ResponseEntity.status(401).body(Map.of("code","ACTIVATION_CREDENTIALS_INVALID","message","用户名或临时密码错误"));
-        }
-
-        // Activate: replace password hash + set NORMAL
-        jdbc.update("UPDATE users SET password_hash = ?, account_status = 'NORMAL' WHERE id = ?", encoder.encode(req.newPassword()), row.get("id"));
-        return ResponseEntity.ok(Map.of("message","账号激活成功，请返回登录"));
+        return ResponseEntity.ok(Map.of("message", result.message()));
     }
 
     public record ActivateRequest(@NotBlank String username, @NotBlank String temporaryPassword, @NotBlank @Size(min=8) String newPassword, @NotBlank String confirmPassword) {}
