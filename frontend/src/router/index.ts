@@ -40,6 +40,11 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
+      path: '/activate-account',
+      name: 'activate',
+      component: () => import('@/views/ActivateAccountView.vue'),
+    },
+    {
       path: '/workspaces',
       name: 'workspaces',
       component: () => import('@/views/WorkspacesView.vue'),

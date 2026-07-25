@@ -10,6 +10,8 @@ export interface AuthContextResponse {
   platformRole: string | null;
   roles: string[];
   schoolMemberships: SchoolMembershipItem[];
+  primaryRole: string | null;
+  primarySchoolId: string | null;
 }
 
 export interface CsrfTokenResponse {

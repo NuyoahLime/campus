@@ -14,7 +14,9 @@ public record AuthContextResponse(
         String accountStatus,
         String platformRole,
         List<String> roles,
-        List<SchoolMembershipItem> schoolMemberships
+        List<SchoolMembershipItem> schoolMemberships,
+        String primaryRole,
+        UUID primarySchoolId
 ) {
     public record SchoolMembershipItem(UUID schoolId, String roleInSchool) {}
 
@@ -31,13 +33,21 @@ public record AuthContextResponse(
                 .map(m -> new SchoolMembershipItem(m.schoolId(), m.roleInSchool()))
                 .toList();
 
+        // Resolve primary identity
+        String primaryRole = null;
+        UUID primarySchoolId = null;
+        if (platformRole != null) {
+            if (memberships.isEmpty()) { primaryRole = "SUPER_ADMIN"; primarySchoolId = null; }
+        } else if (memberships.size() == 1) {
+            primaryRole = memberships.getFirst().roleInSchool();
+            primarySchoolId = memberships.getFirst().schoolId();
+        }
+
         return new AuthContextResponse(
-                user.getUserId(),
-                user.getUsername(),
+                user.getUserId(), user.getUsername(),
                 user.isEnabled() && user.isAccountNonLocked() ? "NORMAL" : "LOCKED",
-                platformRole,
-                roles,
-                memberships
+                platformRole, roles, memberships,
+                primaryRole, primarySchoolId
         );
     }
 }

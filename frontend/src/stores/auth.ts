@@ -23,11 +23,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   function defaultWorkspaceRoute(): string {
     if (!user.value) return '/login';
-    const r = roles.value;
-    if (r.includes('SUPER_ADMIN')) return '/admin';
-    if (r.includes('SCHOOL_ADMIN')) return '/school-admin';
-    if (r.includes('TEACHER')) return '/teacher';
-    if (r.includes('STUDENT')) return '/student';
+    const pr = user.value.primaryRole;
+    if (pr === 'SUPER_ADMIN') return '/admin';
+    if (pr === 'SCHOOL_ADMIN') return '/school-admin';
+    if (pr === 'TEACHER') return '/teacher';
+    if (pr === 'STUDENT') return '/student';
     return '/account/no-access';
   }
 
