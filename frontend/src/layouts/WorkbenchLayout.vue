@@ -1,8 +1,8 @@
 <template>
   <div class="workbench-layout">
     <el-container>
-      <!-- Sidebar -->
-      <el-aside :width="sidebarCollapsed ? '64px' : '220px'" class="wb-sidebar">
+      <!-- Desktop Sidebar -->
+      <el-aside :width="sidebarCollapsed ? '64px' : '220px'" class="wb-sidebar desktop-only">
         <div class="sidebar-header">
           <span v-if="!sidebarCollapsed" class="sidebar-title">Campus Guinness</span>
           <el-button text @click="sidebarCollapsed = !sidebarCollapsed" class="collapse-btn">
@@ -22,18 +22,29 @@
         </el-menu>
       </el-aside>
 
+      <!-- Mobile Drawer -->
+      <el-drawer v-model="mobileOpen" direction="ltr" size="260px" :with-header="false" class="mobile-only-drawer">
+        <el-menu :default-active="activeMenu" router class="mobile-menu" @select="mobileOpen = false">
+          <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+          </el-menu-item>
+        </el-menu>
+      </el-drawer>
+
       <!-- Main -->
       <el-container>
         <el-header class="wb-header" height="56px">
           <div class="header-left">
+            <el-button class="mobile-only-btn" text @click="mobileOpen = true"><el-icon><Menu /></el-icon></el-button>
             <span class="role-badge">
               <el-tag :type="roleTagType" size="small">{{ roleLabel }}</el-tag>
             </span>
             <span class="user-name">{{ auth.user?.username }}</span>
           </div>
           <div class="header-right">
-            <el-button text @click="goPublic">返回公共门户</el-button>
-            <el-button text type="danger" @click="handleLogout">退出登录</el-button>
+            <el-button text @click="goPublic">门户</el-button>
+            <el-button text type="danger" @click="handleLogout">退出</el-button>
           </div>
         </el-header>
 
@@ -55,6 +66,7 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const sidebarCollapsed = ref(false);
+const mobileOpen = ref(false);
 
 const roleLabel = computed(() => {
   const r = auth.roles;
@@ -188,5 +200,17 @@ async function handleLogout() {
 .wb-main {
   background: #f5f7fa;
   padding: 24px;
+}
+
+.desktop-only { display: block; }
+.mobile-only-btn { display: none; }
+
+@media (max-width: 767px) {
+  .desktop-only { display: none; }
+  .mobile-only-btn { display: inline-flex; }
+  .wb-header { padding: 0 12px; }
+  .wb-main { padding: 12px; }
+  .user-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header-right .el-button { padding: 0 8px; font-size: 13px; }
 }
 </style>

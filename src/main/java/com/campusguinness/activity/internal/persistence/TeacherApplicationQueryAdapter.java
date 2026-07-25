@@ -13,11 +13,11 @@ import java.util.*;
 
 @Component
 @Transactional(readOnly = true)
-class TeacherApplicationQueryAdapter implements TeacherApplicationQueryPort {
+public class TeacherApplicationQueryAdapter implements TeacherApplicationQueryPort {
 
     private final JdbcTemplate jdbc;
 
-    TeacherApplicationQueryAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public TeacherApplicationQueryAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     @Override
     public QueryPage<ActivityApplicationResult> findMine(UUID applicantId, String status,

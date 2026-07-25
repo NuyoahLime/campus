@@ -11,10 +11,10 @@
         <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
           <el-form-item label="所属学校"><el-input :model-value="app?.schoolName || '学校名称暂不可用'" disabled /></el-form-item>
           <el-form-item label="活动名称" prop="title">
-            <el-input v-model="form.title" placeholder="请输入活动名称" maxlength="200" show-word-limit @input="checkDirty" />
+            <el-input v-model="form.title" placeholder="请输入活动名称" maxlength="200" show-word-limit  />
           </el-form-item>
           <el-form-item label="活动说明" prop="description">
-            <el-input v-model="form.description" type="textarea" :rows="5" placeholder="请输入活动说明（选填，可留空）" maxlength="2000" show-word-limit @input="checkDirty" />
+            <el-input v-model="form.description" type="textarea" :rows="5" placeholder="请输入活动说明（选填，可留空）" maxlength="2000" show-word-limit  />
           </el-form-item>
           <el-form-item>
             <el-alert v-if="saveError" :title="saveError" type="error" show-icon :closable="false" style="margin-bottom:12px" />
@@ -76,8 +76,6 @@ async function loadData() {
   finally { loading.value = false; }
 }
 
-function checkDirty() { /* computed handles this */ }
-
 async function handleSave() {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
@@ -104,7 +102,16 @@ async function handleCancel() {
 
 onMounted(() => loadData());
 
-onBeforeRouteLeave(() => { return formDirty.value ? '有未保存的修改，确定离开吗？' : true; });
+let navigationAllowed = false;
+
+onBeforeRouteLeave(async () => {
+  if (!formDirty.value || navigationAllowed || saving.value) return true;
+  try {
+    await ElMessageBox.confirm('有未保存的修改，确定离开吗？', '确认离开', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' });
+    navigationAllowed = true;
+    return true;
+  } catch { return false; }
+});
 </script>
 
 <style scoped>

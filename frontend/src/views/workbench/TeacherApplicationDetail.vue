@@ -1,7 +1,9 @@
 <template>
   <div class="detail-page">
     <el-page-header @back="$router.push('/teacher/applications')" title="返回申请列表" />
-    <div v-if="loading"><el-skeleton :rows="6" animated /></div>
+    <div v-if="invalidId"><el-result icon="error" title="申请地址无效"><template #extra><el-button @click="$router.push('/teacher/applications')">返回申请列表</el-button></template></el-result></div>
+    <div v-else-if="loading"><el-skeleton :rows="6" animated /></div>
+    <div v-else-if="loadError"><el-result icon="error" title="加载失败" :sub-title="loadError"><template #extra><el-button type="primary" @click="load">重试</el-button></template></el-result></div>
     <div v-else-if="notFound"><el-result icon="error" title="404" sub-title="申请不存在或无权查看" /></div>
     <template v-else-if="app">
       <h1>{{ app.title }}</h1>
@@ -47,33 +49,45 @@ import { useRoute, useRouter } from 'vue-router';
 import { getMyApplication, withdrawApplication, returnToDraft, resubmitApplication } from '@/api/teacher-application';
 import { ApiError } from '@/api/http';
 import { appStatusLabel, appStatusTagType } from '@/utils/application-status';
+import { resolveUuidParam } from '@/utils/route-param';
 import { ElMessageBox } from 'element-plus';
 import type { TeacherActivityApplicationItem } from '@/types/teacher-application';
 
 const route = useRoute(); const router = useRouter();
+const applicationId = resolveUuidParam(route.params.applicationId);
+const invalidId = applicationId === null;
 const app = ref<TeacherActivityApplicationItem | null>(null);
 const loading = ref(true); const notFound = ref(false);
+const loadError = ref<string|null>(null);
+const withdrawing = ref(false); const revising = ref(false); const resubmitting = ref(false);
 
 async function load() {
-  loading.value = true; notFound.value = false;
-  try { app.value = await getMyApplication(route.params.applicationId as string); }
-  catch (e) { if (e instanceof ApiError && e.status === 404) notFound.value = true; }
+  if (invalidId) { loading.value = false; return; }
+  loading.value = true; notFound.value = false; loadError.value = null;
+  try { app.value = await getMyApplication(applicationId!); }
+  catch (e) { if (e instanceof ApiError && e.status === 404) notFound.value = true; else loadError.value = e instanceof ApiError ? e.message : '加载失败'; }
   finally { loading.value = false; }
 }
 
 async function handleWithdraw() {
   try { await ElMessageBox.confirm('撤回后该申请将结束，不能再次提交。', '确认撤回', { type: 'warning' }); } catch { return; }
-  try { app.value = await withdrawApplication(route.params.applicationId as string); } catch { /* keep state */ }
+  withdrawing.value = true;
+  try { app.value = await withdrawApplication(applicationId!); } catch { /* keep state */ }
+  finally { withdrawing.value = false; }
 }
 
 async function handleRevise() {
   try { await ElMessageBox.confirm('将退回草稿状态，修改后可重新提交。', '确认', { type: 'info' }); } catch { return; }
-  try { app.value = await returnToDraft(route.params.applicationId as string); router.push(`/teacher/applications/${app.value!.applicationId}/edit`); } catch { /* keep state */ }
+  revising.value = true;
+  try { await returnToDraft(applicationId!); router.push(`/teacher/applications/${applicationId}/edit`); } catch { /* keep state */ }
+  finally { revising.value = false; }
 }
 
 async function handleResubmit() {
   try { await ElMessageBox.confirm('确认提交审核？', '确认', { type: 'warning' }); } catch { return; }
-  try { app.value = await resubmitApplication(route.params.applicationId as string); } catch { /* keep state */ }
+  resubmitting.value = true;
+  try { app.value = await resubmitApplication(applicationId!); } catch { /* keep state */ }
+  finally { resubmitting.value = false; }
 }
 
 function fmt(iso: string | null) { return iso ? new Date(iso).toLocaleString('zh-CN') : '-'; }

@@ -38,15 +38,19 @@ const page = ref(1); const total = ref(0);
 const f = reactive({ status: '', schoolId: '', keyword: '' });
 const statusOpts = [{ v: 'DRAFT', l: '草稿' }, { v: 'SUBMITTED', l: '待审核' }, { v: 'APPROVED', l: '已通过' }, { v: 'REJECTED', l: '已驳回' }, { v: 'WITHDRAWN', l: '已撤回' }];
 const teacherSchools = ref<TeacherSchoolItem[]>([]);
+const schoolsFailed = ref(false);
+
+function parsePage(v: unknown): number { const n = Number(v); return Number.isFinite(n) && n >= 1 ? n : 1; }
+function parseStatus(v: unknown): string { const VALID = ['DRAFT','SUBMITTED','APPROVED','REJECTED','WITHDRAWN']; const s = String(v || ''); return VALID.includes(s) ? s : ''; }
 
 onMounted(async () => {
-  try { teacherSchools.value = await fetchTeacherSchools(); } catch { /* non-blocking */ }
-  // Restore filters from URL
-  f.status = (route.query.status as string) || '';
-  const qs = route.query.schoolId as string | undefined;
+  try { teacherSchools.value = await fetchTeacherSchools(); } catch { schoolsFailed.value = true; }
+  f.status = parseStatus(route.query.status);
+  page.value = parsePage(route.query.page);
+  f.keyword = String(route.query.keyword || '').trim();
+  const qs = String(route.query.schoolId || '');
   if (qs && teacherSchools.value.some(s => s.schoolId === qs)) f.schoolId = qs;
-  f.keyword = (route.query.keyword as string) || '';
-  page.value = Number(route.query.page) || 1;
+  else if (qs) { router.replace({ query: { ...route.query, schoolId: undefined } }); }
   load();
 });
 
@@ -67,12 +71,6 @@ async function load() {
 }
 
 function fmt(iso: string|null) { return iso ? new Date(iso).toLocaleDateString('zh-CN') : ''; }
-
-onMounted(() => {
-  f.status = (route.query.status as string) || ''; f.schoolId = (route.query.schoolId as string) || ''; f.keyword = (route.query.keyword as string) || '';
-  page.value = Number(route.query.page) || 1;
-  load();
-});
 </script>
 
 <style scoped>
