@@ -160,10 +160,12 @@ router.beforeEach(async (to) => {
     return { path: '/login', query: { redirect: to.fullPath }, replace: true };
   }
 
-  // role check
+  // role check — use primaryRole only, not roles array
   if (to.meta.roles && Array.isArray(to.meta.roles) && (to.meta.roles as string[]).length > 0) {
+    const primaryRole = auth.user?.primaryRole;
+    if (!primaryRole) return { path: '/account/no-access', replace: true };
     const required = to.meta.roles as string[];
-    if (!auth.hasAnyRole(required)) {
+    if (!required.includes(primaryRole)) {
       return { path: '/forbidden', replace: true };
     }
   }

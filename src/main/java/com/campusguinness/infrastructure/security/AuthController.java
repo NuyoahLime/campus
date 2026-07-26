@@ -38,14 +38,8 @@ public class AuthController {
             Authentication auth = authManager.authenticate(token);
             CampusGuinnessUserDetails user = (CampusGuinnessUserDetails) auth.getPrincipal();
 
-            // Check primary identity before creating session
-            var identity = user.getResolvedIdentity();
-            if (identity != null && identity.isError()) {
-                SecurityContextHolder.clearContext();
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiErrorResponse.of(identity.errorCode(),
-                                "Account identity error: " + identity.errorCode(), "/api/v1/auth/login"));
-            }
+            var identityResult = checkIdentity(user.getResolvedIdentity());
+            if (identityResult != null) return identityResult;
 
             SecurityContext ctx = SecurityContextHolder.createEmptyContext();
             ctx.setAuthentication(auth);
@@ -70,14 +64,24 @@ public class AuthController {
                             "Authentication is required.", "/api/v1/auth/me"));
         }
         // Verify identity still valid
-        var identity = user.getResolvedIdentity();
-        if (identity != null && identity.isError()) {
-            SecurityContextHolder.clearContext();
-            try { request.getSession(false).invalidate(); } catch (Exception ignored) {}
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiErrorResponse.of(identity.errorCode(),
-                            "Account identity error.", "/api/v1/auth/me"));
+        var identityResult = checkIdentity(user.getResolvedIdentity());
+        if (identityResult != null) {
+            try { var s = request.getSession(false); if (s != null) s.invalidate(); } catch (Exception ignored) {}
+            return identityResult;
         }
         return ResponseEntity.ok(AuthContextResponse.from(user));
+    }
+
+    private ResponseEntity<ApiErrorResponse> checkIdentity(
+            PrimaryIdentityResolver.ResolvedIdentity identity) {
+        if (identity == null) return identityError("IDENTITY_INVALID", "/api/v1/auth/login");
+        if (identity.isError()) return identityError(identity.errorCode(), "/api/v1/auth/login");
+        return null;
+    }
+
+    private ResponseEntity<ApiErrorResponse> identityError(String code, String path) {
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorResponse.of(code, "Account identity error.", path));
     }
 }

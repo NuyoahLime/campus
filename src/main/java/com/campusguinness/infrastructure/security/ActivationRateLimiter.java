@@ -26,11 +26,14 @@ public class ActivationRateLimiter {
 
     public void recordFailure(String normalizedUsername, String clientIp) {
         String key = normalizedUsername + "|" + clientIp;
-        cleanup(key);
-        var w = store.getOrDefault(key, new AttemptWindow(0, clock.instant()));
-        w.count++;
-        w.lastAttempt = clock.instant();
-        store.put(key, w);
+        store.compute(key, (k, v) -> {
+            if (v == null || clock.instant().isAfter(v.lastAttempt.plusSeconds(WINDOW_MINUTES * 60))) {
+                return new AttemptWindow(1, clock.instant());
+            }
+            v.count++;
+            v.lastAttempt = clock.instant();
+            return v;
+        });
     }
 
     public void clear(String normalizedUsername, String clientIp) {
