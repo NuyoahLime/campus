@@ -62,12 +62,21 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me() {
+    public ResponseEntity<?> me(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof CampusGuinnessUserDetails user)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiErrorResponse.of("AUTHENTICATION_REQUIRED",
                             "Authentication is required.", "/api/v1/auth/me"));
+        }
+        // Verify identity still valid
+        var identity = user.getResolvedIdentity();
+        if (identity != null && identity.isError()) {
+            SecurityContextHolder.clearContext();
+            try { request.getSession(false).invalidate(); } catch (Exception ignored) {}
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiErrorResponse.of(identity.errorCode(),
+                            "Account identity error.", "/api/v1/auth/me"));
         }
         return ResponseEntity.ok(AuthContextResponse.from(user));
     }

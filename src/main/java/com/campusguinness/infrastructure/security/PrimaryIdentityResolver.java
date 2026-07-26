@@ -6,10 +6,13 @@ import com.campusguinness.identity.application.query.AuthenticationAccount.Schoo
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
 public class PrimaryIdentityResolver {
+
+    private static final Set<String> VALID_SCHOOL_ROLES = Set.of("STUDENT", "TEACHER", "SCHOOL_ADMIN");
 
     public ResolvedIdentity resolve(AuthenticationAccount account) {
         boolean isSuperAdmin = "SUPER_ADMIN".equals(account.platformRole());
@@ -27,6 +30,7 @@ public class PrimaryIdentityResolver {
         if (account.platformRole() == null) {
             if (memberships.size() == 1) {
                 var m = memberships.getFirst();
+                if (!VALID_SCHOOL_ROLES.contains(m.roleInSchool())) return ResolvedIdentity.invalid(account.userId());
                 return new ResolvedIdentity(account.userId(), m.roleInSchool(), m.schoolId(), account.accountStatus());
             }
             if (memberships.isEmpty()) return ResolvedIdentity.notAssigned(account.userId());
