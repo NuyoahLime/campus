@@ -44,8 +44,6 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
         var success = new AtomicInteger(0);
         var conflict = new AtomicInteger(0);
         var unexpected = new AtomicInteger(0);
-        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
-
         Runnable task = () -> {
             try { barrier.await(3, TimeUnit.SECONDS); } catch (Exception e) { unexpected.incrementAndGet(); latch.countDown(); return; }
             try {
@@ -59,17 +57,20 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
             finally { latch.countDown(); }
         };
 
-        executor.submit(task); executor.submit(task);
-        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
-        executor.shutdownNow();
-
-        assertThat(success.get()).as("success count").isEqualTo(1);
-        assertThat(conflict.get()).as("conflict count").isEqualTo(1);
-        assertThat(unexpected.get()).as("unexpected errors").isEqualTo(0);
-
-        Integer userCount = jdbc.queryForObject("SELECT count(*) FROM users WHERE username=?", Integer.class, sharedName);
-        assertThat(userCount).isEqualTo(1);
-        Integer memCount = jdbc.queryForObject("SELECT count(*) FROM school_memberships WHERE school_id=?", Integer.class, schoolId);
-        assertThat(memCount).isEqualTo(1);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            executor.submit(task); executor.submit(task);
+            assertThat(latch.await(10, TimeUnit.SECONDS)).as("both concurrent tasks completed").isTrue();
+            assertThat(success.get()).as("success count").isEqualTo(1);
+            assertThat(conflict.get()).as("conflict count").isEqualTo(1);
+            assertThat(unexpected.get()).as("unexpected errors").isEqualTo(0);
+            Integer userCount = jdbc.queryForObject("SELECT count(*) FROM users WHERE username=?", Integer.class, sharedName);
+            assertThat(userCount).isEqualTo(1);
+            Integer memCount = jdbc.queryForObject("SELECT count(*) FROM school_memberships WHERE school_id=?", Integer.class, schoolId);
+            assertThat(memCount).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
     }
 }
