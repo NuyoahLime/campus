@@ -49,11 +49,11 @@ public class AccountProvisioningService {
         UUID userId = UUID.randomUUID();
         try {
             jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", userId, trimmed, encoder.encode(tempPassword), "PENDING_ACTIVATION", null);
-            jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, schoolId, "SCHOOL_ADMIN", "ACTIVE");
-            auditProvisioning(actorId, userId, schoolId, "SCHOOL_ADMIN", "CREATE_SCHOOL_ADMIN");
         } catch (DuplicateKeyException ex) {
             throw new DuplicateUsernameException(trimmed);
         }
+        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, schoolId, "SCHOOL_ADMIN", "ACTIVE");
+        auditProvisioning(actorId, userId, schoolId, "SCHOOL_ADMIN", "CREATE_SCHOOL_ADMIN");
         String schoolName = (String) schoolRow.getFirst().get("name");
         return new ProvisioningResult(userId, trimmed, "SCHOOL_ADMIN", schoolId, schoolName, "PENDING_ACTIVATION");
     }
@@ -73,11 +73,11 @@ public class AccountProvisioningService {
         UUID userId = UUID.randomUUID();
         try {
             jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", userId, trimmed, encoder.encode(tempPassword), "PENDING_ACTIVATION", null);
-            jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, actorSchoolId, role, "ACTIVE");
-            auditProvisioning(actorId, userId, actorSchoolId, role, "CREATE_" + role);
         } catch (DuplicateKeyException ex) {
             throw new DuplicateUsernameException(trimmed);
         }
+        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, actorSchoolId, role, "ACTIVE");
+        auditProvisioning(actorId, userId, actorSchoolId, role, "CREATE_" + role);
         String schoolName = jdbc.queryForObject("SELECT name FROM schools WHERE id = ?", String.class, actorSchoolId);
         return new ProvisioningResult(userId, trimmed, role, actorSchoolId, schoolName, "PENDING_ACTIVATION");
     }

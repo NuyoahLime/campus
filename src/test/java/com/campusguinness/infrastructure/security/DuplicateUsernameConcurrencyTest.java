@@ -24,15 +24,15 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
     @BeforeEach void setup() {
         schoolId = UUID.randomUUID(); actorId = UUID.randomUUID();
         baseName = UUID.randomUUID().toString().substring(0,8);
-        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,'USCC','SC-"+baseName+"','INT-"+baseName+"','PRIMARY','Test','Addr','Name','12345','a@b.com','NORMAL')", schoolId);
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,'USCC',?,'INT-'||?,'PRIMARY','Test','Addr','Name','12345','a@b.com','NORMAL')", schoolId, "Concurrency Test School "+baseName, "SC-"+baseName, baseName);
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", actorId, "dupactor-"+baseName, "$2a$10$hAnonDummyHashForTest", "NORMAL", "SUPER_ADMIN");
     }
 
     @AfterEach void cleanup() {
         jdbc.update("DELETE FROM account_provisioning_audit_logs WHERE actor_id=?", actorId);
-        jdbc.update("DELETE FROM school_memberships WHERE school_id=?", schoolId);
-        jdbc.update("DELETE FROM users WHERE username LIKE 'dup-%'");
-        jdbc.update("DELETE FROM users WHERE username LIKE 'dupactor-%'");
+        jdbc.update("DELETE FROM school_memberships WHERE school_id=? AND user_id IN (SELECT id FROM users WHERE username='dupactor-'||?)", schoolId, baseName);
+        jdbc.update("DELETE FROM users WHERE username='dupactor-'||?", baseName);
+        jdbc.update("DELETE FROM users WHERE username='dup-'||?", baseName);
         jdbc.update("DELETE FROM schools WHERE id=?", schoolId);
     }
 
