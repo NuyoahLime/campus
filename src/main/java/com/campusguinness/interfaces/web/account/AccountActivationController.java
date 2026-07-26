@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 
 import com.campusguinness.infrastructure.security.AccountActivationService;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,19 +24,23 @@ public class AccountActivationController {
     }
 
     @PostMapping("/activate")
-    public ResponseEntity<?> activate(@Valid @RequestBody ActivateRequest req) {
-        // Validate passwords match
+    public ResponseEntity<?> activate(@Valid @RequestBody ActivateRequest req, HttpServletRequest request) {
         if (!req.newPassword().equals(req.confirmPassword())) {
             return ResponseEntity.badRequest().body(Map.of("code","PASSWORD_MISMATCH","message","两次输入的密码不一致"));
         }
-        // Validate new != temp
         if (req.newPassword().equals(req.temporaryPassword())) {
             return ResponseEntity.badRequest().body(Map.of("code","PASSWORD_SAME_AS_TEMP","message","新密码不能与临时密码相同"));
         }
 
-        var result = service.activate(req.username(), req.temporaryPassword(), req.newPassword());
+        String ip = request.getRemoteAddr();
+        String ua = request.getHeader("User-Agent");
+        var result = service.activate(req.username(), req.temporaryPassword(), req.newPassword(), ip, ua);
         if (!result.success()) {
-            int status = "ACCOUNT_ALREADY_ACTIVATED".equals(result.code()) ? 409 : 401;
+            int status = switch (result.code()) {
+                case "ACCOUNT_ALREADY_ACTIVATED", "ACCOUNT_STATE_INVALID" -> 409;
+                case "ACTIVATION_RATE_LIMITED" -> 429;
+                default -> 401;
+            };
             return ResponseEntity.status(status).body(Map.of("code", result.code(), "message", result.message()));
         }
         return ResponseEntity.ok(Map.of("message", result.message()));
