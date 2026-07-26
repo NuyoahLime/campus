@@ -38,7 +38,7 @@ public class AuthController {
             Authentication auth = authManager.authenticate(token);
             CampusGuinnessUserDetails user = (CampusGuinnessUserDetails) auth.getPrincipal();
 
-            var identityResult = checkIdentity(user.getResolvedIdentity());
+            var identityResult = checkIdentity(user.getResolvedIdentity(), "/api/v1/auth/login");
             if (identityResult != null) return identityResult;
 
             SecurityContext ctx = SecurityContextHolder.createEmptyContext();
@@ -64,7 +64,7 @@ public class AuthController {
                             "Authentication is required.", "/api/v1/auth/me"));
         }
         // Verify identity still valid
-        var identityResult = checkIdentity(user.getResolvedIdentity());
+        var identityResult = checkIdentity(user.getResolvedIdentity(), "/api/v1/auth/me");
         if (identityResult != null) {
             try { var s = request.getSession(false); if (s != null) s.invalidate(); } catch (Exception ignored) {}
             return identityResult;
@@ -72,10 +72,10 @@ public class AuthController {
         return ResponseEntity.ok(AuthContextResponse.from(user));
     }
 
-    private ResponseEntity<ApiErrorResponse> checkIdentity(
-            PrimaryIdentityResolver.ResolvedIdentity identity) {
-        if (identity == null) return identityError("IDENTITY_INVALID", "/api/v1/auth/login");
-        if (identity.isError()) return identityError(identity.errorCode(), "/api/v1/auth/login");
+    private ResponseEntity<?> checkIdentity(
+            PrimaryIdentityResolver.ResolvedIdentity identity, String path) {
+        if (identity == null) return identityError("IDENTITY_INVALID", path);
+        if (identity.isError()) return identityError(identity.errorCode(), path);
         return null;
     }
 

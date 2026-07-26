@@ -39,6 +39,7 @@ public class AccountActivationController {
             int status = switch (result.code()) {
                 case "ACCOUNT_ALREADY_ACTIVATED", "ACCOUNT_STATE_INVALID" -> 409;
                 case "ACTIVATION_RATE_LIMITED" -> 429;
+                case "PASSWORD_BLANK", "PASSWORD_TOO_SHORT", "PASSWORD_TOO_LONG", "PASSWORD_POLICY_VIOLATION" -> 400;
                 default -> 401;
             };
             return ResponseEntity.status(status).body(Map.of("code", result.code(), "message", result.message()));

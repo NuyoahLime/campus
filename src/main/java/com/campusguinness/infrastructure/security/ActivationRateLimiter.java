@@ -15,7 +15,6 @@ public class ActivationRateLimiter {
     private static final long WINDOW_MINUTES = 15;
 
     public ActivationRateLimiter(Clock clock) { this.clock = clock; }
-    public ActivationRateLimiter() { this(Clock.systemUTC()); }
 
     public boolean isRateLimited(String normalizedUsername, String clientIp) {
         String key = normalizedUsername + "|" + clientIp;
