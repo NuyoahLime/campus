@@ -33,10 +33,9 @@ public class AccountActivationService {
     public ActivationResult activate(String rawUsername, String tempPassword, String newPassword,
             String clientIp, String userAgent) {
         String username = rawUsername.trim();
-        String normalized = username.toLowerCase();
 
         // Rate limit check
-        if (rateLimiter.isRateLimited(normalized, clientIp)) {
+        if (rateLimiter.isRateLimited(username, clientIp)) {
             audit.record(null, username, "RATE_LIMITED", "RATE_LIMITED", clientIp, userAgent);
             return new ActivationResult(false, "ACTIVATION_RATE_LIMITED", "尝试次数过多，请15分钟后重试", null);
         }
@@ -51,7 +50,7 @@ public class AccountActivationService {
         // Query by username — all states
         var rows = jdbc.queryForList("SELECT id, password_hash, account_status FROM users WHERE username = ?", username);
         if (rows.isEmpty()) {
-            rateLimiter.recordFailure(normalized, clientIp);
+            rateLimiter.recordFailure(username, clientIp);
             audit.record(null, username, "FAILURE", "ACTIVATION_CREDENTIALS_INVALID", clientIp, userAgent);
             return new ActivationResult(false, "ACTIVATION_CREDENTIALS_INVALID", "用户名或临时密码错误", null);
         }
@@ -72,7 +71,7 @@ public class AccountActivationService {
 
         // PENDING_ACTIVATION — verify temp password
         if (!encoder.matches(tempPassword, (String) row.get("password_hash"))) {
-            rateLimiter.recordFailure(normalized, clientIp);
+            rateLimiter.recordFailure(username, clientIp);
             audit.record(userId, username, "FAILURE", "ACTIVATION_CREDENTIALS_INVALID", clientIp, userAgent);
             return new ActivationResult(false, "ACTIVATION_CREDENTIALS_INVALID", "用户名或临时密码错误", null);
         }
@@ -86,7 +85,7 @@ public class AccountActivationService {
             return new ActivationResult(false, "ACCOUNT_ALREADY_ACTIVATED", "账号已激活", userId);
         }
 
-        rateLimiter.clear(normalized, clientIp);
+        rateLimiter.clear(username, clientIp);
         audit.record(userId, username, "SUCCESS", null, clientIp, userAgent);
         return new ActivationResult(true, "SUCCESS", "激活成功", userId);
     }
