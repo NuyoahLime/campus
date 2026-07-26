@@ -139,17 +139,15 @@ describe('useAuthStore', () => {
   });
 
   it('defaultWorkspaceRoute returns correct path', async () => {
-    mockMeResponse(['TEACHER']);
-    const store = useAuthStore();
-    await store.restoreSession();
-    expect(store.defaultWorkspaceRoute()).toBe('/teacher');
+    mockGet.mockResolvedValue({ data: { userId:'u', username:'t', accountStatus:'NORMAL', platformRole:null, roles:['TEACHER'], schoolMemberships:[], primaryRole:'TEACHER', primarySchoolId:null } });
+    await useAuthStore().restoreSession();
+    expect(useAuthStore().defaultWorkspaceRoute()).toBe('/teacher');
   });
 
-  it('defaultWorkspaceRoute for multi-role prefers admin', async () => {
-    mockMeResponse(['STUDENT', 'SUPER_ADMIN']);
-    const store = useAuthStore();
-    await store.restoreSession();
-    expect(store.defaultWorkspaceRoute()).toBe('/admin');
+  it('defaultWorkspaceRoute uses primaryRole', async () => {
+    mockGet.mockResolvedValue({ data: { userId:'u', username:'t', accountStatus:'NORMAL', platformRole:null, roles:['STUDENT','SUPER_ADMIN'], schoolMemberships:[], primaryRole:'STUDENT', primarySchoolId:null } });
+    await useAuthStore().restoreSession();
+    expect(useAuthStore().defaultWorkspaceRoute()).toBe('/student');
   });
 
   it('logout clears user', async () => {
