@@ -33,7 +33,7 @@ public class AdminSchoolAccountController {
     @GetMapping("/api/v1/admin/schools/{schoolId}/administrators")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public List<Map<String,Object>> listSchoolAdmins(@PathVariable UUID schoolId) {
-        return service.listSchoolAdmins(schoolId).stream().map(a -> Map.<String,Object>of(
+        return service.listSchoolAdmins(schoolId, 0, 100).stream().map(a -> Map.<String,Object>of(
                 "userId", a.userId(), "username", a.username(), "role", a.role(),
                 "schoolName", a.schoolName(), "accountStatus", a.accountStatus(), "createdAt", a.createdAt())).toList();
     }
