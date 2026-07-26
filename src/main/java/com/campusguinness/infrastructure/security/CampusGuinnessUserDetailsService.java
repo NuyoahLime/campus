@@ -35,16 +35,18 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
 
     private final AuthenticationAccountQuery accountQuery;
     private final PrimaryIdentityResolver identityResolver;
+    private final LoginNameNormalizer normalizer;
 
     public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery,
-            PrimaryIdentityResolver identityResolver) {
+            PrimaryIdentityResolver identityResolver, LoginNameNormalizer normalizer) {
         this.accountQuery = accountQuery;
         this.identityResolver = identityResolver;
+        this.normalizer = normalizer;
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        String normalized = normalizeLoginName(username);
+        String normalized = normalizer.normalize(username);
 
         AuthenticationAccount account = accountQuery.findByLoginName(normalized)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
@@ -65,13 +67,6 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
                 account.memberships(),
                 identity
         );
-    }
-
-    /**
-     * Normalize login name: trim whitespace. Future: lowercase if case-insensitive.
-     */
-    private String normalizeLoginName(String raw) {
-        return raw != null ? raw.trim() : "";
     }
 
     /**

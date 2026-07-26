@@ -28,7 +28,7 @@ class CampusGuinnessUserDetailsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CampusGuinnessUserDetailsService(accountQuery, new PrimaryIdentityResolver());
+        service = new CampusGuinnessUserDetailsService(accountQuery, new PrimaryIdentityResolver(), new LoginNameNormalizer());
     }
 
     private AuthenticationAccount account(String status, String platformRole) {
