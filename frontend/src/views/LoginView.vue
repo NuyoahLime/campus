@@ -63,11 +63,11 @@ const rules: FormRules = {
 
 async function handleLogin() {
   if (submitting.value) return;
-  const valid = await formRef.value?.validate().catch(() => false);
-  if (!valid) { submitting.value = false; return; }
-
   submitting.value = true;
   errorMsg.value = null;
+
+  const valid = await formRef.value?.validate().catch(() => false);
+  if (!valid) { submitting.value = false; return; }
 
   try {
     await auth.login(form.username, form.password);
