@@ -14,7 +14,6 @@
               placeholder="请输入密码"
               autocomplete="current-password"
               show-password
-              @keyup.enter="handleLogin"
             />
           </el-form-item>
           <el-form-item>
@@ -63,8 +62,9 @@ const rules: FormRules = {
 };
 
 async function handleLogin() {
+  if (submitting.value) return;
   const valid = await formRef.value?.validate().catch(() => false);
-  if (!valid) return;
+  if (!valid) { submitting.value = false; return; }
 
   submitting.value = true;
   errorMsg.value = null;

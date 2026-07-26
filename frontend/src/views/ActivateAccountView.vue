@@ -49,8 +49,9 @@ const rules: FormRules = {
 };
 
 async function handleActivate() {
+  if (loading.value) return;
   const valid = await formRef.value?.validate().catch(() => false);
-  if (!valid) return;
+  if (!valid) { loading.value = false; return; }
   loading.value = true; errorMsg.value = null;
   try {
     await http.post('/v1/auth/activate', { username: form.username, temporaryPassword: form.temporaryPassword, newPassword: form.newPassword, confirmPassword: form.confirmPassword });

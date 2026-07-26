@@ -4,6 +4,7 @@ import com.campusguinness.identity.application.port.PasswordPolicy;
 import com.campusguinness.identity.application.exception.InvalidPasswordException;
 import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,12 +19,14 @@ public class AccountProvisioningService {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
     private final SchoolMembershipQueryPort membershipPort;
+    private final LoginNameNormalizer normalizer;
 
     public AccountProvisioningService(JdbcTemplate jdbc, PasswordEncoder encoder,
-            SchoolMembershipQueryPort membershipPort) {
+            SchoolMembershipQueryPort membershipPort, LoginNameNormalizer normalizer) {
         this.jdbc = jdbc;
         this.encoder = encoder;
         this.membershipPort = membershipPort;
+        this.normalizer = normalizer;
     }
 
     public record ProvisioningResult(UUID userId, String username, String role, UUID schoolId, String schoolName, String accountStatus) {}
@@ -33,7 +36,7 @@ public class AccountProvisioningService {
         // Validate temp password
         try { PasswordPolicy.validate(tempPassword); } catch (InvalidPasswordException e) { throw new IllegalArgumentException(e.getMessage()); }
 
-        String trimmed = username.trim();
+        String trimmed = normalizer.normalize(username);
         // Check duplicate
         int count = jdbc.queryForObject("SELECT count(*) FROM users WHERE username = ?", Integer.class, trimmed);
         if (count > 0) throw new DuplicateUsernameException(trimmed);
@@ -44,9 +47,13 @@ public class AccountProvisioningService {
         if ("DISABLED".equals(schoolRow.getFirst().get("school_status"))) throw new IllegalStateException("SCHOOL_NOT_AVAILABLE");
 
         UUID userId = UUID.randomUUID();
-        jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", userId, trimmed, encoder.encode(tempPassword), "PENDING_ACTIVATION", null);
-        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, schoolId, "SCHOOL_ADMIN", "ACTIVE");
-        auditProvisioning(actorId, userId, schoolId, "SCHOOL_ADMIN", "CREATE_SCHOOL_ADMIN");
+        try {
+            jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", userId, trimmed, encoder.encode(tempPassword), "PENDING_ACTIVATION", null);
+            jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, schoolId, "SCHOOL_ADMIN", "ACTIVE");
+            auditProvisioning(actorId, userId, schoolId, "SCHOOL_ADMIN", "CREATE_SCHOOL_ADMIN");
+        } catch (DuplicateKeyException ex) {
+            throw new DuplicateUsernameException(trimmed);
+        }
         String schoolName = (String) schoolRow.getFirst().get("name");
         return new ProvisioningResult(userId, trimmed, "SCHOOL_ADMIN", schoolId, schoolName, "PENDING_ACTIVATION");
     }
@@ -55,7 +62,7 @@ public class AccountProvisioningService {
         if (!"TEACHER".equals(role) && !"STUDENT".equals(role)) throw new IllegalArgumentException("Only TEACHER or STUDENT allowed");
         try { PasswordPolicy.validate(tempPassword); } catch (InvalidPasswordException e) { throw new IllegalArgumentException(e.getMessage()); }
 
-        String trimmed = username.trim();
+        String trimmed = normalizer.normalize(username);
         int count = jdbc.queryForObject("SELECT count(*) FROM users WHERE username = ?", Integer.class, trimmed);
         if (count > 0) throw new DuplicateUsernameException(trimmed);
 
@@ -64,9 +71,13 @@ public class AccountProvisioningService {
         if (!"NORMAL".equals(schoolStatus)) throw new IllegalStateException("SCHOOL_NOT_ACTIVE");
 
         UUID userId = UUID.randomUUID();
-        jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", userId, trimmed, encoder.encode(tempPassword), "PENDING_ACTIVATION", null);
-        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, actorSchoolId, role, "ACTIVE");
-        auditProvisioning(actorId, userId, actorSchoolId, role, "CREATE_" + role);
+        try {
+            jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", userId, trimmed, encoder.encode(tempPassword), "PENDING_ACTIVATION", null);
+            jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), userId, actorSchoolId, role, "ACTIVE");
+            auditProvisioning(actorId, userId, actorSchoolId, role, "CREATE_" + role);
+        } catch (DuplicateKeyException ex) {
+            throw new DuplicateUsernameException(trimmed);
+        }
         String schoolName = jdbc.queryForObject("SELECT name FROM schools WHERE id = ?", String.class, actorSchoolId);
         return new ProvisioningResult(userId, trimmed, role, actorSchoolId, schoolName, "PENDING_ACTIVATION");
     }
