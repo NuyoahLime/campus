@@ -18,7 +18,7 @@
             />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading="submitting" :disabled="submitting" style="width: 100%">
+            <el-button native-type="submit" type="primary" :loading="submitting" :disabled="submitting" style="width: 100%">
               {{ submitting ? '登录中...' : '登录' }}
             </el-button>
           </el-form-item>

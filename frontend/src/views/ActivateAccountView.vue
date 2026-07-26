@@ -17,7 +17,7 @@
             <el-input v-model="form.confirmPassword" type="password" placeholder="再次输入新密码" show-password />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading="loading" :disabled="loading" style="width:100%">{{ loading ? '激活中...' : '激活账号' }}</el-button>
+            <el-button native-type="submit" type="primary" :loading="loading" :disabled="loading" style="width:100%">{{ loading ? '激活中...' : '激活账号' }}</el-button>
           </el-form-item>
         </el-form>
         <div v-if="errorMsg" class="err"><el-alert :title="errorMsg" type="error" show-icon :closable="false" /></div>

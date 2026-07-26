@@ -45,6 +45,13 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of("BAD_REQUEST", msg != null ? msg : "Invalid request", req.getRequestURI()));
     }
 
+    @ExceptionHandler(com.campusguinness.infrastructure.security.AccountProvisioningService.DuplicateUsernameException.class)
+    public ResponseEntity<ApiErrorResponse> handleDuplicateUsername(
+            com.campusguinness.infrastructure.security.AccountProvisioningService.DuplicateUsernameException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of("USERNAME_ALREADY_EXISTS", "Username already exists", req.getRequestURI()));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(IllegalStateException ex, HttpServletRequest req) {
         String msg = ex.getMessage();
