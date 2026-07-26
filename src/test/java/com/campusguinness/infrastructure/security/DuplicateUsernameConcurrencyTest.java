@@ -29,10 +29,11 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
     }
 
     @AfterEach void cleanup() {
+        String sharedUsername = "dup-" + baseName;
+        String actorUsername = "dupactor-" + baseName;
         jdbc.update("DELETE FROM account_provisioning_audit_logs WHERE actor_id=?", actorId);
-        jdbc.update("DELETE FROM school_memberships WHERE school_id=? AND user_id IN (SELECT id FROM users WHERE username='dupactor-'||?)", schoolId, baseName);
-        jdbc.update("DELETE FROM users WHERE username='dupactor-'||?", baseName);
-        jdbc.update("DELETE FROM users WHERE username='dup-'||?", baseName);
+        jdbc.update("DELETE FROM school_memberships WHERE school_id=?", schoolId);
+        jdbc.update("DELETE FROM users WHERE username IN (?,?)", sharedUsername, actorUsername);
         jdbc.update("DELETE FROM schools WHERE id=?", schoolId);
     }
 
@@ -43,9 +44,10 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
         var success = new AtomicInteger(0);
         var conflict = new AtomicInteger(0);
         var unexpected = new AtomicInteger(0);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
 
         Runnable task = () -> {
-            try { barrier.await(3, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            try { barrier.await(3, TimeUnit.SECONDS); } catch (Exception e) { unexpected.incrementAndGet(); latch.countDown(); return; }
             try {
                 svc.createSchoolAdmin(actorId, schoolId, sharedName, "TempPass1!");
                 success.incrementAndGet();
@@ -57,15 +59,14 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
             finally { latch.countDown(); }
         };
 
-        new Thread(task).start(); new Thread(task).start();
+        executor.submit(task); executor.submit(task);
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+        executor.shutdownNow();
 
-        // One winner, one conflict
         assertThat(success.get()).as("success count").isEqualTo(1);
         assertThat(conflict.get()).as("conflict count").isEqualTo(1);
         assertThat(unexpected.get()).as("unexpected errors").isEqualTo(0);
 
-        // No partial data
         Integer userCount = jdbc.queryForObject("SELECT count(*) FROM users WHERE username=?", Integer.class, sharedName);
         assertThat(userCount).isEqualTo(1);
         Integer memCount = jdbc.queryForObject("SELECT count(*) FROM school_memberships WHERE school_id=?", Integer.class, schoolId);
