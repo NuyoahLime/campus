@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'; import { useRouter } from 'vue-router';
-import { createActivity } from '@/api/school-admin-activity'; import { ApiError } from '@/api/http'; import { toISO } from '@/types/school-admin-activity';
+import { createActivity } from '@/api/school-admin-activity'; import { ApiError } from '@/api/http'; import { localDateTimeToInstant } from '@/utils/activity-time';
 import type { FormInstance, FormRules } from 'element-plus';
 
 const router=useRouter(); const fRef=ref<FormInstance>(); const submitting=ref(false); const submitErr=ref<string|null>(null);
@@ -26,7 +26,8 @@ const rules:FormRules={title:[{required:true,message:'请输入活动名称'},{m
 async function handleSubmit() {
   if (submitting.value) return; submitting.value=true; submitErr.value=null;
   const valid = await fRef.value?.validate().catch(() => false); if (!valid) { submitting.value=false; return; }
-  try { const r = await createActivity({title:form.title,description:form.description||undefined,startTime:toISO(form.startTime),endTime:toISO(form.endTime),location:form.location||undefined}); router.replace(`/school-admin/activities/${r.activityId}`); }
+  if (form.startTime && form.endTime && new Date(form.endTime) < new Date(form.startTime)) { submitErr.value = '结束时间不得早于开始时间'; submitting.value = false; return; }
+  try { const r = await createActivity({title:form.title.trim()||undefined,description:form.description||undefined,startTime:localDateTimeToInstant(form.startTime),endTime:localDateTimeToInstant(form.endTime),location:form.location||undefined}); router.replace(`/school-admin/activities/${r.activityId}`); }
   catch(e) { submitErr.value = e instanceof ApiError ? e.message : '创建失败'; }
   finally { submitting.value = false; }
 }

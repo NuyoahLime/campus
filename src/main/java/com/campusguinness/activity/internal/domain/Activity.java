@@ -81,6 +81,8 @@ public final class Activity {
         if (b.createdBy == null) throw new IllegalArgumentException("createdBy required");
         if (b.title == null || b.title.isBlank()) throw new IllegalArgumentException("title required");
         if (b.title.length() > 200) throw new IllegalArgumentException("title max 200 chars");
+        if (b.startTime != null && b.endTime != null && b.endTime.isBefore(b.startTime))
+            throw new IllegalArgumentException("endTime must not be before startTime");
     }
 
     // ── Field mutation (only in DRAFT) ──

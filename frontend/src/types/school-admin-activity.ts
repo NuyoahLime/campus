@@ -20,5 +20,3 @@ export interface UpdateActivityPayload { title?: string; description?: string; s
 
 export interface ActivityListFilter { executionStatus?: string; publicStatus?: string; keyword?: string; }
 
-export function toISO(dt: string): string | undefined { return dt ? new Date(dt).toISOString() : undefined; }
-
