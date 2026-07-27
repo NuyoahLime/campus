@@ -44,7 +44,8 @@ public class ActivityQueryService {
             throw new IllegalArgumentException("invalid executionStatus: " + executionStatus);
         if (publicStatus != null && !VALID_PUBLIC.contains(publicStatus))
             throw new IllegalArgumentException("invalid publicStatus: " + publicStatus);
-        String kw = keyword != null ? keyword.trim() : null;
+        String kw = keyword == null ? null : keyword.trim();
+        if (kw != null && kw.isEmpty()) kw = null;
         if (kw != null && kw.length() > 100) throw new IllegalArgumentException("keyword too long");
         return queryPort.findBySchool(schoolId, executionStatus, publicStatus, kw, page, size);
     }

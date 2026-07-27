@@ -11,16 +11,16 @@
 
       <div v-if="detail.executionStatus==='DRAFT'" class="actions">
         <el-button @click="openEdit">编辑</el-button>
-        <el-button @click="showAddProject=true">添加项目</el-button>
+        <el-button @click="openAddProject">添加项目</el-button>
         <el-button type="success" :loading="publishing" :disabled="publishing" @click="handlePublish">发布活动</el-button>
       </div>
       <el-alert v-if="actionErr" :title="actionErr" type="error" show-icon :closable="false" style="margin-top:12px" />
 
-      <el-dialog v-model="showEdit" title="编辑活动" width="520px"><el-form ref="efRef" :model="eForm" label-position="top" @submit.prevent="handleUpdate">
-        <el-form-item label="活动名称"><el-input v-model="eForm.title" maxlength="200" /></el-form-item>
-        <el-form-item label="活动说明"><el-input v-model="eForm.description" type="textarea" :rows="3" /></el-form-item>
-        <el-row :gutter="16"><el-col :span="12"><el-form-item label="开始时间"><el-date-picker v-model="eForm.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col><el-col :span="12"><el-form-item label="结束时间"><el-date-picker v-model="eForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col></el-row>
-        <el-form-item label="地点"><el-input v-model="eForm.location" /></el-form-item>
+      <el-dialog v-model="showEdit" title="编辑活动" width="520px"><el-form ref="efRef" :model="eForm" :rules="editRules" label-position="top" @submit.prevent="handleUpdate">
+        <el-form-item label="活动名称" prop="title"><el-input v-model="eForm.title" maxlength="200" /></el-form-item>
+        <el-form-item label="活动说明" prop="description"><el-input v-model="eForm.description" type="textarea" :rows="3" /></el-form-item>
+        <el-row :gutter="16"><el-col :span="12"><el-form-item label="开始时间" prop="startTime"><el-date-picker v-model="eForm.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col><el-col :span="12"><el-form-item label="结束时间" prop="endTime"><el-date-picker v-model="eForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col></el-row>
+        <el-form-item label="地点" prop="location"><el-input v-model="eForm.location" /></el-form-item>
         <el-alert v-if="editErr" :title="editErr" type="error" show-icon style="margin-bottom:12px" />
         <template #footer><el-button @click="showEdit=false">取消</el-button><el-button native-type="submit" type="primary" :loading="updating" :disabled="updating">保存</el-button></template>
       </el-form></el-dialog>
@@ -31,7 +31,7 @@
       </section>
 
       <el-dialog v-model="showAddProject" title="添加项目" width="400px">
-        <el-alert v-if="projErr" :title="projErr" type="error" show-icon style="margin-bottom:12px" />
+        <el-alert v-if="projErr" :title="projErr" type="error" show-icon style="margin-bottom:12px"><template #default><el-button size="small" @click="loadProjects" style="margin-top:4px">重新加载</el-button></template></el-alert>
         <el-select v-model="selectedProjectId" placeholder="选择挑战项目" filterable style="width:100%" :loading="projLoading"><el-option v-for="p in projects" :key="p.projectId" :label="p.name" :value="p.projectId" /></el-select>
         <template #footer><el-button @click="showAddProject=false">取消</el-button><el-button type="primary" :loading="addingProject" :disabled="addingProject||!selectedProjectId" @click="handleAddProject">添加</el-button></template>
       </el-dialog>
@@ -45,8 +45,8 @@ import { useRoute } from 'vue-router';
 import { fetchActivity, updateActivity, addProject, removeProject, publishActivity, fetchAvailableProjects } from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
 import { executionLabel, publicLabel, execTagType, publicTagType } from '@/utils/activity-status';
-import { toISO } from '@/types/school-admin-activity';
-import { ElMessageBox } from 'element-plus'; import type { FormInstance } from 'element-plus';
+import { localDateTimeToInstant, instantToLocalDateTime } from '@/utils/activity-time';
+import { ElMessageBox } from 'element-plus'; import type { FormInstance, FormRules } from 'element-plus';
 import type { SchoolAdminActivityDetail } from '@/types/school-admin-activity';
 
 const route=useRoute(); const id=route.params.activityId as string;
@@ -56,21 +56,26 @@ const actionErr=ref<string|null>(null); const editErr=ref<string|null>(null); co
 const selectedProjectId=ref(''); const projects=ref<{projectId:string;name:string}[]>([]);
 const projLoading=ref(false);
 const eForm=reactive({title:'',description:'',startTime:'',endTime:'',location:''});
+const editRules: FormRules = { title: [{ required: true, message: '请输入活动名称', trigger: 'blur' }, { max: 200 }], description: [{ max: 2000 }], startTime: [], endTime: [] };
 
 async function load() { loading.value=true;error.value=null;try{detail.value=await fetchActivity(id)}catch(err:unknown){error.value=err instanceof ApiError?err.message:'加载失败'}finally{loading.value=false} }
 async function loadProjects() { projLoading.value=true;projErr.value=null;try{const r=await fetchAvailableProjects();projects.value=r.items}catch(err:unknown){projErr.value=err instanceof ApiError?err.message:'加载项目列表失败'}finally{projLoading.value=false} }
 
-function openEdit() { if(!detail.value)return;eForm.title=detail.value.title||'';eForm.description=detail.value.description||'';eForm.startTime=detail.value.startTime||'';eForm.endTime=detail.value.endTime||'';eForm.location=detail.value.location||'';showEdit.value=true; }
+function openEdit() { if(!detail.value)return;eForm.title=detail.value.title||'';eForm.description=detail.value.description||'';eForm.startTime=instantToLocalDateTime(detail.value.startTime);eForm.endTime=instantToLocalDateTime(detail.value.endTime);eForm.location=detail.value.location||'';showEdit.value=true; }
 
 async function handleUpdate() {
   if(updating.value)return; updating.value=true; editErr.value=null;
-  await efRef.value?.validate?.().catch(() => false);
+  if (eForm.startTime && eForm.endTime && new Date(eForm.endTime) < new Date(eForm.startTime)) { editErr.value='结束时间不得早于开始时间'; updating.value=false; return; }
+  const valid = (await efRef.value?.validate().catch(() => false)) !== false;
+  if (!valid) { updating.value = false; return; }
   try {
-    await updateActivity(id, {title:eForm.title,description:eForm.description||undefined,startTime:toISO(eForm.startTime),endTime:toISO(eForm.endTime),location:eForm.location||undefined});
+    await updateActivity(id, {title:eForm.title,description:eForm.description||undefined,startTime:localDateTimeToInstant(eForm.startTime),endTime:localDateTimeToInstant(eForm.endTime),location:eForm.location||undefined});
     showEdit.value=false; await load();
   } catch(err:unknown) { editErr.value = err instanceof ApiError ? err.message : '保存失败'; }
   finally { updating.value = false; }
 }
+
+async function openAddProject() { showAddProject.value=true; selectedProjectId.value=''; projErr.value=null; await loadProjects(); }
 
 async function handlePublish() {
   try{await ElMessageBox.confirm('确认发布？','确认',{type:'warning'})}catch{return}

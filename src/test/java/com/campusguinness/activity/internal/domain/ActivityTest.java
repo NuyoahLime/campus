@@ -87,6 +87,51 @@ class ActivityTest {
             assertThatThrownBy(() -> Activity.create(validBuilder().title("A".repeat(201))))
                     .isInstanceOf(IllegalArgumentException.class);
         }
+
+        @Test
+        @DisplayName("create rejects endTime before startTime")
+        void createRejectsEndBeforeStart() {
+            assertThatThrownBy(() -> Activity.create(validBuilder()
+                    .startTime(Instant.parse("2026-09-02T08:00:00Z"))
+                    .endTime(Instant.parse("2026-09-01T08:00:00Z"))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("endTime must not be before startTime");
+        }
+
+        @Test
+        @DisplayName("create allows equal startTime and endTime")
+        void createAllowsEqualStartAndEnd() {
+            Instant t = Instant.parse("2026-09-01T08:00:00Z");
+            var a = Activity.create(validBuilder().startTime(t).endTime(t));
+            assertThat(a.startTime()).isEqualTo(t);
+            assertThat(a.endTime()).isEqualTo(t);
+        }
+
+        @Test
+        @DisplayName("create allows both times null")
+        void createAllowsBothTimesNull() {
+            var a = Activity.create(validBuilder().startTime(null).endTime(null));
+            assertThat(a.startTime()).isNull();
+            assertThat(a.endTime()).isNull();
+        }
+
+        @Test
+        @DisplayName("create allows only startTime")
+        void createAllowsOnlyStartTime() {
+            Instant t = Instant.parse("2026-09-01T08:00:00Z");
+            var a = Activity.create(validBuilder().startTime(t).endTime(null));
+            assertThat(a.startTime()).isEqualTo(t);
+            assertThat(a.endTime()).isNull();
+        }
+
+        @Test
+        @DisplayName("create allows only endTime")
+        void createAllowsOnlyEndTime() {
+            Instant t = Instant.parse("2026-09-02T17:00:00Z");
+            var a = Activity.create(validBuilder().startTime(null).endTime(t));
+            assertThat(a.startTime()).isNull();
+            assertThat(a.endTime()).isEqualTo(t);
+        }
     }
 
     @Nested

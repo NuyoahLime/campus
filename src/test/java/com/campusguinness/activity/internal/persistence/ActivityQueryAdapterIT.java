@@ -119,9 +119,72 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         assertThat(result.totalElements()).isEqualTo(1);
     }
 
+    // ── findBySchool tests ──
+
+    @Test @DisplayName("findBySchool isolates by schoolId")
+    void findBySchoolIsolatesBySchoolId() {
+        var otherSchoolId = UUID.randomUUID();
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                otherSchoolId, "Other", "USCC", "OTH-01", "INT-OTH", "PRIMARY", "Shanghai", "addr", "n", "p", "e", "NORMAL");
+        jpa.save(activity("Mine", "DRAFT", schoolId, Instant.now()));
+        jpa.save(activity("Theirs", "DRAFT", otherSchoolId, Instant.now()));
+        var result = adapter.findBySchool(schoolId, null, null, null, 0, 20);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().get(0).title()).isEqualTo("Mine");
+    }
+
+    @Test @DisplayName("findBySchool filters by executionStatus")
+    void findBySchoolFiltersByExecutionStatus() {
+        jpa.save(activity("Draft", "DRAFT", Instant.now()));
+        jpa.save(activity("Published", "PUBLISHED", Instant.now()));
+        var result = adapter.findBySchool(schoolId, "DRAFT", null, null, 0, 20);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().get(0).title()).isEqualTo("Draft");
+    }
+
+    @Test @DisplayName("findBySchool filters by publicStatus")
+    void findBySchoolFiltersByPublicStatus() {
+        var a1 = activity("NotSubmitted", "DRAFT", Instant.now());
+        a1.setPublicStatus("NOT_SUBMITTED");
+        var a2 = activity("PendingReview", "PUBLISHED", Instant.now());
+        a2.setPublicStatus("PENDING_PLATFORM_REVIEW");
+        jpa.saveAll(List.of(a1, a2));
+        var result = adapter.findBySchool(schoolId, null, "PENDING_PLATFORM_REVIEW", null, 0, 20);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().get(0).title()).isEqualTo("PendingReview");
+    }
+
+    @Test @DisplayName("findBySchool keyword case-insensitive")
+    void findBySchoolKeywordCaseInsensitive() {
+        jpa.save(activity("Mathematics Competition", "DRAFT", Instant.now()));
+        var result = adapter.findBySchool(schoolId, null, null, "mathematics", 0, 20);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().get(0).title()).isEqualTo("Mathematics Competition");
+    }
+
+    @Test @DisplayName("findBySchool keyword partial match")
+    void findBySchoolKeywordPartialMatch() {
+        jpa.save(activity("Spring Coding Challenge", "DRAFT", Instant.now()));
+        jpa.save(activity("Autumn Math", "DRAFT", Instant.now()));
+        var result = adapter.findBySchool(schoolId, null, null, "cod", 0, 20);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().get(0).title()).isEqualTo("Spring Coding Challenge");
+    }
+
+    @Test @DisplayName("findBySchool empty results returns zero total")
+    void findBySchoolEmptyResults() {
+        var result = adapter.findBySchool(schoolId, "CANCELLED", null, null, 0, 20);
+        assertThat(result.items()).isEmpty();
+        assertThat(result.totalElements()).isEqualTo(0);
+    }
+
     private ActivityEntity activity(String title, String execStatus, Instant startTime) {
+        return activity(title, execStatus, schoolId, startTime);
+    }
+
+    private ActivityEntity activity(String title, String execStatus, UUID schoolIdOverride, Instant startTime) {
         var e = new ActivityEntity();
-        e.setId(UUID.randomUUID()); e.setSchoolId(schoolId); e.setCreatedBy(userId);
+        e.setId(UUID.randomUUID()); e.setSchoolId(schoolIdOverride); e.setCreatedBy(userId);
         e.setTitle(title); e.setExecutionStatus(execStatus); e.setPublicStatus("NOT_SUBMITTED");
         e.setStartTime(startTime); e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
         return e;
