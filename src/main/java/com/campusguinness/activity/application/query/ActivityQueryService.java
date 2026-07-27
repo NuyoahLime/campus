@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -30,13 +31,22 @@ public class ActivityQueryService {
         return queryPort.findPublicPublished(page, size, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
     }
 
+    private static final Set<String> VALID_EXECUTION = Set.of("DRAFT","PUBLISHED","IN_PROGRESS","ENDED","CANCELLED");
+    private static final Set<String> VALID_PUBLIC = Set.of("NOT_SUBMITTED","PENDING_PLATFORM_REVIEW","PLATFORM_APPROVED","PLATFORM_REJECTED","PUBLIC","SCHOOL_WITHDRAWN","PLATFORM_TAKEDOWN");
+
     /** School-scoped list with filters. */
     public QueryPage<ActivityListResult> listBySchool(UUID schoolId, String executionStatus,
             String publicStatus, String keyword, int page, int size) {
         if (page < 0) throw new IllegalArgumentException("page must be >= 0");
         if (size < 1 || size > 100) throw new IllegalArgumentException("size must be between 1 and 100");
         if (schoolId == null) throw new IllegalArgumentException("schoolId required");
-        return queryPort.findBySchool(schoolId, executionStatus, publicStatus, keyword, page, size);
+        if (executionStatus != null && !VALID_EXECUTION.contains(executionStatus))
+            throw new IllegalArgumentException("invalid executionStatus: " + executionStatus);
+        if (publicStatus != null && !VALID_PUBLIC.contains(publicStatus))
+            throw new IllegalArgumentException("invalid publicStatus: " + publicStatus);
+        String kw = keyword != null ? keyword.trim() : null;
+        if (kw != null && kw.length() > 100) throw new IllegalArgumentException("keyword too long");
+        return queryPort.findBySchool(schoolId, executionStatus, publicStatus, kw, page, size);
     }
 
     /** Public review queue. */

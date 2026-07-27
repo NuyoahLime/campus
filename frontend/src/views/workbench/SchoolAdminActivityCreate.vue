@@ -26,7 +26,7 @@ const rules:FormRules={title:[{required:true,message:'请输入活动名称'},{m
 async function handleSubmit() {
   if (submitting.value) return; submitting.value=true; submitErr.value=null;
   const valid = await fRef.value?.validate().catch(() => false); if (!valid) { submitting.value=false; return; }
-  try { const r = await createActivity({title:form.title,description:form.description||undefined,startTime:toISO(form.startTime),endTime:toISO(form.endTime),location:form.location||undefined}); router.replace(`/school-admin/activities/${r.activityId || r.id}`); }
+  try { const r = await createActivity({title:form.title,description:form.description||undefined,startTime:toISO(form.startTime),endTime:toISO(form.endTime),location:form.location||undefined}); router.replace(`/school-admin/activities/${r.activityId}`); }
   catch(e) { submitErr.value = e instanceof ApiError ? e.message : '创建失败'; }
   finally { submitting.value = false; }
 }

@@ -33,7 +33,7 @@ const f=reactive({executionStatus:'',publicStatus:'',keyword:''});
 const execOpts=[{v:'DRAFT',l:'草稿'},{v:'PUBLISHED',l:'已发布'},{v:'IN_PROGRESS',l:'进行中'},{v:'ENDED',l:'已结束'},{v:'CANCELLED',l:'已取消'}];
 const pubOpts=[{v:'NOT_SUBMITTED',l:'未提交'},{v:'PENDING_PLATFORM_REVIEW',l:'审核中'},{v:'PLATFORM_APPROVED',l:'平台批准'},{v:'PLATFORM_REJECTED',l:'平台驳回'},{v:'PUBLIC',l:'已公开'},{v:'SCHOOL_WITHDRAWN',l:'学校撤回'},{v:'PLATFORM_TAKEDOWN',l:'平台下架'}];
 
-async function load() { loading.value=true;error.value=null;try{const r=await fetchActivities(f,page.value-1);items.value=r.items;total.value=r.totalElements}catch(e){error.value=e instanceof ApiError?e.message:'加载失败'}finally{loading.value=false} }
+async function load() { loading.value=true;error.value=null;try{const flt={executionStatus:f.executionStatus||undefined,publicStatus:f.publicStatus||undefined,keyword:f.keyword?.trim()||undefined};const r=await fetchActivities(flt,page.value-1);items.value=r.items;total.value=r.totalElements}catch(e){error.value=e instanceof ApiError?e.message:'加载失败'}finally{loading.value=false} }
 function search() { page.value=1; load(); }
 function handlePage(p:number) { page.value=p; load(); }
 function fmt(iso:string|null) { return iso ? new Date(iso).toLocaleDateString('zh-CN') : ''; }
