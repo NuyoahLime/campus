@@ -14,7 +14,11 @@ export interface SchoolAdminActivityDetail {
 export interface ActivityProjectItem { id: string; activityId: string; projectId: string; }
 export interface ResponsibleTeacherItem { activityProjectId: string; userId: string; }
 
+export interface ActivityMutationResponse { id?: string; activityId?: string; executionStatus: string; publicStatus: string; }
 export interface CreateActivityPayload { title: string; description?: string; startTime?: string; endTime?: string; location?: string; }
 export interface UpdateActivityPayload { title?: string; description?: string; startTime?: string; endTime?: string; location?: string; }
 
 export interface ActivityListFilter { executionStatus?: string; publicStatus?: string; keyword?: string; }
+
+export function toISO(dt: string): string | undefined { return dt ? new Date(dt).toISOString() : undefined; }
+

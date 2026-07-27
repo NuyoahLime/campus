@@ -1,6 +1,6 @@
 import http from './http';
 import type { PageResponse } from '@/types/api';
-import type { SchoolAdminActivityItem, SchoolAdminActivityDetail, CreateActivityPayload, UpdateActivityPayload, ActivityListFilter, ActivityProjectItem } from '@/types/school-admin-activity';
+import type { SchoolAdminActivityItem, SchoolAdminActivityDetail, CreateActivityPayload, UpdateActivityPayload, ActivityListFilter, ActivityProjectItem, ActivityMutationResponse } from '@/types/school-admin-activity';
 
 export async function fetchActivities(filter: ActivityListFilter, page = 0, size = 20): Promise<PageResponse<SchoolAdminActivityItem>> {
   const params: Record<string, string | number> = { page, size };
@@ -16,13 +16,13 @@ export async function fetchActivity(id: string): Promise<SchoolAdminActivityDeta
   return res.data;
 }
 
-export async function createActivity(payload: CreateActivityPayload): Promise<SchoolAdminActivityDetail> {
-  const res = await http.post<SchoolAdminActivityDetail>('/v1/school-admin/activities', payload);
+export async function createActivity(payload: CreateActivityPayload): Promise<ActivityMutationResponse> {
+  const res = await http.post<ActivityMutationResponse>('/v1/school-admin/activities', payload);
   return res.data;
 }
 
-export async function updateActivity(id: string, payload: UpdateActivityPayload): Promise<SchoolAdminActivityDetail> {
-  const res = await http.patch<SchoolAdminActivityDetail>(`/v1/school-admin/activities/${id}`, payload);
+export async function updateActivity(id: string, payload: UpdateActivityPayload): Promise<ActivityMutationResponse> {
+  const res = await http.patch<ActivityMutationResponse>(`/v1/school-admin/activities/${id}`, payload);
   return res.data;
 }
 
@@ -35,7 +35,13 @@ export async function removeProject(activityId: string, projectId: string): Prom
   await http.delete(`/v1/school-admin/activities/${activityId}/projects/${projectId}`);
 }
 
-export async function publishActivity(id: string): Promise<SchoolAdminActivityDetail> {
-  const res = await http.post<SchoolAdminActivityDetail>(`/v1/school-admin/activities/${id}/publish`);
+export async function publishActivity(id: string): Promise<ActivityMutationResponse> {
+  const res = await http.post<ActivityMutationResponse>(`/v1/school-admin/activities/${id}/publish`);
   return res.data;
 }
+
+export async function fetchAvailableProjects(page = 0, size = 100): Promise<PageResponse<{ projectId: string; name: string }>> {
+  const res = await http.get<PageResponse<{ projectId: string; name: string }>>('/v1/challenge-projects', { params: { page, size } });
+  return res.data;
+}
+
