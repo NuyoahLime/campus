@@ -59,14 +59,14 @@ const eForm=reactive({title:'',description:'',startTime:'',endTime:'',location:'
 const editRules: FormRules = { title: [{ required: true, message: '请输入活动名称', trigger: 'blur' }, { max: 200 }], description: [{ max: 2000 }], startTime: [], endTime: [] };
 
 async function load() { loading.value=true;error.value=null;try{detail.value=await fetchActivity(id)}catch(err:unknown){error.value=err instanceof ApiError?err.message:'加载失败'}finally{loading.value=false} }
-async function loadProjects() { projLoading.value=true;projErr.value=null;try{const r=await fetchAvailableProjects();projects.value=r.items}catch(err:unknown){projErr.value=err instanceof ApiError?err.message:'加载项目列表失败'}finally{projLoading.value=false} }
+async function loadProjects() { if (projLoading.value) return; projLoading.value=true;projErr.value=null;try{const r=await fetchAvailableProjects();projects.value=r.items}catch(err:unknown){projErr.value=err instanceof ApiError?err.message:'加载项目列表失败'}finally{projLoading.value=false} }
 
 function openEdit() { if(!detail.value)return;eForm.title=detail.value.title||'';eForm.description=detail.value.description||'';eForm.startTime=instantToLocalDateTime(detail.value.startTime);eForm.endTime=instantToLocalDateTime(detail.value.endTime);eForm.location=detail.value.location||'';showEdit.value=true; }
 
 async function handleUpdate() {
   if(updating.value)return; updating.value=true; editErr.value=null;
   if (eForm.startTime && eForm.endTime && new Date(eForm.endTime) < new Date(eForm.startTime)) { editErr.value='结束时间不得早于开始时间'; updating.value=false; return; }
-  const valid = (await efRef.value?.validate().catch(() => false)) !== false;
+  const valid = await efRef.value?.validate().catch(() => false) ?? false;
   if (!valid) { updating.value = false; return; }
   try {
     await updateActivity(id, {title:eForm.title,description:eForm.description||undefined,startTime:localDateTimeToInstant(eForm.startTime),endTime:localDateTimeToInstant(eForm.endTime),location:eForm.location||undefined});

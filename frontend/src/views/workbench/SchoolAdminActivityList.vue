@@ -22,12 +22,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'; import { useRoute } from 'vue-router';
+import { ref, reactive, onMounted } from 'vue'; import { useRoute, useRouter } from 'vue-router';
 import { fetchActivities } from '@/api/school-admin-activity'; import { ApiError } from '@/api/http';
 import { executionLabel, publicLabel, execTagType, publicTagType } from '@/utils/activity-status';
 import type { SchoolAdminActivityItem as Item } from '@/types/school-admin-activity';
 
-const route=useRoute();
+const route=useRoute(); const router=useRouter();
 const items=ref<Item[]>([]); const loading=ref(true); const error=ref<string|null>(null); const total=ref(0); const page=ref(1);
 const f=reactive({executionStatus:'',publicStatus:'',keyword:''});
 const execOpts=[{v:'DRAFT',l:'草稿'},{v:'PUBLISHED',l:'已发布'},{v:'IN_PROGRESS',l:'进行中'},{v:'ENDED',l:'已结束'},{v:'CANCELLED',l:'已取消'}];

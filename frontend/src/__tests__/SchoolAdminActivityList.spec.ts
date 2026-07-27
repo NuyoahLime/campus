@@ -43,6 +43,22 @@ beforeEach(() => {
 });
 
 describe('SchoolAdminActivityList', () => {
+  it('mounts without ReferenceError (router is defined)', async () => {
+    vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
+
+    const router = makeRouter();
+    await router.push('/school-admin/activities');
+    await router.isReady();
+
+    const wrapper = mount(SchoolAdminActivityList, {
+      global: { plugins: [router, createPinia(), ElementPlus] },
+    });
+    await flushPromises();
+
+    // If router was undefined, the component would not render
+    expect(wrapper.html()).toBeTruthy();
+  });
+
   it('renders activity items', async () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(
       mockPage([sampleItem(), sampleItem({ id: 'b', title: '英语竞赛' })])

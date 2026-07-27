@@ -26,8 +26,10 @@ const rules:FormRules={title:[{required:true,message:'请输入活动名称'},{m
 async function handleSubmit() {
   if (submitting.value) return; submitting.value=true; submitErr.value=null;
   const valid = await fRef.value?.validate().catch(() => false); if (!valid) { submitting.value=false; return; }
+  const title = form.title.trim();
+  if (!title) { submitErr.value = '请输入活动名称'; submitting.value = false; return; }
   if (form.startTime && form.endTime && new Date(form.endTime) < new Date(form.startTime)) { submitErr.value = '结束时间不得早于开始时间'; submitting.value = false; return; }
-  try { const r = await createActivity({title:form.title.trim()||undefined,description:form.description||undefined,startTime:localDateTimeToInstant(form.startTime),endTime:localDateTimeToInstant(form.endTime),location:form.location||undefined}); router.replace(`/school-admin/activities/${r.activityId}`); }
+  try { const r = await createActivity({title,description:form.description||undefined,startTime:localDateTimeToInstant(form.startTime),endTime:localDateTimeToInstant(form.endTime),location:form.location||undefined}); router.replace(`/school-admin/activities/${r.activityId}`); }
   catch(e) { submitErr.value = e instanceof ApiError ? e.message : '创建失败'; }
   finally { submitting.value = false; }
 }

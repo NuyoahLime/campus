@@ -1,19 +1,29 @@
 package com.campusguinness.interfaces.web.activity;
 
 import com.campusguinness.PostgreSqlIntegrationTestSupport;
+import com.campusguinness.identity.application.query.AuthenticationAccount.SchoolMembershipRecord;
+import com.campusguinness.infrastructure.security.CampusGuinnessUserDetails;
+import com.campusguinness.infrastructure.security.PrimaryIdentityResolver.ResolvedIdentity;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -26,7 +36,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
 
-    UUID schoolId, userId, otherSchoolId, studentId;
+    UUID schoolId, userId, otherSchoolId, studentId, teacherId;
     UUID activityId;
 
     @BeforeEach void setUp() {
@@ -34,6 +44,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         userId = UUID.randomUUID();
         otherSchoolId = UUID.randomUUID();
         studentId = UUID.randomUUID();
+        teacherId = UUID.randomUUID();
         activityId = UUID.randomUUID();
 
         jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -45,19 +56,36 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                 userId, "sa-" + UUID.randomUUID().toString().substring(0, 6), "$2a$10$hash0000000000000000000000", "NORMAL");
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)",
                 studentId, "st-" + UUID.randomUUID().toString().substring(0, 6), "$2a$10$hash0000000000000000000000", "NORMAL");
+        jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)",
+                teacherId, "te-" + UUID.randomUUID().toString().substring(0, 6), "$2a$10$hash0000000000000000000000", "NORMAL");
 
         jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
                 UUID.randomUUID(), userId, schoolId, "SCHOOL_ADMIN", "ACTIVE");
         jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
                 UUID.randomUUID(), studentId, schoolId, "STUDENT", "ACTIVE");
+        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
+                UUID.randomUUID(), teacherId, schoolId, "TEACHER", "ACTIVE");
     }
 
     @AfterEach void tearDown() {
         jdbc.update("DELETE FROM activity_projects WHERE activity_id IN (SELECT id FROM activities WHERE school_id IN (?,?))", schoolId, otherSchoolId);
         jdbc.update("DELETE FROM activities WHERE school_id IN (?,?)", schoolId, otherSchoolId);
-        jdbc.update("DELETE FROM school_memberships WHERE user_id IN (?,?)", userId, studentId);
-        jdbc.update("DELETE FROM users WHERE id IN (?,?)", userId, studentId);
+        jdbc.update("DELETE FROM school_memberships WHERE user_id IN (?,?,?)", userId, studentId, teacherId);
+        jdbc.update("DELETE FROM users WHERE id IN (?,?,?)", userId, studentId, teacherId);
         jdbc.update("DELETE FROM schools WHERE id IN (?,?)", schoolId, otherSchoolId);
+    }
+
+    // ── principal helper ──
+
+    private RequestPostProcessor authUser(UUID uid, UUID sid, String role) {
+        var membership = new SchoolMembershipRecord(sid, role);
+        var identity = new ResolvedIdentity(uid, role, sid, "NORMAL");
+        var details = new CampusGuinnessUserDetails(
+                uid, "test-" + uid, "hash", "NORMAL",
+                Set.of(new SimpleGrantedAuthority("ROLE_" + role)),
+                List.of(membership), identity);
+        var auth = new UsernamePasswordAuthenticationToken(details, details.getPassword(), details.getAuthorities());
+        return SecurityMockMvcRequestPostProcessors.authentication(auth);
     }
 
     // ── Authentication / Authorization ──
@@ -69,93 +97,145 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test @DisplayName("STUDENT returns 403")
-    @WithMockUser(username = "st", roles = {"STUDENT"})
     void student403() throws Exception {
-        mvc.perform(get("/api/v1/school-admin/activities"))
+        mvc.perform(get("/api/v1/school-admin/activities")
+                        .with(authUser(studentId, schoolId, "STUDENT")))
                 .andExpect(status().isForbidden());
     }
 
     @Test @DisplayName("TEACHER returns 403")
-    @WithMockUser(username = "te", roles = {"TEACHER"})
     void teacher403() throws Exception {
-        mvc.perform(get("/api/v1/school-admin/activities"))
+        mvc.perform(get("/api/v1/school-admin/activities")
+                        .with(authUser(teacherId, schoolId, "TEACHER")))
                 .andExpect(status().isForbidden());
     }
 
     @Test @DisplayName("SCHOOL_ADMIN returns 200 for own school")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void schoolAdmin200() throws Exception {
-        mvc.perform(get("/api/v1/school-admin/activities"))
+        mvc.perform(get("/api/v1/school-admin/activities")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isOk());
     }
 
     // ── Cross-school isolation ──
 
     @Test @DisplayName("cannot access activity of other school — returns 404")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void crossSchoolIsolation() throws Exception {
         UUID otherActivityId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
                 otherActivityId, otherSchoolId, "Other Act", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
 
-        mvc.perform(get("/api/v1/school-admin/activities/" + otherActivityId))
+        mvc.perform(get("/api/v1/school-admin/activities/" + otherActivityId)
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test @DisplayName("list excludes other school activities")
+    void listExcludesOtherSchool() throws Exception {
+        seedActivity("My Activity", "DRAFT");
+        UUID otherActId = UUID.randomUUID();
+        jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
+                otherActId, otherSchoolId, "Other Activity", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+
+        mvc.perform(get("/api/v1/school-admin/activities")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("My Activity"));
     }
 
     // ── List filtering ──
 
     @Test @DisplayName("list filters by executionStatus")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void listFiltersByExecutionStatus() throws Exception {
         seedActivity("Draft A", "DRAFT");
         seedActivity("Published B", "PUBLISHED");
 
-        mvc.perform(get("/api/v1/school-admin/activities?executionStatus=DRAFT"))
+        mvc.perform(get("/api/v1/school-admin/activities?executionStatus=DRAFT")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.items[0].title").value("Draft A"));
     }
 
+    @Test @DisplayName("list filters by publicStatus")
+    void listFiltersByPublicStatus() throws Exception {
+        var a1 = activityId; seedActivity("NotSub", "DRAFT");
+        jdbc.update("UPDATE activities SET public_status='PENDING_PLATFORM_REVIEW' WHERE id=?", a1);
+        UUID a2 = UUID.randomUUID();
+        jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
+                a2, schoolId, "Public", "PUBLISHED", "PUBLIC", userId, Instant.now(), Instant.now(), 1);
+
+        mvc.perform(get("/api/v1/school-admin/activities?publicStatus=PUBLIC")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.items[0].publicStatus").value("PUBLIC"));
+    }
+
     @Test @DisplayName("list filters by keyword")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void listFiltersByKeyword() throws Exception {
         seedActivity("Math Challenge", "DRAFT");
         seedActivity("Science Fair", "DRAFT");
 
-        mvc.perform(get("/api/v1/school-admin/activities?keyword=math"))
+        mvc.perform(get("/api/v1/school-admin/activities?keyword=math")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.items[0].title").value("Math Challenge"));
     }
 
+    @Test @DisplayName("list includes totalPages in response")
+    void listIncludesTotalPages() throws Exception {
+        seedActivity("A", "DRAFT");
+        mvc.perform(get("/api/v1/school-admin/activities")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalPages").value(greaterThanOrEqualTo(1)));
+    }
+
     @Test @DisplayName("list rejects invalid executionStatus with 400")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void listRejectsInvalidExecutionStatus() throws Exception {
-        mvc.perform(get("/api/v1/school-admin/activities?executionStatus=INVALID"))
+        mvc.perform(get("/api/v1/school-admin/activities?executionStatus=INVALID")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test @DisplayName("list rejects keyword over 100 chars with 400")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void listRejectsTooLongKeyword() throws Exception {
-        mvc.perform(get("/api/v1/school-admin/activities?keyword=" + "A".repeat(101)))
+        mvc.perform(get("/api/v1/school-admin/activities?keyword=" + "A".repeat(101))
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test @DisplayName("list rejects negative page with 400")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void listRejectsNegativePage() throws Exception {
-        mvc.perform(get("/api/v1/school-admin/activities?page=-1"))
+        mvc.perform(get("/api/v1/school-admin/activities?page=-1")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test @DisplayName("list rejects size 0 with 400")
+    void listRejectsSizeZero() throws Exception {
+        mvc.perform(get("/api/v1/school-admin/activities?size=0")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test @DisplayName("list rejects size over 100 with 400")
+    void listRejectsSizeOver100() throws Exception {
+        mvc.perform(get("/api/v1/school-admin/activities?size=101")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isBadRequest());
     }
 
     // ── Create ──
 
     @Test @DisplayName("create returns 201 with valid payload")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void createReturns201() throws Exception {
         mvc.perform(post("/api/v1/school-admin/activities")
                         .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"New Activity\",\"description\":\"A test activity\"}"))
                 .andExpect(status().isCreated())
@@ -164,10 +244,10 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test @DisplayName("create rejects endTime before startTime with 400")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void createRejectsInvalidTime() throws Exception {
         mvc.perform(post("/api/v1/school-admin/activities")
                         .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Bad Time\",\"startTime\":\"2026-09-02T00:00:00Z\",\"endTime\":\"2026-09-01T00:00:00Z\"}"))
                 .andExpect(status().isBadRequest());
@@ -176,12 +256,12 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     // ── Update ──
 
     @Test @DisplayName("update DRAFT returns 200")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void updateDraftReturns200() throws Exception {
         seedActivity("Original Title", "DRAFT");
 
         mvc.perform(patch("/api/v1/school-admin/activities/" + activityId)
                         .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Updated Title\"}"))
                 .andExpect(status().isOk())
@@ -189,24 +269,24 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test @DisplayName("update non-DRAFT rejected")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void updateNonDraftRejected() throws Exception {
         seedActivity("Published Activity", "PUBLISHED");
 
         mvc.perform(patch("/api/v1/school-admin/activities/" + activityId)
                         .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Changed\"}"))
                 .andExpect(status().isConflict());
     }
 
     @Test @DisplayName("update rejects invalid time with 400")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void updateRejectsInvalidTime() throws Exception {
         seedActivity("Time Test", "DRAFT");
 
         mvc.perform(patch("/api/v1/school-admin/activities/" + activityId)
                         .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"startTime\":\"2026-12-31T00:00:00Z\",\"endTime\":\"2026-01-01T00:00:00Z\"}"))
                 .andExpect(status().isBadRequest());
@@ -214,23 +294,68 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     // ── Publish ──
 
-    @Test @DisplayName("publish DRAFT returns 200")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
-    void publishDraftReturns200() throws Exception {
-        seedActivity("Ready to Publish", "DRAFT");
+    @Test @DisplayName("publish with complete data returns 200 and updates DB")
+    void publishCompleteReturns200() throws Exception {
+        UUID actId = seedPublishableActivity();
 
-        mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/publish")
-                        .with(csrf()))
+        mvc.perform(post("/api/v1/school-admin/activities/" + actId + "/publish")
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.executionStatus").value("PUBLISHED"));
+
+        String dbStatus = jdbc.queryForObject("SELECT execution_status FROM activities WHERE id=?", String.class, actId);
+        assertThat(dbStatus).isEqualTo("PUBLISHED");
+    }
+
+    @Test @DisplayName("publish without project returns 409")
+    void publishWithoutProjectReturns409() throws Exception {
+        seedActivity("Bare Draft", "DRAFT");
+
+        mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/publish")
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isConflict());
+    }
+
+    // ── Projects ──
+
+    @Test @DisplayName("add PUBLISHED project succeeds")
+    void addPublishedProjectSucceeds() throws Exception {
+        seedActivity("Project Test", "DRAFT");
+        UUID publishedProjectId = seedPublishedProject();
+
+        mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/projects")
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":\"" + publishedProjectId + "\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test @DisplayName("remove project succeeds")
+    void removeProjectSucceeds() throws Exception {
+        seedActivity("Project Test", "DRAFT");
+        UUID publishedProjectId = seedPublishedProject();
+        UUID apId = UUID.randomUUID();
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id) VALUES (?,?,?)",
+                apId, activityId, publishedProjectId);
+
+        mvc.perform(delete("/api/v1/school-admin/activities/" + activityId + "/projects/" + publishedProjectId)
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isNoContent());
+
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM activity_projects WHERE activity_id=?", Integer.class, activityId);
+        assertThat(count).isEqualTo(0);
     }
 
     // ── CSRF ──
 
     @Test @DisplayName("write without CSRF returns 403")
-    @WithMockUser(username = "sa", roles = {"SCHOOL_ADMIN"})
     void writeWithoutCsrfReturns403() throws Exception {
         mvc.perform(post("/api/v1/school-admin/activities")
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"No CSRF\"}"))
                 .andExpect(status().isForbidden());
@@ -242,5 +367,22 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         activityId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
                 activityId, schoolId, title, executionStatus, "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+    }
+
+    private UUID seedPublishableActivity() {
+        UUID actId = UUID.randomUUID();
+        jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                actId, schoolId, "Ready Activity", "desc", Instant.now(), Instant.now().plusSeconds(86400), "Gym", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+        UUID publishedProjectId = seedPublishedProject();
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id) VALUES (?,?,?)",
+                UUID.randomUUID(), actId, publishedProjectId);
+        return actId;
+    }
+
+    private UUID seedPublishedProject() {
+        UUID projectId = UUID.randomUUID();
+        jdbc.update("INSERT INTO challenge_projects(id,school_id,title,status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?)",
+                projectId, schoolId, "Test Project", "PUBLISHED", userId, Instant.now(), Instant.now(), 1);
+        return projectId;
     }
 }

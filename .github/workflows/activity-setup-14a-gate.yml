@@ -14,6 +14,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  banned-patterns:
+    name: Forbidden Pattern Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Check for skipped, disabled, or placeholder tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          BANNED=$(grep -rn -E '@Disabled|assertThat\(true\)|expect\(true\)\.toBe\(true\)|\.skip\(|\.todo\(|describe\.only\(|it\.only\(|test\.only\(|it\.skip\(|test\.skip\(|describe\.skip\(' \
+            src/test frontend/src --include='*.java' --include='*.ts' --include='*.vue' 2>/dev/null || true)
+          if [ -n "$BANNED" ]; then
+            echo "Forbidden skipped or placeholder patterns found:"
+            echo "$BANNED"
+            exit 1
+          fi
+          echo "No banned patterns found."
+
   frontend:
     name: Frontend Lint, Type-check, Tests & Build
     runs-on: ubuntu-latest
@@ -96,7 +118,7 @@ jobs:
     name: Maven Clean Verify
     needs: backend-targeted
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     services:
       postgres:
@@ -150,18 +172,24 @@ jobs:
 
   gate:
     name: Gate
-    needs: [frontend, backend-targeted, backend-full]
+    needs: [banned-patterns, frontend, backend-targeted, backend-full]
     runs-on: ubuntu-latest
     if: always()
     timeout-minutes: 2
 
     steps:
       - name: Verify all jobs passed
+        shell: bash
         run: |
+          echo "Banned Patterns: ${{ needs.banned-patterns.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
           echo "Backend Targeted: ${{ needs.backend-targeted.result }}"
           echo "Backend Full: ${{ needs.backend-full.result }}"
 
+          if [ "${{ needs.banned-patterns.result }}" != "success" ]; then
+            echo "BANNED PATTERNS GATE FAILED"
+            exit 1
+          fi
           if [ "${{ needs.frontend.result }}" != "success" ]; then
             echo "FRONTEND GATE FAILED"
             exit 1
