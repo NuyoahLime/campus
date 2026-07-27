@@ -63,7 +63,7 @@ public class SchoolAdminActivityController {
         var result = queryService.listBySchool(schoolId, executionStatus, publicStatus, keyword, page, size);
         var items = result.items().stream()
                 .map(r -> new ActivityListItem(r.id(), r.schoolId(), r.title(),
-                        r.startTime(), r.endTime(), r.location(), r.executionStatus(), null))
+                        r.startTime(), r.endTime(), r.location(), r.executionStatus(), r.publicStatus()))
                 .toList();
         return ResponseEntity.ok(PageResponse.of(items, result.page(), result.size(), result.totalElements()));
     }

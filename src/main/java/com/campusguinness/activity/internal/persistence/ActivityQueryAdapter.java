@@ -109,6 +109,7 @@ class ActivityQueryAdapter implements ActivityQueryPort {
 
     private ActivityListResult toResult(ActivityEntity e) {
         return new ActivityListResult(e.getId(), e.getSchoolId(), e.getTitle(),
-                e.getStartTime(), e.getEndTime(), e.getLocation(), e.getExecutionStatus());
+                e.getStartTime(), e.getEndTime(), e.getLocation(), e.getExecutionStatus(),
+                e.getPublicStatus());
     }
 }

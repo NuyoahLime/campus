@@ -103,7 +103,9 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['SCHOOL_ADMIN'] },
       children: [
         { path: '', name: 'school-admin-home', component: () => import('@/views/workbench/SchoolAdminHomeView.vue') },
-        { path: 'activities', name: 'school-admin-activities', component: () => import('@/views/NotImplementedView.vue') },
+        { path: 'activities', name: 'school-admin-activities', component: () => import('@/views/workbench/SchoolAdminActivityList.vue') },
+        { path: 'activities/new', name: 'school-admin-activity-create', component: () => import('@/views/workbench/SchoolAdminActivityCreate.vue') },
+        { path: 'activities/:activityId', name: 'school-admin-activity-detail', component: () => import('@/views/workbench/SchoolAdminActivityDetail.vue') },
         { path: 'participants', name: 'school-admin-participants', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'projects', name: 'school-admin-projects', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'teachers', name: 'school-admin-teachers', component: () => import('@/views/NotImplementedView.vue') },

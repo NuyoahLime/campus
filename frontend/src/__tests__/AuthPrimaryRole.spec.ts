@@ -8,8 +8,8 @@ describe('AuthPrimaryRole', () => {
   });
 
   it('roles array cannot bypass primaryRole', () => {
-    const primaryRole = 'STUDENT';
-    const adminRequiredRole = 'SUPER_ADMIN';
+    const primaryRole = 'STUDENT' as string;
+    const adminRequiredRole = 'SUPER_ADMIN' as string;
     const canAccessAdmin = primaryRole === adminRequiredRole;
     expect(canAccessAdmin).toBe(false);
   });
