@@ -1,6 +1,7 @@
 package com.campusguinness.identity.internal.persistence;
 
 import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,8 +15,12 @@ import java.util.UUID;
 class SchoolMembershipQueryAdapter implements SchoolMembershipQueryPort {
 
     private final SchoolMembershipJpaRepository jpa;
+    private final JdbcTemplate jdbc;
 
-    SchoolMembershipQueryAdapter(SchoolMembershipJpaRepository jpa) { this.jpa = jpa; }
+    SchoolMembershipQueryAdapter(SchoolMembershipJpaRepository jpa, JdbcTemplate jdbc) {
+        this.jpa = jpa;
+        this.jdbc = jdbc;
+    }
 
     @Override
     public boolean hasActiveTeacherMembership(UUID userId, UUID schoolId) {
@@ -65,5 +70,12 @@ class SchoolMembershipQueryAdapter implements SchoolMembershipQueryPort {
         return jpa.findAllById(membershipIds).stream()
                 .collect(java.util.stream.Collectors.toMap(
                         SchoolMembershipEntity::getId, SchoolMembershipEntity::getUserId));
+    }
+
+    @Override
+    public boolean hasNormalAccountStatus(UUID userId) {
+        var rows = jdbc.queryForList(
+                "SELECT account_status FROM users WHERE id = ?", String.class, userId);
+        return !rows.isEmpty() && "NORMAL".equals(rows.getFirst());
     }
 }
