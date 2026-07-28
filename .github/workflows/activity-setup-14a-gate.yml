@@ -65,6 +65,8 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
+      - name: Prepare frontend reports
+        run: mkdir -p vitest-results
       - name: Run tests
         run: npm run test -- --run
         env:
@@ -122,7 +124,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: campus
           POSTGRES_PASSWORD: campus
