@@ -88,7 +88,17 @@ describe('SchoolAdminActivityList', () => {
     const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
     const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-    expect(router.currentRoute.value.query.executionStatus).toBeUndefined();
+    // Change executionStatus filter
+    const statusSelect = wrapper.find('.filter .el-select__wrapper');
+    expect(statusSelect.exists()).toBe(true);
+    await statusSelect.trigger('click');
+    await flushPromises();
+    const draftOption = wrapper.find('.el-select-dropdown__item');
+    if (draftOption.exists()) {
+      await draftOption.trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
+    }
     wrapper.unmount();
   });
 

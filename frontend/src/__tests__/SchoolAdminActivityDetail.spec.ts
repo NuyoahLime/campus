@@ -159,9 +159,16 @@ describe('SchoolAdminActivityDetail', () => {
     await flushPromises();
     await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
     await flushPromises();
-    const selectText = wrapper.find('.el-select').text();
-    expect(selectText).not.toContain('Already Added');
-    expect(selectText).toContain('Available');
+    // Open the select dropdown to see real options
+    const selectTrigger = wrapper.find('.el-select__wrapper');
+    expect(selectTrigger.exists()).toBe(true);
+    await selectTrigger.trigger('click');
+    await flushPromises();
+    // Collect visible option texts
+    const options = wrapper.findAll('.el-select-dropdown__item');
+    const optionTexts = options.map(o => o.text());
+    expect(optionTexts).toContain('Available');
+    expect(optionTexts).not.toContain('Already Added');
     wrapper.unmount();
   });
 
@@ -202,7 +209,12 @@ describe('SchoolAdminActivityDetail', () => {
     // Click real "添加项目" button
     await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
     await flushPromises();
-    // Select the project via hidden select option click
+    // Open the select dropdown
+    const selectTrigger = wrapper.find('.el-select__wrapper');
+    expect(selectTrigger.exists()).toBe(true);
+    await selectTrigger.trigger('click');
+    await flushPromises();
+    // Click the project option in the dropdown
     const option = wrapper.find('.el-select-dropdown__item');
     expect(option.exists()).toBe(true);
     await option.trigger('click');
@@ -228,6 +240,10 @@ describe('SchoolAdminActivityDetail', () => {
     const wrapper = mountDetail();
     await flushPromises();
     await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
+    await flushPromises();
+    const selectTrigger = wrapper.find('.el-select__wrapper');
+    expect(selectTrigger.exists()).toBe(true);
+    await selectTrigger.trigger('click');
     await flushPromises();
     const option = wrapper.find('.el-select-dropdown__item');
     expect(option.exists()).toBe(true);
