@@ -6,6 +6,7 @@ import com.campusguinness.infrastructure.security.PrimaryIdentityResolver.Resolv
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.io.Serial;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -20,6 +21,9 @@ import java.util.UUID;
  * Password comparison is delegated to {@link org.springframework.security.crypto.password.PasswordEncoder}.
  */
 public final class CampusGuinnessUserDetails implements UserDetails {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private final UUID userId;
     private final String loginName;

@@ -44,6 +44,9 @@ public class PrimaryIdentityResolver {
     public record ResolvedIdentity(UUID userId, String primaryRole, UUID primarySchoolId,
             String accountStatus, String errorCode) {
 
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         public ResolvedIdentity(UUID userId, String primaryRole, UUID primarySchoolId, String accountStatus) {
             this(userId, primaryRole, primarySchoolId, accountStatus, null);
         }

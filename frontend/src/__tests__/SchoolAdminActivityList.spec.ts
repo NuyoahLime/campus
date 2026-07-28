@@ -86,22 +86,26 @@ describe('SchoolAdminActivityList', () => {
   it('listWritesFiltersToRoute', async () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
     const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
-    const wrapper = mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus], stubs: { teleport: true } },
-    });
-    await flushPromises();
-    const statusSelect = wrapper.find('.filter .el-select__wrapper');
-    expect(statusSelect.exists()).toBe(true);
-    await statusSelect.trigger('click');
-    await flushPromises();
-    const options = wrapper.findAll('.el-select-dropdown__item');
-    expect(options.length).toBeGreaterThan(0);
-    const draftOption = options.find(o => o.text() === '草稿');
-    expect(draftOption).toBeDefined();
-    await draftOption!.trigger('click');
-    await flushPromises();
-    expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
-    wrapper.unmount();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const wrapper = mount(SchoolAdminActivityList, { attachTo: host, global: { plugins: [router, createPinia(), ElementPlus] } });
+    try {
+      await flushPromises();
+      const statusSelect = wrapper.find('.filter .el-select__wrapper');
+      expect(statusSelect.exists()).toBe(true);
+      await statusSelect.trigger('click');
+      await flushPromises();
+      const options = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
+      expect(options.length).toBeGreaterThan(0);
+      const draftOption = options.find(o => o.textContent?.trim() === '草稿');
+      expect(draftOption).toBeDefined();
+      draftOption!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
   });
 
   it('listPaginationUsesZeroBasedApiPage', async () => {
