@@ -231,4 +231,99 @@ class ActivityManagementServiceTest {
                     .hasMessageContaining("DRAFT");
         }
     }
+
+    @Nested class ResponsibleTeacher {
+        private final UUID apId = UUID.randomUUID();
+        private final UUID teacherUserId = UUID.randomUUID();
+        private final UUID membershipId = UUID.randomUUID();
+
+        @Test void assignUsesAssignableMembership() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(membershipPort.findAssignableTeacherMembershipId(teacherUserId, a.schoolId()))
+                    .thenReturn(Optional.of(membershipId));
+            when(teacherPort.exists(apId, membershipId)).thenReturn(false);
+            when(teacherPort.assign(apId, membershipId, teacherUserId))
+                    .thenReturn(new ResponsibleTeacherPort.TeacherRecord(UUID.randomUUID(), apId, membershipId, teacherUserId, "te", "", "", "ACTIVE", "NORMAL"));
+            var result = svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId);
+            assertThat(result.userId()).isEqualTo(teacherUserId);
+        }
+
+        @Test void assignRejectsCrossSchoolTeacher() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(membershipPort.findAssignableTeacherMembershipId(teacherUserId, a.schoolId()))
+                    .thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test void assignRejectsDuplicate() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(membershipPort.findAssignableTeacherMembershipId(teacherUserId, a.schoolId()))
+                    .thenReturn(Optional.of(membershipId));
+            when(teacherPort.exists(apId, membershipId)).thenReturn(true);
+            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test void assignRejectsTerminalActivity() {
+            var a = draft();
+            a.publish(); a.beginExecution(); a.end();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test void unassignUsesHistoricalAssignment() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(teacherPort.findByActivityProjectAndUserId(apId, teacherUserId))
+                    .thenReturn(Optional.of(new ResponsibleTeacherPort.TeacherRecord(UUID.randomUUID(), apId, UUID.randomUUID(), teacherUserId, "te", "", "", "ENDED", "DISABLED")));
+            svc.unassignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId);
+            verify(teacherPort).unassignById(any());
+        }
+
+        @Test void unassignRejectsTerminalActivity() {
+            var a = draft();
+            a.publish(); a.beginExecution(); a.end();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            assertThatThrownBy(() -> svc.unassignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test void unassignLastTeacherFromPublishedRejected() {
+            var a = draft();
+            a.publish();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(teacherPort.findByActivityProjectAndUserId(apId, teacherUserId))
+                    .thenReturn(Optional.of(new ResponsibleTeacherPort.TeacherRecord(UUID.randomUUID(), apId, UUID.randomUUID(), teacherUserId, "te", "", "", "ACTIVE", "NORMAL")));
+            when(teacherPort.countAssignableByActivityProjects(any())).thenReturn(Map.of(apId, 1L));
+            assertThatThrownBy(() -> svc.unassignResponsibleTeacher(a.id().value(), UUID.randomUUID(), teacherUserId))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("last assignable teacher");
+        }
+
+        @Test void removeProjectDeletesTeachersBeforeProject() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            svc.removeProject(a.id().value(), UUID.randomUUID());
+            var inOrder = org.mockito.Mockito.inOrder(teacherPort, projectPort);
+            inOrder.verify(teacherPort).deleteAllByActivityProject(apId);
+            inOrder.verify(projectPort).remove(any(), any());
+        }
+    }
 }
