@@ -18,7 +18,7 @@ public record AuthenticationAccount(
         String platformRole,
         List<SchoolMembershipRecord> memberships
 ) {
-    public record SchoolMembershipRecord(UUID schoolId, String roleInSchool) {
+    public record SchoolMembershipRecord(UUID schoolId, String roleInSchool) implements java.io.Serializable {
         @java.io.Serial
         private static final long serialVersionUID = 1L;
     }

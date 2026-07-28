@@ -42,7 +42,7 @@ public class PrimaryIdentityResolver {
     }
 
     public record ResolvedIdentity(UUID userId, String primaryRole, UUID primarySchoolId,
-            String accountStatus, String errorCode) {
+            String accountStatus, String errorCode) implements java.io.Serializable {
 
         @java.io.Serial
         private static final long serialVersionUID = 1L;
