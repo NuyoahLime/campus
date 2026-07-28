@@ -105,6 +105,7 @@ describe('SchoolAdminActivityList', () => {
     } finally {
       wrapper.unmount();
       host.remove();
+      document.body.querySelectorAll('.el-popper-container').forEach(el => el.remove());
     }
   });
 
