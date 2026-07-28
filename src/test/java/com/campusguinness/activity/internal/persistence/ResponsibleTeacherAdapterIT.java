@@ -5,6 +5,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,8 @@ class ResponsibleTeacherAdapterIT extends PostgreSqlIntegrationTestSupport {
     UUID schoolId, userId, teacher1Id, teacher2Id;
     UUID membership1, membership2, projectId, ruleVersionId, actId, apId;
     final List<UUID> createdAssignmentIds = new ArrayList<>();
+
+    private static Timestamp ts(Instant value) { return value == null ? null : Timestamp.from(value); }
 
     @BeforeEach void setUp() {
         schoolId = UUID.randomUUID(); userId = UUID.randomUUID();
@@ -44,8 +47,9 @@ class ResponsibleTeacherAdapterIT extends PostgreSqlIntegrationTestSupport {
         jdbc.update("INSERT INTO project_rule_versions(id,project_id,version_number,score_storage_type,score_indicator_type,comparison_direction,effective_score_rule,created_by) VALUES (?,?,?,?,?,?,?,?)",
                 ruleVersionId, projectId, 1, "INTEGER", "NUMERIC", "HIGHER_BETTER", "BEST", userId);
 
+        var now = Instant.now();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
-                actId, schoolId, "t", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                actId, schoolId, "t", "DRAFT", "NOT_SUBMITTED", userId, ts(now), ts(now), 1);
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
                 apId, actId, projectId, ruleVersionId);
     }
