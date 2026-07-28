@@ -54,7 +54,7 @@ jobs:
       - name: Upload frontend reports
         if: always()
         uses: actions/upload-artifact@v5
-        with: { name: frontend-reports, path: frontend/vitest-results/, retention-days: 7 }
+        with: { name: frontend-reports, path: frontend/vitest-results/, if-no-files-found: error, retention-days: 7 }
       - name: Build
         run: npm run build
         env: { NODE_OPTIONS: '--max-old-space-size=4096' }
