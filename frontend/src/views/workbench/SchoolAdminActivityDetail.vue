@@ -98,7 +98,7 @@ const availableProjects = computed(() => {
   return projects.value.filter(p => !addedIds.has(p.projectId));
 });
 
-async function load() { if (!isValidId.value) return; loading.value=true;error.value=null;try{const d=await fetchActivity(id); (d as any).projects.forEach((p:any)=>{p._teachers=(d as any).responsibleTeachers.filter((t:any)=>t.activityProjectId===p.id);}); detail.value=d; }catch(err:unknown){error.value=err instanceof ApiError?err.message:'加载失败'}finally{loading.value=false} }
+async function load() { if (!isValidId.value) return; loading.value=true;error.value=null;try{const loaded=await fetchActivity(id); loaded.projects.forEach(p=>{p._teachers=loaded.responsibleTeachers.filter(t=>t.activityProjectId===p.id);}); detail.value=loaded; }catch(err:unknown){error.value=err instanceof ApiError?err.message:'加载失败'}finally{loading.value=false} }
 async function loadProjects() { if (projLoading.value) return; projLoading.value=true;projErr.value=null;try{const r=await fetchAvailableProjects();projects.value=r.items}catch(err:unknown){projErr.value=err instanceof ApiError?err.message:'加载项目列表失败'}finally{projLoading.value=false} }
 
 function openEdit() { if(!detail.value)return;eForm.title=detail.value.title||'';eForm.description=detail.value.description||'';eForm.startTime=instantToLocalDateTime(detail.value.startTime);eForm.endTime=instantToLocalDateTime(detail.value.endTime);eForm.location=detail.value.location||'';showEdit.value=true; }
@@ -152,7 +152,7 @@ const teacherKeyword=ref(''); const selectedTeacherId=ref(''); const teacherList
 const allTeachers=ref<import('@/types/school-admin-activity').SchoolTeacherItem[]>([]); const assigningTeacher=ref(false);
 const availableTeachers = computed(() => { const assignedIds = new Set(projectTeachers.value.map(t => t.userId)); return allTeachers.value.filter(t => !assignedIds.has(t.userId)); });
 const unassigningTeacherId=ref<string|null>(null);
-const publishBlocked = computed(() => detail.value && detail.value.executionStatus==='DRAFT' && detail.value.projects.some((p:any) => !p._teachers || !p._teachers.some((t:any)=>t.membershipStatus==='ACTIVE' && t.accountStatus==='NORMAL')));
+const publishBlocked = computed(() => detail.value && detail.value.executionStatus==='DRAFT' && detail.value.projects.some(p => !p._teachers || !p._teachers.some((t:any)=>t.membershipStatus==='ACTIVE' && t.accountStatus==='NORMAL')));
 
 async function loadTeacherData() { teacherLoading.value=true; teacherErr.value=null; try { const [teachers, all] = await Promise.all([fetchResponsibleTeachers(id, manageProjectId.value), fetchSchoolTeachers()]); projectTeachers.value=teachers; allTeachers.value=all.items; selectedTeacherId.value=''; } catch(err:unknown) { teacherErr.value = err instanceof ApiError ? err.message : '加载失败'; } finally { teacherLoading.value=false; } }
 async function searchTeachers() { teacherListLoading.value=true;try{const r=await fetchSchoolTeachers(teacherKeyword.value);allTeachers.value=r.items;}catch(err:unknown){teacherErr.value=err instanceof ApiError?err.message:'搜索失败';teacherListLoading.value=false;}finally{if(teacherListLoading.value)teacherListLoading.value=false;} }

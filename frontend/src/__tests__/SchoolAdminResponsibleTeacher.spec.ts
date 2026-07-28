@@ -7,6 +7,7 @@ import { ElMessageBox } from 'element-plus';
 import SchoolAdminActivityDetail from '@/views/workbench/SchoolAdminActivityDetail.vue';
 import * as api from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
+import type { SchoolAdminActivityDetail, ResponsibleTeacherItem, ActivityMutationResponse } from '@/types/school-admin-activity';
 
 const ACTIVITY_ID = '11111111-1111-4111-8111-111111111111';
 const PROJECT_ID = '22222222-2222-4222-8222-222222222222';
@@ -20,9 +21,17 @@ function makeRouter() {
   ]});
 }
 
-function draftDetail(overrides: any = {}) {
+function makeTeacher(userId: string, overrides: Partial<ResponsibleTeacherItem> = {}): ResponsibleTeacherItem {
+  return { id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL', ...overrides };
+}
+
+function draftDetail(overrides: Partial<SchoolAdminActivityDetail> = {}): SchoolAdminActivityDetail {
   return {
-    activityId: ACTIVITY_ID, schoolId: 'aaa', title: 'T', description: '', startTime: '2026-09-01T00:00:00.000Z', endTime: '2026-09-02T00:00:00.000Z', location: 'R', executionStatus: 'DRAFT', publicStatus: 'NOT_SUBMITTED', createdBy: 'ccc', projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [] }], responsibleTeachers: [], ...overrides,
+    activityId: ACTIVITY_ID, schoolId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', title: 'T', description: '',
+    startTime: '2026-09-01T00:00:00.000Z', endTime: '2026-09-02T00:00:00.000Z', location: 'R',
+    executionStatus: 'DRAFT', publicStatus: 'NOT_SUBMITTED', createdBy: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [] }],
+    responsibleTeachers: [], ...overrides,
   };
 }
 
@@ -149,9 +158,9 @@ describe('SchoolAdminResponsibleTeacher', () => {
   });
 
   it('doubleAssignTeacherOnlyCallsApiOnce', async () => {
-    let resolve: (v: unknown) => void = () => {};
-    const deferred = new Promise(r => { resolve = r; });
-    const assignSpy = vi.spyOn(api, 'assignResponsibleTeacher').mockReturnValue(deferred as Promise<any>);
+    let resolveAssign: (v: ResponsibleTeacherItem) => void = () => undefined;
+    const deferred = new Promise<ResponsibleTeacherItem>(r => { resolveAssign = r; });
+    const assignSpy = vi.spyOn(api, 'assignResponsibleTeacher').mockReturnValue(deferred);
     vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
     vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
     vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: TEACHER_ID, membershipId: 'm1', username: 't', subject: '', title: '' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
@@ -171,16 +180,16 @@ describe('SchoolAdminResponsibleTeacher', () => {
     const btn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
     await btn.trigger('click');
     await btn.trigger('click');
-    resolve({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
+    resolveAssign({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
     await flushPromises();
     expect(assignSpy).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 
   it('doubleUnassignTeacherOnlyCallsApiOnce', async () => {
-    let resolve: (v: void) => void = () => {};
-    const deferred = new Promise<void>(r => { resolve = r; });
-    const unassignSpy = vi.spyOn(api, 'unassignResponsibleTeacher').mockReturnValue(deferred);
+    let resolveUnassign: () => void = () => undefined;
+    const deferredUnassign = new Promise<void>(r => { resolveUnassign = r; });
+    const unassignSpy = vi.spyOn(api, 'unassignResponsibleTeacher').mockReturnValue(deferredUnassign);
     vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail({ responsibleTeachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }], projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }] }] }));
     vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
     vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [], page: 0, size: 50, totalElements: 0, totalPages: 0, hasNext: false });
@@ -192,7 +201,7 @@ describe('SchoolAdminResponsibleTeacher', () => {
     const closeBtn = wrapper.find('.el-tag__close');
     await closeBtn.trigger('click');
     await closeBtn.trigger('click');
-    resolve();
+    resolveUnassign();
     await flushPromises();
     expect(unassignSpy).toHaveBeenCalledTimes(1);
     wrapper.unmount();
