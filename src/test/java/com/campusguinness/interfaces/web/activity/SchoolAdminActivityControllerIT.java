@@ -29,6 +29,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.jayway.jsonpath.JsonPath;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -402,6 +404,23 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isConflict());
     }
 
+    @Test @DisplayName("addProject to IN_PROGRESS activity returns 409")
+    void addProjectToInProgressActivityReturns409() throws Exception {
+        seedActivity("InProgress", "PUBLISHED");
+        jdbc.update("UPDATE activities SET execution_status='IN_PROGRESS' WHERE id=?", activityId);
+        var pf = seedPublishedProject();
+
+        mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/projects")
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":\"" + pf.projectId + "\"}"))
+                .andExpect(status().isConflict());
+
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM activity_projects WHERE activity_id=?", Integer.class, activityId);
+        assertThat(count).isEqualTo(0);
+    }
+
     @Test @DisplayName("removeProject from PUBLISHED activity returns 409")
     void removeProjectFromPublishedActivityReturns409() throws Exception {
         seedActivity("Published", "PUBLISHED");
@@ -415,23 +434,47 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isConflict());
     }
 
+    @Test @DisplayName("removeProject from IN_PROGRESS activity returns 409")
+    void removeProjectFromInProgressActivityReturns409() throws Exception {
+        seedActivity("InProgress", "PUBLISHED");
+        jdbc.update("UPDATE activities SET execution_status='IN_PROGRESS' WHERE id=?", activityId);
+        var pf = seedPublishedProject();
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
+                UUID.randomUUID(), activityId, pf.projectId, pf.ruleVersionId);
+
+        mvc.perform(delete("/api/v1/school-admin/activities/" + activityId + "/projects/" + pf.projectId)
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isConflict());
+
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM activity_projects WHERE activity_id=?", Integer.class, activityId);
+        assertThat(count).isEqualTo(1);
+    }
+
     // ── Full flow: project publish → rule version → activity project ──
 
-    @Test @DisplayName("full flow: SUPER_ADMIN publishes project → SCHOOL_ADMIN adds to activity with real rule version")
+    @Test @DisplayName("full flow: SUPER_ADMIN creates+PUBLISHES project via HTTP → SCHOOL_ADMIN creates activity+adds project via HTTP")
     void fullFlowPublishToActivityProject() throws Exception {
         UUID superAdminId = UUID.randomUUID();
-        UUID projectId = UUID.randomUUID();
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)",
                 superAdminId, "super-" + UUID.randomUUID().toString().substring(0, 6),
                 "$2a$10$hash0000000000000000000000", "NORMAL", "SUPER_ADMIN");
+        var superAuth = authUser(superAdminId, null, "SUPER_ADMIN");
 
+        UUID projectId = null;
         try {
-            // Step 1: SUPER_ADMIN creates and publishes a project
-            var superAuth = authUser(superAdminId, null, "SUPER_ADMIN");
-            jdbc.update("INSERT INTO challenge_projects(id,name,category,score_storage_type,score_indicator_type,comparison_direction,allow_tie,effective_score_rule,project_status) VALUES (?,?,?,?,?,?,?,?,?)",
-                    projectId, "FullFlow Project", "SPEED", "INTEGER", "NUMERIC", "HIGHER_BETTER", true, "BEST", "DRAFT");
+            // Step 1: SUPER_ADMIN creates DRAFT project via HTTP
+            var createResult = mvc.perform(post("/api/v1/challenge-projects")
+                            .with(csrf())
+                            .with(superAuth)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"FullFlow Project\",\"category\":\"SPEED\",\"scoreStorageType\":\"INTEGER\",\"scoreIndicatorType\":\"NUMERIC\",\"comparisonDirection\":\"HIGHER_BETTER\",\"effectiveScoreRule\":\"BEST\",\"allowTie\":true}"))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+            projectId = UUID.fromString(JsonPath.read(createResult.getResponse().getContentAsString(), "$.id"));
             createdProjectIds.add(projectId);
 
+            // Step 2: SUPER_ADMIN publishes project via HTTP
             mvc.perform(post("/api/v1/challenge-projects/" + projectId + "/publish")
                             .with(csrf())
                             .with(superAuth))
@@ -450,11 +493,18 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                     UUID.class, projectId);
             assertThat(currentRv).isNotNull();
 
-            // Step 2: SCHOOL_ADMIN creates DRAFT activity
-            seedActivity("Full Flow Activity", "DRAFT");
+            // Step 3: SCHOOL_ADMIN creates DRAFT activity via HTTP
+            var actResult = mvc.perform(post("/api/v1/school-admin/activities")
+                            .with(csrf())
+                            .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"Full Flow Activity\"}"))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+            UUID actId = UUID.fromString(JsonPath.read(actResult.getResponse().getContentAsString(), "$.activityId"));
 
-            // Step 3: SCHOOL_ADMIN adds the published project
-            mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/projects")
+            // Step 4: SCHOOL_ADMIN adds the published project via HTTP
+            mvc.perform(post("/api/v1/school-admin/activities/" + actId + "/projects")
                             .with(csrf())
                             .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -464,15 +514,17 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
             // Assert activity_projects.rule_version_id equals the project's current rule version
             UUID actualRv = jdbc.queryForObject(
                     "SELECT rule_version_id FROM activity_projects WHERE activity_id=? AND project_id=?",
-                    UUID.class, activityId, projectId);
+                    UUID.class, actId, projectId);
             assertThat(actualRv).isEqualTo(currentRv);
         } finally {
-            jdbc.update("DELETE FROM activity_projects WHERE activity_id IN (SELECT id FROM activities WHERE school_id=?)", schoolId);
-            jdbc.update("DELETE FROM activities WHERE school_id=?", schoolId);
-            jdbc.update("UPDATE challenge_projects SET current_rule_version_id=NULL WHERE id=?", projectId);
-            jdbc.update("DELETE FROM project_rule_versions WHERE project_id=?", projectId);
-            jdbc.update("DELETE FROM challenge_projects WHERE id=?", projectId);
-            createdProjectIds.remove(projectId);
+            if (projectId != null) {
+                jdbc.update("DELETE FROM activity_projects WHERE project_id=?", projectId);
+                jdbc.update("DELETE FROM activities WHERE school_id=?", schoolId);
+                jdbc.update("UPDATE challenge_projects SET current_rule_version_id=NULL WHERE id=?", projectId);
+                jdbc.update("DELETE FROM project_rule_versions WHERE project_id=?", projectId);
+                jdbc.update("DELETE FROM challenge_projects WHERE id=?", projectId);
+                createdProjectIds.remove(projectId);
+            }
             jdbc.update("DELETE FROM users WHERE id=?", superAdminId);
         }
     }
