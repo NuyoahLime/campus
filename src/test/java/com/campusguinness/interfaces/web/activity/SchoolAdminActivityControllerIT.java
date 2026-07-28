@@ -462,6 +462,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         var superAuth = authUser(superAdminId, null, "SUPER_ADMIN");
 
         UUID projectId = null;
+        UUID actId = null;
         try {
             // Step 1: SUPER_ADMIN creates DRAFT project via HTTP
             var createResult = mvc.perform(post("/api/v1/challenge-projects")
@@ -501,7 +502,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                             .content("{\"title\":\"Full Flow Activity\"}"))
                     .andExpect(status().isCreated())
                     .andReturn();
-            UUID actId = UUID.fromString(JsonPath.read(actResult.getResponse().getContentAsString(), "$.activityId"));
+            actId = UUID.fromString(JsonPath.read(actResult.getResponse().getContentAsString(), "$.activityId"));
 
             // Step 4: SCHOOL_ADMIN adds the published project via HTTP
             mvc.perform(post("/api/v1/school-admin/activities/" + actId + "/projects")
@@ -518,8 +519,8 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
             assertThat(actualRv).isEqualTo(currentRv);
         } finally {
             if (projectId != null) {
-                jdbc.update("DELETE FROM activity_projects WHERE project_id=?", projectId);
-                jdbc.update("DELETE FROM activities WHERE school_id=?", schoolId);
+                jdbc.update("DELETE FROM activity_projects WHERE activity_id=?", actId);
+                jdbc.update("DELETE FROM activities WHERE id=?", actId);
                 jdbc.update("UPDATE challenge_projects SET current_rule_version_id=NULL WHERE id=?", projectId);
                 jdbc.update("DELETE FROM project_rule_versions WHERE project_id=?", projectId);
                 jdbc.update("DELETE FROM challenge_projects WHERE id=?", projectId);

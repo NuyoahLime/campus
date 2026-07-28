@@ -40,6 +40,7 @@ function mockPage(items: SchoolAdminActivityItem[], overrides: Partial<PageRespo
 
 beforeEach(() => {
   setActivePinia(createPinia());
+  vi.restoreAllMocks();
 });
 
 describe('SchoolAdminActivityList', () => {
