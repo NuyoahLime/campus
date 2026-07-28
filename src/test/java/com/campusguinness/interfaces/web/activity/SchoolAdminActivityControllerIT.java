@@ -41,6 +41,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     UUID schoolId, userId, otherSchoolId, studentId, teacherId;
     UUID activityId;
+    UUID teacherMembershipId;
     final List<UUID> createdProjectIds = new ArrayList<>();
 
     @BeforeEach void setUp() {
@@ -50,6 +51,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         studentId = UUID.randomUUID();
         teacherId = UUID.randomUUID();
         activityId = UUID.randomUUID();
+        teacherMembershipId = UUID.randomUUID();
 
         jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 schoolId, "My School", "USCC", "MY-01", "INT-MY", "PRIMARY", "Beijing", "addr", "n", "p", "e", "NORMAL");
@@ -68,7 +70,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
                 UUID.randomUUID(), studentId, schoolId, "STUDENT", "ACTIVE");
         jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
-                UUID.randomUUID(), teacherId, schoolId, "TEACHER", "ACTIVE");
+                teacherMembershipId, teacherId, schoolId, "TEACHER", "ACTIVE");
     }
 
     @AfterEach void tearDown() {
@@ -589,10 +591,6 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         var pf = seedPublishedProject();
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
                 apId, actId, pf.projectId, pf.ruleVersionId);
-        // Add a responsible teacher
-        UUID teacherMembershipId = UUID.randomUUID();
-        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
-                teacherMembershipId, userId, schoolId, "TEACHER", "ACTIVE");
         jdbc.update("INSERT INTO responsible_teachers(id,activity_project_id,teacher_membership_id) VALUES (?,?,?)",
                 UUID.randomUUID(), apId, teacherMembershipId);
         return actId;
