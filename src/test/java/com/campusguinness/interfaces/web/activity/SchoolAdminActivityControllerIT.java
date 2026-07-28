@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -138,7 +139,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     void crossSchoolIsolation() throws Exception {
         UUID otherActivityId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
-                otherActivityId, otherSchoolId, "Other Act", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                otherActivityId, otherSchoolId, "Other Act", "DRAFT", "NOT_SUBMITTED", userId, ts(Instant.now()), ts(Instant.now()), 1);
 
         mvc.perform(get("/api/v1/school-admin/activities/" + otherActivityId)
                         .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
@@ -150,7 +151,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         seedActivity("My Activity", "DRAFT");
         UUID otherActId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
-                otherActId, otherSchoolId, "Other Activity", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                otherActId, otherSchoolId, "Other Activity", "DRAFT", "NOT_SUBMITTED", userId, ts(Instant.now()), ts(Instant.now()), 1);
 
         mvc.perform(get("/api/v1/school-admin/activities")
                         .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
@@ -179,7 +180,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         jdbc.update("UPDATE activities SET public_status=? WHERE id=?", "PENDING_PLATFORM_REVIEW", activityId);
         UUID a2 = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
-                a2, schoolId, "Public", "PUBLISHED", "PUBLIC", userId, Instant.now(), Instant.now(), 1);
+                a2, schoolId, "Public", "PUBLISHED", "PUBLIC", userId, ts(Instant.now()), ts(Instant.now()), 1);
 
         mvc.perform(get("/api/v1/school-admin/activities?publicStatus=PUBLIC")
                         .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
@@ -338,7 +339,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         // Activity with project but no responsible_teachers
         UUID actId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                actId, schoolId, "No Teacher", "desc", Instant.now(), Instant.now().plusSeconds(86400), "Gym", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                actId, schoolId, "No Teacher", "desc", ts(Instant.now()), ts(Instant.now().plusSeconds(86400)), "Gym", "DRAFT", "NOT_SUBMITTED", userId, ts(Instant.now()), ts(Instant.now()), 1);
         var pf = seedPublishedProject();
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
                 UUID.randomUUID(), actId, pf.projectId, pf.ruleVersionId);
@@ -562,12 +563,15 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     /** Holds projectId + ruleVersionId for fixture wiring. */
     record ProjectFixture(UUID projectId, UUID ruleVersionId) {}
 
+    private static Timestamp ts(Instant value) { return value == null ? null : Timestamp.from(value); }
+
     // ── helpers ──
 
     private void seedActivity(String title, String executionStatus) {
         activityId = UUID.randomUUID();
+        var now = Instant.now();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
-                activityId, schoolId, title, executionStatus, "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                activityId, schoolId, title, executionStatus, "NOT_SUBMITTED", userId, ts(now), ts(now), 1);
     }
 
     /** Complete activity with title, time range, location — but no project. */
@@ -575,8 +579,8 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         UUID actId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 actId, schoolId, "Complete Without Project", "desc",
-                Instant.now(), Instant.now().plusSeconds(86400), "Gym",
-                "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                ts(Instant.now()), ts(Instant.now().plusSeconds(86400)), "Gym",
+                "DRAFT", "NOT_SUBMITTED", userId, ts(Instant.now()), ts(Instant.now()), 1);
         return actId;
     }
 
@@ -586,8 +590,8 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         UUID apId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 actId, schoolId, "Ready Activity", "desc",
-                Instant.now(), Instant.now().plusSeconds(86400), "Gym",
-                "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                ts(Instant.now()), ts(Instant.now().plusSeconds(86400)), "Gym",
+                "DRAFT", "NOT_SUBMITTED", userId, ts(Instant.now()), ts(Instant.now()), 1);
         var pf = seedPublishedProject();
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
                 apId, actId, pf.projectId, pf.ruleVersionId);
