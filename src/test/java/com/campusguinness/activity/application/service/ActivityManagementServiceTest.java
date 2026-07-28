@@ -316,14 +316,29 @@ class ActivityManagementServiceTest {
         }
 
         @Test void assignRejectsStudent() {
+            UUID studentId = UUID.randomUUID();
             var a = draft();
             when(repo.findById(any())).thenReturn(Optional.of(a));
             when(projectPort.findByActivityAndProject(any(), any()))
                     .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
-            when(membershipPort.findAssignableTeacherMembershipId(any(), any()))
+            when(membershipPort.findAssignableTeacherMembershipId(studentId, a.schoolId()))
                     .thenReturn(Optional.empty()); // STUDENT won't match TEACHER+NORMAL
-            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), UUID.randomUUID()))
+            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), studentId))
                     .isInstanceOf(IllegalArgumentException.class);
+            verify(teacherPort, never()).assign(any(), any(), any());
+        }
+
+        @Test void assignRejectsAbnormalAccount() {
+            UUID lockedUserId = UUID.randomUUID();
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(membershipPort.findAssignableTeacherMembershipId(lockedUserId, a.schoolId()))
+                    .thenReturn(Optional.empty()); // LOCKED/DISABLED won't match NORMAL
+            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), lockedUserId))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(teacherPort, never()).assign(any(), any(), any());
         }
 
         @Test void removeProjectDeletesTeachersBeforeProject() {

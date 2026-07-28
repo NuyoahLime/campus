@@ -87,6 +87,11 @@ class SchoolTeacherDirectoryQueryAdapterIT extends PostgreSqlIntegrationTestSupp
         assertThat(result.items().stream().map(i -> i.userId())).contains(teacherId);
     }
 
+    @Test void keywordMatchesTitle() {
+        var result = adapter.findActiveTeachers(schoolId, "senior", 0, 20);
+        assertThat(result.items().stream().map(i -> i.userId())).contains(teacherId);
+    }
+
     @Test void paginates() {
         var p0 = adapter.findActiveTeachers(schoolId, null, 0, 1);
         var p1 = adapter.findActiveTeachers(schoolId, null, 1, 1);
