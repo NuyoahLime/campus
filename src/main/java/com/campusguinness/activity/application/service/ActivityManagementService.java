@@ -91,6 +91,16 @@ public class ActivityManagementService {
         var projects = projectPort.findByActivity(act.id().value());
         if (projects.isEmpty())
             throw new IllegalStateException("Cannot publish: at least one project required");
+
+        // Every project must have at least one assignable teacher
+        var projectIds = projects.stream().map(p -> p.id()).toList();
+        var counts = teacherPort.countAssignableByActivityProjects(projectIds);
+        for (var p : projects) {
+            long c = counts.getOrDefault(p.id(), 0L);
+            if (c == 0) {
+                throw new IllegalStateException("Cannot publish: every project must have at least one responsible teacher");
+            }
+        }
     }
 
     public ActivityResult beginExecution(UUID id) {
@@ -193,9 +203,11 @@ public class ActivityManagementService {
         var activity = find(activityId);
         requireDraftForProjectConfiguration(activity);
 
-        if (!projectPort.existsByActivityAndProject(activityId, projectId)) {
-            throw new IllegalArgumentException("Project not found on this activity");
-        }
+        var ap = projectPort.findByActivityAndProject(activityId, projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found on this activity"));
+
+        // Delete teacher assignments first (FK RESTRICT), then the project
+        teacherPort.deleteAllByActivityProject(ap.id());
         projectPort.remove(activityId, projectId);
     }
 
@@ -215,17 +227,12 @@ public class ActivityManagementService {
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
-        if (!membershipPort.hasActiveTeacherMembership(teacherId, activity.schoolId())) {
-            throw new IllegalArgumentException(
-                    "Teacher not found or not an active TEACHER at school " + activity.schoolId());
-        }
-
         UUID membershipId = membershipPort.findActiveTeacherMembershipId(teacherId, activity.schoolId())
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "Teacher not found or not an active TEACHER at school " + activity.schoolId()));
+                        "Teacher must be an active TEACHER at this school with NORMAL account"));
 
         if (teacherPort.exists(ap.id(), membershipId)) {
-            throw new IllegalArgumentException("Teacher already assigned to this project");
+            throw new IllegalStateException("Teacher already assigned to this project");
         }
 
         return teacherPort.assign(ap.id(), membershipId, teacherId);
@@ -237,14 +244,21 @@ public class ActivityManagementService {
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
-        UUID membershipId = membershipPort.findActiveTeacherMembershipId(teacherId, activity.schoolId())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Teacher not found or not an active TEACHER at school " + activity.schoolId()));
+        var assignment = teacherPort.findByActivityProjectAndUserId(ap.id(), teacherId)
+                .orElseThrow(() -> new IllegalArgumentException("Teacher not assigned to this project"));
 
-        if (!teacherPort.exists(ap.id(), membershipId)) {
-            throw new IllegalArgumentException("Teacher not assigned to this project");
+        // For PUBLISHED/IN_PROGRESS: cannot remove the last assignable teacher
+        if (activity.executionStatus() == ExecutionStatus.PUBLISHED
+                || activity.executionStatus() == ExecutionStatus.IN_PROGRESS) {
+            var counts = teacherPort.countAssignableByActivityProjects(List.of(ap.id()));
+            long currentAssignable = counts.getOrDefault(ap.id(), 0L);
+            if (currentAssignable <= 1 && "ACTIVE".equals(assignment.membershipStatus())
+                    && "NORMAL".equals(assignment.accountStatus())) {
+                throw new IllegalStateException("Cannot remove the last assignable teacher from a published project");
+            }
         }
-        teacherPort.unassign(ap.id(), membershipId);
+
+        teacherPort.unassignById(assignment.id());
     }
 
     // ── Queries ──

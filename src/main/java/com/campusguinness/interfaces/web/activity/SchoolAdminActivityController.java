@@ -78,7 +78,7 @@ public class SchoolAdminActivityController {
                 .toList();
         var teachers = projects.stream()
                 .flatMap(p -> service.listResponsibleTeachers(activityId, p.projectId()).stream()
-                        .map(t -> new ResponsibleTeacherResponse(t.activityProjectId(), t.userId())))
+                        .map(t -> new ResponsibleTeacherResponse(t.id(), t.activityProjectId(), t.teacherMembershipId(), t.userId(), t.username(), t.subject(), t.title(), t.membershipStatus(), t.accountStatus())))
                 .toList();
 
         return ResponseEntity.ok(new ActivityDetailResponse(
@@ -192,7 +192,7 @@ public class SchoolAdminActivityController {
                                                                      @PathVariable UUID projectId) {
         requireOwnSchool(service.findById(activityId).schoolId());
         return service.listResponsibleTeachers(activityId, projectId).stream()
-                .map(r -> new ResponsibleTeacherResponse(r.activityProjectId(), r.userId()))
+                .map(r -> new ResponsibleTeacherResponse(r.id(), r.activityProjectId(), r.teacherMembershipId(), r.userId(), r.username(), r.subject(), r.title(), r.membershipStatus(), r.accountStatus()))
                 .toList();
     }
 
@@ -203,7 +203,7 @@ public class SchoolAdminActivityController {
             @RequestBody AssignResponsibleTeacherRequest req) {
         requireOwnSchool(service.findById(activityId).schoolId());
         var r = service.assignResponsibleTeacher(activityId, projectId, req.teacherId());
-        return ResponseEntity.ok(new ResponsibleTeacherResponse(r.activityProjectId(), r.userId()));
+        return ResponseEntity.ok(new ResponsibleTeacherResponse(r.id(), r.activityProjectId(), r.teacherMembershipId(), r.userId(), r.username(), r.subject(), r.title(), r.membershipStatus(), r.accountStatus()));
     }
 
     @DeleteMapping("/{activityId}/projects/{projectId}/responsible-teachers/{teacherId}")
