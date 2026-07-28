@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
@@ -35,6 +35,10 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.restoreAllMocks();
   vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+});
+
+afterEach(() => {
+  document.body.querySelectorAll('.el-popper-container').forEach(el => el.remove());
 });
 
 describe('SchoolAdminResponsibleTeacher', () => {
