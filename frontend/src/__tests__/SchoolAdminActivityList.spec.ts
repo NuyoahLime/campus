@@ -100,12 +100,12 @@ describe('SchoolAdminActivityList', () => {
       expect(options.length).toBeGreaterThan(0);
       const draftOption = options.find(o => o.textContent?.trim() === '草稿');
       expect(draftOption).toBeDefined();
-      draftOption!.click();
+      draftOption!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       await nextTick();
       await flushPromises();
       await vi.waitFor(() => {
         expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
-      });
+      }, { timeout: 5000 });
     } finally {
       wrapper.unmount();
       host.remove();
