@@ -1,6 +1,9 @@
 package com.campusguinness.activity.internal.persistence;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -11,6 +14,7 @@ public class ActivityProjectEntity {
     @Column(name = "activity_id", nullable = false) private UUID activityId;
     @Column(name = "project_id", nullable = false) private UUID projectId;
     @Column(name = "rule_version_id", nullable = false) private UUID ruleVersionId;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config", columnDefinition = "jsonb") private String config;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     protected ActivityProjectEntity() {}
