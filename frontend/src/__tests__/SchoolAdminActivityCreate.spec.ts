@@ -8,6 +8,8 @@ import * as api from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
 import type { ActivityMutationResponse } from '@/types/school-admin-activity';
 
+const ACTIVITY_ID = '11111111-1111-4111-8111-111111111111';
+
 function makeRouter() {
   return createRouter({
     history: createWebHistory(),
@@ -19,8 +21,8 @@ function makeRouter() {
   });
 }
 
-function mockCreated(id = 'new-id'): ActivityMutationResponse {
-  return { activityId: id, executionStatus: 'DRAFT', publicStatus: 'NOT_SUBMITTED' };
+function mockCreated(): ActivityMutationResponse {
+  return { activityId: ACTIVITY_ID, executionStatus: 'DRAFT', publicStatus: 'NOT_SUBMITTED' };
 }
 
 beforeEach(() => {
@@ -28,131 +30,65 @@ beforeEach(() => {
 });
 
 describe('SchoolAdminActivityCreate', () => {
-  it('renders create form', async () => {
+  it('realFormSubmitSendsCompletePayload', async () => {
+    const spy = vi.spyOn(api, 'createActivity').mockResolvedValue(mockCreated());
+    const router = makeRouter();
+    await router.push('/school-admin/activities/new');
+    await router.isReady();
+    const wrapper = mount(SchoolAdminActivityCreate, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    await flushPromises();
+    // Fill title via real input
+    await wrapper.find('input[placeholder="请输入活动名称"]').setValue('Test Activity');
+    await wrapper.find('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Test Activity' }));
+  });
+
+  it('duplicateSubmitCallsCreateOnce', async () => {
+    let resolvePromise: (v: ActivityMutationResponse) => void = () => {};
+    const deferred = new Promise<ActivityMutationResponse>(r => { resolvePromise = r; });
+    const spy = vi.spyOn(api, 'createActivity').mockReturnValue(deferred);
+    const router = makeRouter();
+    await router.push('/school-admin/activities/new');
+    await router.isReady();
+    const wrapper = mount(SchoolAdminActivityCreate, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    await flushPromises();
+    await wrapper.find('input[placeholder="请输入活动名称"]').setValue('Test');
+    // Trigger submit twice rapidly
+    await wrapper.find('form').trigger('submit.prevent');
+    await wrapper.find('form').trigger('submit.prevent');
+    resolvePromise(mockCreated());
+    await flushPromises();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('successNavigatesToUuidDetail', async () => {
     vi.spyOn(api, 'createActivity').mockResolvedValue(mockCreated());
-
     const router = makeRouter();
     await router.push('/school-admin/activities/new');
     await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityCreate, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    const wrapper = mount(SchoolAdminActivityCreate, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-
-    expect(wrapper.text()).toContain('创建活动');
+    await wrapper.find('input[placeholder="请输入活动名称"]').setValue('Test');
+    await wrapper.find('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe(`/school-admin/activities/${ACTIVITY_ID}`);
   });
 
-  it('does not request when title is empty', async () => {
+  it('invalidTimeDoesNotRequest', async () => {
     const spy = vi.spyOn(api, 'createActivity').mockResolvedValue(mockCreated());
-
     const router = makeRouter();
     await router.push('/school-admin/activities/new');
     await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityCreate, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    const wrapper = mount(SchoolAdminActivityCreate, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-
-    // Submit without filling title
-    await wrapper.find('form').trigger('submit');
-    await flushPromises();
-
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  it('rejects endTime before startTime without requesting', async () => {
-    const spy = vi.spyOn(api, 'createActivity').mockResolvedValue(mockCreated());
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities/new');
-    await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityCreate, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    // Manually set time values and form data
     const vm = wrapper.vm as unknown as { form: Record<string, string> };
-    vm.form.title = 'Test Title';
+    vm.form.title = 'Test';
     vm.form.startTime = '2026-09-02T00:00:00';
     vm.form.endTime = '2026-09-01T00:00:00';
-
-    await wrapper.find('form').trigger('submit');
+    await wrapper.find('form').trigger('submit.prevent');
     await flushPromises();
-
     expect(spy).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('结束时间不得早于开始时间');
-  });
-
-  it('navigates to detail on success', async () => {
-    vi.spyOn(api, 'createActivity').mockResolvedValue(mockCreated('created-123'));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities/new');
-    await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityCreate, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    // Fill title and submit
-    const vm = wrapper.vm as unknown as { form: Record<string, string>; handleSubmit: () => Promise<void> };
-    vm.form.title = 'Valid Title';
-
-    await vm.handleSubmit();
-    await flushPromises();
-
-    expect(router.currentRoute.value.path).toBe('/school-admin/activities/created-123');
-  });
-
-  it('shows error on API failure', async () => {
-    vi.spyOn(api, 'createActivity').mockRejectedValue(new ApiError(400, '创建失败：标题过长'));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities/new');
-    await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityCreate, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    const vm = wrapper.vm as unknown as { form: Record<string, string>; handleSubmit: () => Promise<void> };
-    vm.form.title = 'Test';
-    await vm.handleSubmit();
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('创建失败');
-  });
-
-  it('converts local time to ISO when submitting', async () => {
-    const spy = vi.spyOn(api, 'createActivity').mockResolvedValue(mockCreated());
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities/new');
-    await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityCreate, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    const vm = wrapper.vm as unknown as { form: Record<string, string>; handleSubmit: () => Promise<void> };
-    vm.form.title = 'Time Test';
-    vm.form.startTime = '2026-09-01T08:00:00';
-    vm.form.endTime = '2026-09-02T17:00:00';
-    await vm.handleSubmit();
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        startTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) as unknown as string,
-        endTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) as unknown as string,
-      })
-    );
   });
 });

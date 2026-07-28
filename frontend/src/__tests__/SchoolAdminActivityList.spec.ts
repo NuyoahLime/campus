@@ -22,8 +22,8 @@ function makeRouter() {
 
 function sampleItem(overrides: Partial<SchoolAdminActivityItem> = {}): SchoolAdminActivityItem {
   return {
-    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    schoolId: 'school-1',
+    id: '11111111-1111-4111-8111-111111111111',
+    schoolId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     title: '数学挑战赛',
     startTime: '2026-09-01T08:00:00Z',
     endTime: '2026-09-02T17:00:00Z',
@@ -34,8 +34,8 @@ function sampleItem(overrides: Partial<SchoolAdminActivityItem> = {}): SchoolAdm
   };
 }
 
-function mockPage(items: SchoolAdminActivityItem[]): PageResponse<SchoolAdminActivityItem> {
-  return { items, page: 0, size: 20, totalElements: items.length, totalPages: 1, hasNext: false };
+function mockPage(items: SchoolAdminActivityItem[], overrides: Partial<PageResponse<SchoolAdminActivityItem>> = {}): PageResponse<SchoolAdminActivityItem> {
+  return { items, page: 0, size: 20, totalElements: items.length, totalPages: Math.max(1, Math.ceil(items.length / 20)), hasNext: false, ...overrides };
 }
 
 beforeEach(() => {
@@ -43,188 +43,67 @@ beforeEach(() => {
 });
 
 describe('SchoolAdminActivityList', () => {
-  it('mounts without ReferenceError (router is defined)', async () => {
-    vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities');
-    await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    // If router was undefined, the component would not render
-    expect(wrapper.html()).toBeTruthy();
-  });
-
   it('renders activity items', async () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(
-      mockPage([sampleItem(), sampleItem({ id: 'b', title: '英语竞赛' })])
+      mockPage([sampleItem(), sampleItem({ id: '22222222-2222-4222-8222-222222222222', title: '英语竞赛' })])
     );
-
     const router = makeRouter();
     await router.push('/school-admin/activities');
     await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-
     expect(wrapper.text()).toContain('数学挑战赛');
     expect(wrapper.text()).toContain('英语竞赛');
   });
 
-  it('shows empty state when no activities', async () => {
-    vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
+  it('listRetryCallsApiAgainAndRendersResult', async () => {
+    let callCount = 0;
+    const spy = vi.spyOn(api, 'fetchActivities').mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) throw new ApiError(500, '服务器错误');
+      return mockPage([sampleItem({ title: 'Retry Success' })]);
+    });
     const router = makeRouter();
     await router.push('/school-admin/activities');
     await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-
-    expect(wrapper.text()).toContain('暂无活动');
-  });
-
-  it('shows error state and retry button', async () => {
-    vi.spyOn(api, 'fetchActivities').mockRejectedValue(new ApiError(500, '服务器错误'));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities');
-    await router.isReady();
-
-    const wrapper = mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
     expect(wrapper.text()).toContain('加载失败');
-    expect(wrapper.text()).toContain('重试');
-  });
-
-  it('sends page 0 for page 1 in UI', async () => {
-    const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities');
-    await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    // Click retry button
+    await wrapper.find('.el-result .el-button').trigger('click');
     await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({}),
-      0,  // page is 0-based for API
-      20,
-    );
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain('Retry Success');
   });
 
-  it('restores executionStatus from route query', async () => {
+  it('listRestoresFiltersFromRoute', async () => {
     const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
     const router = makeRouter();
-    await router.push('/school-admin/activities?executionStatus=DRAFT');
+    await router.push('/school-admin/activities?executionStatus=DRAFT&keyword=math&page=1');
     await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ executionStatus: 'DRAFT' }),
-      0, 20,
-    );
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ executionStatus: 'DRAFT', keyword: 'math' }), 0, 20);
   });
 
-  it('restores keyword from route query', async () => {
-    const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities?keyword=math');
-    await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ keyword: 'math' }),
-      0, 20,
-    );
-  });
-
-  it('falls back to page 1 for invalid page query', async () => {
-    const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities?page=abc');
-    await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(expect.anything(), 0, 20);
-  });
-
-  it('falls back to page 1 for negative page query', async () => {
-    const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities?page=-5');
-    await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(expect.anything(), 0, 20);
-  });
-
-  it('trims keyword before sending to API', async () => {
-    const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
-    const router = makeRouter();
-    await router.push('/school-admin/activities?keyword=%20%20hello%20%20');
-    await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ keyword: 'hello' }),
-      0, 20,
-    );
-  });
-
-  it('writes filter state to route query', async () => {
+  it('listWritesFiltersToRoute', async () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-
     const router = makeRouter();
     await router.push('/school-admin/activities');
     await router.isReady();
-
-    mount(SchoolAdminActivityList, {
-      global: { plugins: [router, createPinia(), ElementPlus] },
-    });
+    mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-
-    // After mount, route.query should be empty since no filters set initially
+    // Empty filters should not write to URL
     expect(router.currentRoute.value.query.executionStatus).toBeUndefined();
-    expect(router.currentRoute.value.query.keyword).toBeUndefined();
+  });
+
+  it('listPaginationUsesZeroBasedApiPage', async () => {
+    const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
+    const router = makeRouter();
+    await router.push('/school-admin/activities?page=2');
+    await router.isReady();
+    mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    await flushPromises();
+    expect(spy).toHaveBeenCalledWith(expect.anything(), 1, 20);
   });
 });

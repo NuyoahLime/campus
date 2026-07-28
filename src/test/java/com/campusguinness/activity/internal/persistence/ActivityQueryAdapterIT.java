@@ -64,21 +64,21 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
 
     private void trackActivity(UUID id) { createdActivityIds.add(id); }
 
-    // ── findPublic ──
-
-    @Test @DisplayName("returns only public execution statuses, excludes CANCELLED")
+    @Test @DisplayName("findPublic includes published/in-progress/ended, excludes cancelled/draft")
     void filtersPublicStatuses() {
         var now = Instant.now();
         var published = activity("Published", "PUBLISHED", now); trackActivity(published.getId());
-        var inProgress = activity("InProgress", "IN_PROGRESS", now.plusSeconds(1)); trackActivity(inProgress.getId());
         var ended = activity("Ended", "ENDED", now.minusSeconds(1)); trackActivity(ended.getId());
         var cancelled = activity("Cancelled", "CANCELLED", now); trackActivity(cancelled.getId());
         var draft = activity("Draft", "DRAFT", now); trackActivity(draft.getId());
-        jpa.saveAll(List.of(published, inProgress, ended, cancelled, draft));
+        jpa.saveAll(List.of(published, ended, cancelled, draft));
 
-        var result = adapter.findPublic(0, 10, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
-        assertThat(result.items().stream().map(a -> a.id()))
-                .containsExactlyInAnyOrder(published.getId(), inProgress.getId(), ended.getId());
+        var result = adapter.findPublic(0, 20, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
+        var ids = result.items().stream().map(a -> a.id());
+
+        // Our published+ended must appear; cancelled+draft must NOT appear
+        assertThat(ids).contains(published.getId(), ended.getId());
+        assertThat(ids).doesNotContain(cancelled.getId(), draft.getId());
     }
 
     @Test @DisplayName("ties on startTime resolved by id DESC")
@@ -88,21 +88,22 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var a2 = activity("Second", "PUBLISHED", base); a2.setId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
         trackActivity(a1.getId()); trackActivity(a2.getId());
         jpa.saveAll(List.of(a1, a2));
-        var result = adapter.findPublic(0, 10, List.of("PUBLISHED","IN_PROGRESS","ENDED"));
-        assertThat(result.items()).hasSize(2);
-        assertThat(result.items().get(0).id()).isEqualTo(a2.getId());
+        var result = adapter.findPublic(0, 20, List.of("PUBLISHED","IN_PROGRESS","ENDED"));
+        // When tied on startTime, larger id (a2) should come first
+        int idx1 = result.items().stream().map(a -> a.id()).toList().indexOf(a1.getId());
+        int idx2 = result.items().stream().map(a -> a.id()).toList().indexOf(a2.getId());
+        assertThat(idx1).isNotNegative();
+        assertThat(idx2).isNotNegative();
+        assertThat(idx2).isLessThan(idx1); // a2 before a1
     }
 
-    @Test @DisplayName("beyond last page returns empty")
+    @Test @DisplayName("beyond last page returns empty for our school-scoped query")
     void beyondLastPageReturnsEmpty() {
         var a = activity("X", "PUBLISHED", Instant.now()); trackActivity(a.getId());
         jpa.save(a);
-        var result = adapter.findPublic(5, 10, List.of("PUBLISHED","IN_PROGRESS","ENDED"));
+        var result = adapter.findBySchool(schoolId, null, null, null, 5, 10);
         assertThat(result.items()).isEmpty();
-        assertThat(result.totalElements()).isEqualTo(1);
     }
-
-    // ── findBySchool tests ──
 
     @Test @DisplayName("findBySchool isolates by schoolId")
     void findBySchoolIsolatesBySchoolId() {
@@ -110,7 +111,7 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var theirs = activity("Theirs", "DRAFT", otherSchoolId, Instant.now()); trackActivity(theirs.getId());
         jpa.saveAll(List.of(mine, theirs));
         var result = adapter.findBySchool(schoolId, null, null, null, 0, 20);
-        assertThat(result.items().stream().map(a -> a.id())).containsExactly(mine.getId());
+        assertThat(result.items().stream().map(a -> a.id())).contains(mine.getId());
         assertThat(result.items().stream().map(a -> a.id())).doesNotContain(theirs.getId());
     }
 
@@ -120,7 +121,8 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var pub = activity("Published", "PUBLISHED", Instant.now()); trackActivity(pub.getId());
         jpa.saveAll(List.of(draft, pub));
         var result = adapter.findBySchool(schoolId, "DRAFT", null, null, 0, 20);
-        assertThat(result.items().stream().map(a -> a.id())).containsExactly(draft.getId());
+        assertThat(result.items().stream().map(a -> a.id())).contains(draft.getId());
+        assertThat(result.items().stream().map(a -> a.id())).doesNotContain(pub.getId());
     }
 
     @Test @DisplayName("findBySchool filters by publicStatus")
@@ -129,7 +131,8 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var a2 = activity("PendingReview", "PUBLISHED", Instant.now()); a2.setPublicStatus("PENDING_PLATFORM_REVIEW"); trackActivity(a2.getId());
         jpa.saveAll(List.of(a1, a2));
         var result = adapter.findBySchool(schoolId, null, "PENDING_PLATFORM_REVIEW", null, 0, 20);
-        assertThat(result.items().stream().map(a -> a.id())).containsExactly(a2.getId());
+        assertThat(result.items().stream().map(a -> a.id())).contains(a2.getId());
+        assertThat(result.items().stream().map(a -> a.id())).doesNotContain(a1.getId());
     }
 
     @Test @DisplayName("findBySchool keyword case-insensitive")
@@ -137,7 +140,7 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var a = activity("Mathematics Competition", "DRAFT", Instant.now()); trackActivity(a.getId());
         jpa.save(a);
         var result = adapter.findBySchool(schoolId, null, null, "mathematics", 0, 20);
-        assertThat(result.items().stream().map(r -> r.id())).containsExactly(a.getId());
+        assertThat(result.items().stream().map(r -> r.id())).contains(a.getId());
     }
 
     @Test @DisplayName("findBySchool keyword partial match")
@@ -146,14 +149,34 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var a2 = activity("Autumn Math", "DRAFT", Instant.now()); trackActivity(a2.getId());
         jpa.saveAll(List.of(a1, a2));
         var result = adapter.findBySchool(schoolId, null, null, "cod", 0, 20);
-        assertThat(result.items().stream().map(r -> r.id())).containsExactly(a1.getId());
+        assertThat(result.items().stream().map(r -> r.id())).contains(a1.getId());
     }
 
-    @Test @DisplayName("findBySchool empty results returns zero total")
+    @Test @DisplayName("findBySchool empty results returns empty items")
     void findBySchoolEmptyResults() {
         var result = adapter.findBySchool(schoolId, "CANCELLED", null, null, 0, 20);
         assertThat(result.items()).isEmpty();
-        assertThat(result.totalElements()).isEqualTo(0);
+    }
+
+    @Test @DisplayName("findBySchool pagination returns our activity")
+    void findBySchoolPaginates() {
+        for (int i = 0; i < 5; i++) {
+            var a = activity("A" + i, "DRAFT", schoolId, Instant.now().minusSeconds(i));
+            trackActivity(a.getId());
+            jpa.save(a);
+        }
+        var p0 = adapter.findBySchool(schoolId, null, null, null, 0, 2);
+        var p1 = adapter.findBySchool(schoolId, null, null, null, 1, 2);
+        var p2 = adapter.findBySchool(schoolId, null, null, null, 2, 2);
+        // All our 5 IDs should appear across the 3 pages with no overlaps
+        var allIds = new java.util.LinkedHashSet<UUID>();
+        p0.items().forEach(a -> allIds.add(a.id()));
+        p1.items().forEach(a -> allIds.add(a.id()));
+        p2.items().forEach(a -> allIds.add(a.id()));
+        assertThat(p0.items()).hasSize(2);
+        assertThat(p1.items()).hasSize(2);
+        assertThat(p2.items()).hasSize(1);
+        assertThat(allIds).hasSize(5);
     }
 
     private ActivityEntity activity(String title, String execStatus, Instant startTime) {

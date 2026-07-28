@@ -45,7 +45,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { fetchActivity, updateActivity, addProject, removeProject, publishActivity, fetchAvailableProjects } from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
 import { executionLabel, publicLabel, execTagType, publicTagType } from '@/utils/activity-status';
@@ -56,7 +55,6 @@ import type { SchoolAdminActivityDetail } from '@/types/school-admin-activity';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const props = defineProps<{ activityId: string }>();
-const router = useRouter();
 const id = props.activityId;
 const isValidId = computed(() => UUID_PATTERN.test(id));
 
@@ -115,11 +113,13 @@ async function handleAddProject() {
 
 async function handleRemoveProject(pid:string) {
   if (removingProjectId.value !== null) return;
-  try { await ElMessageBox.confirm('确认移除？','确认',{type:'warning'}); } catch { return; }
   removingProjectId.value = pid; actionErr.value = null;
-  try { await removeProject(id,pid); await load(); }
-  catch(err:unknown) { actionErr.value = err instanceof ApiError ? err.message : '移除失败'; }
-  finally { removingProjectId.value = null; }
+  try {
+    await ElMessageBox.confirm('确认移除？','确认',{type:'warning'});
+    await removeProject(id,pid); await load();
+  } catch(err:unknown) {
+    if (err !== 'cancel' && err !== 'close') actionErr.value = err instanceof ApiError ? err.message : '移除失败';
+  } finally { removingProjectId.value = null; }
 }
 
 function fmt(iso:string|null) { return iso ? new Date(iso).toLocaleDateString('zh-CN') : '-'; }
