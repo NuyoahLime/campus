@@ -13,7 +13,11 @@ class ActivityRepositoryAdapter implements ActivityRepository {
     ActivityRepositoryAdapter(ActivityJpaRepository r) { this.jpaRepository = r; }
 
     @Override @Transactional
-    public void save(Activity a) { jpaRepository.save(ActivityPersistenceMapper.toEntity(a)); }
+    public void save(Activity a) {
+        jpaRepository.findById(a.id().value()).ifPresentOrElse(
+                existing -> ActivityPersistenceMapper.updateEntity(existing, a),
+                () -> jpaRepository.save(ActivityPersistenceMapper.toEntity(a)));
+    }
 
     @Override @Transactional(readOnly = true)
     public Optional<Activity> findById(ActivityId id) {

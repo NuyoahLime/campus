@@ -28,4 +28,16 @@ final class ActivityPersistenceMapper {
                 .executionStatus(ExecutionStatus.valueOf(e.getExecutionStatus()))
                 .publicStatus(PublicStatus.valueOf(e.getPublicStatus())));
     }
+
+    /** Update mutable fields on managed entity — preserves id, schoolId, createdBy, createdAt, version. */
+    static void updateEntity(ActivityEntity entity, Activity domain) {
+        entity.setTitle(domain.title());
+        entity.setDescription(domain.description());
+        entity.setStartTime(domain.startTime());
+        entity.setEndTime(domain.endTime());
+        entity.setLocation(domain.location());
+        entity.setExecutionStatus(domain.executionStatus().name());
+        entity.setPublicStatus(domain.publicStatus().name());
+        entity.setUpdatedAt(Instant.now());
+    }
 }

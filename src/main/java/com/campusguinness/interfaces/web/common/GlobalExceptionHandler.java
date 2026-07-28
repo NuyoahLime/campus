@@ -71,6 +71,13 @@ public class GlobalExceptionHandler {
                         "Stored data could not be restored safely.", req.getRequestURI()));
     }
 
+    @ExceptionHandler({org.springframework.security.authorization.AuthorizationDeniedException.class,
+            org.springframework.security.access.AccessDeniedException.class})
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(Exception ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorResponse.of("ACCESS_DENIED", ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiErrorResponse> handleDomainConflict(RuntimeException ex, HttpServletRequest req) {
         String msg = ex.getMessage();

@@ -216,7 +216,6 @@ class ActivityManagementServiceTest {
             var a = draft();
             a.publish();
             when(repo.findById(any())).thenReturn(Optional.of(a));
-            when(projectRepo.findById(any())).thenReturn(java.util.Optional.of(pubProject));
             assertThatThrownBy(() -> svc.addProject(a.id().value(), pubProject.id().value()))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("DRAFT");
