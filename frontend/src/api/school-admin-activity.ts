@@ -45,3 +45,26 @@ export async function fetchAvailableProjects(page = 0, size = 100): Promise<Page
   return res.data;
 }
 
+import type { SchoolTeacherItem, ResponsibleTeacherItem } from '@/types/school-admin-activity';
+
+export async function fetchSchoolTeachers(keyword = '', page = 0, size = 50): Promise<PageResponse<SchoolTeacherItem>> {
+  const params: Record<string, string | number> = { page, size };
+  if (keyword.trim()) params.keyword = keyword.trim();
+  const res = await http.get<PageResponse<SchoolTeacherItem>>('/v1/school-admin/teachers', { params });
+  return res.data;
+}
+
+export async function fetchResponsibleTeachers(activityId: string, projectId: string): Promise<ResponsibleTeacherItem[]> {
+  const res = await http.get<ResponsibleTeacherItem[]>(`/v1/school-admin/activities/${activityId}/projects/${projectId}/responsible-teachers`);
+  return res.data;
+}
+
+export async function assignResponsibleTeacher(activityId: string, projectId: string, teacherId: string): Promise<ResponsibleTeacherItem> {
+  const res = await http.post<ResponsibleTeacherItem>(`/v1/school-admin/activities/${activityId}/projects/${projectId}/responsible-teachers`, { teacherId });
+  return res.data;
+}
+
+export async function unassignResponsibleTeacher(activityId: string, projectId: string, teacherId: string): Promise<void> {
+  await http.delete(`/v1/school-admin/activities/${activityId}/projects/${projectId}/responsible-teachers/${teacherId}`);
+}
+

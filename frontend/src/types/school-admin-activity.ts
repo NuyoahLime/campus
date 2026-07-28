@@ -12,7 +12,9 @@ export interface SchoolAdminActivityDetail {
 }
 
 export interface ActivityProjectItem { id: string; activityId: string; projectId: string; }
-export interface ResponsibleTeacherItem { activityProjectId: string; userId: string; }
+export interface ResponsibleTeacherItem { id: string; activityProjectId: string; teacherMembershipId: string; userId: string; username: string; subject: string; title: string; membershipStatus: string; accountStatus: string; }
+
+export interface SchoolTeacherItem { userId: string; membershipId: string; username: string; subject: string; title: string; }
 
 export interface ActivityMutationResponse { activityId: string; executionStatus: string; publicStatus: string; }
 export interface CreateActivityPayload { title: string; description?: string; startTime?: string; endTime?: string; location?: string; }
