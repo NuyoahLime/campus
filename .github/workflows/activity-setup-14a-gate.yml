@@ -85,6 +85,7 @@ jobs:
           path: |
             frontend/vitest-results/
             frontend/coverage/
+          if-no-files-found: error
           retention-days: 7
 
   backend-targeted:
