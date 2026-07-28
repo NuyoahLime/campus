@@ -46,9 +46,15 @@ jobs:
         run: npm run lint
       - name: Type-check
         run: npm run type-check
+      - name: Prepare frontend reports
+        run: mkdir -p vitest-results
       - name: Run tests
         run: npm run test -- --run
         env: { NODE_OPTIONS: '--max-old-space-size=4096' }
+      - name: Upload frontend reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with: { name: frontend-reports, path: frontend/vitest-results/, retention-days: 7 }
       - name: Build
         run: npm run build
         env: { NODE_OPTIONS: '--max-old-space-size=4096' }
@@ -66,6 +72,10 @@ jobs:
       - name: Run targeted tests
         run: mvn --batch-mode --no-transfer-progress -Dtest='*ResponsibleTeacher*,*SchoolTeacherDirectory*,*ActivityManagementService*,*SchoolAdminActivity*,*SchoolMembership*' test
         env: { MAVEN_OPTS: '-Xmx2048m -XX:MaxMetaspaceSize=512m' }
+      - name: Upload targeted backend reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with: { name: backend-targeted-reports, path: target/surefire-reports/, retention-days: 7 }
 
   backend-full:
     name: Maven Clean Verify
@@ -93,6 +103,14 @@ jobs:
           SPRING_DATASOURCE_USERNAME: campus
           SPRING_DATASOURCE_PASSWORD: campus
           SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with: { name: backend-full-surefire, path: target/surefire-reports/, retention-days: 7 }
+      - name: Upload failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with: { name: backend-full-failsafe, path: target/failsafe-reports/, retention-days: 7 }
 
   gate:
     name: Gate
