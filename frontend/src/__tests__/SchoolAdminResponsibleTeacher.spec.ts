@@ -43,6 +43,7 @@ describe('SchoolAdminResponsibleTeacher', () => {
     await wrapper.find('.el-button--small').trigger('click'); // manage teachers
     await flushPromises();
     expect(dirSpy).toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it('assignedTeachersRenderUnderCorrectProject', async () => {
@@ -52,6 +53,20 @@ describe('SchoolAdminResponsibleTeacher', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('teacher1');
     expect(wrapper.text()).toContain('Math');
+    wrapper.unmount();
+  });
+
+  it('assignedTeachersExcludedFromSelector', async () => {
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail({ responsibleTeachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }], projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }] }] }));
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: TEACHER_ID, membershipId: 'm1', username: 'teacher1', subject: 'Math', title: 'Sr' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
+    vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValue([{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }]);
+    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
+    await flushPromises();
+    await wrapper.find('.el-button--small').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('暂无可分配教师');
+    wrapper.unmount();
   });
 
   it('missingTeacherDisablesPublish', async () => {
@@ -61,6 +76,7 @@ describe('SchoolAdminResponsibleTeacher', () => {
     await flushPromises();
     const btn = wrapper.find('.el-button--success');
     expect(btn.attributes('disabled')).toBeDefined();
+    wrapper.unmount();
   });
 
   it('terminalActivityHidesTeacherMutationActions', async () => {
@@ -69,6 +85,7 @@ describe('SchoolAdminResponsibleTeacher', () => {
     const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
     await flushPromises();
     expect(wrapper.text()).not.toContain('管理教师');
+    wrapper.unmount();
   });
 
   it('teacherDirectoryFailureShowsRetry', async () => {
@@ -81,5 +98,6 @@ describe('SchoolAdminResponsibleTeacher', () => {
     await wrapper.find('.el-button--small').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('重新加载');
+    wrapper.unmount();
   });
 });

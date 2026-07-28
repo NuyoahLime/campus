@@ -59,6 +59,7 @@ class SchoolTeacherDirectoryQueryAdapterIT extends PostgreSqlIntegrationTestSupp
     }
 
     @AfterEach void tearDown() {
+        jdbc.update("DELETE FROM teacher_profiles WHERE membership_id IN (" + String.join(",", createdMembershipIds.stream().map(id -> "'" + id + "'").toArray(String[]::new)) + ")");
         for (UUID mid : createdMembershipIds) { jdbc.update("DELETE FROM school_memberships WHERE id=?", mid); }
         for (UUID uid : createdUserIds) { jdbc.update("DELETE FROM users WHERE id=?", uid); }
         for (UUID sid : createdSchoolIds) { jdbc.update("DELETE FROM schools WHERE id=?", sid); }
