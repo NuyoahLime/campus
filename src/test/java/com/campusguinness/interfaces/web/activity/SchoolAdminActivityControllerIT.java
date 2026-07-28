@@ -72,7 +72,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @AfterEach void tearDown() {
-        // FK-safe deletion order: activity_projects → project_rule_versions → challenge_projects → activities → identities
+        jdbc.update("DELETE FROM responsible_teachers WHERE activity_project_id IN (SELECT id FROM activity_projects WHERE activity_id IN (SELECT id FROM activities WHERE school_id IN (?,?)))", schoolId, otherSchoolId);
         jdbc.update("DELETE FROM activity_projects WHERE activity_id IN (SELECT id FROM activities WHERE school_id IN (?,?))", schoolId, otherSchoolId);
         jdbc.update("DELETE FROM activities WHERE school_id IN (?,?)", schoolId, otherSchoolId);
         for (UUID pid : createdProjectIds) {
@@ -331,6 +331,22 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isConflict());
     }
 
+    @Test @DisplayName("publish without responsible teacher returns 409")
+    void publishWithoutResponsibleTeacherReturns409() throws Exception {
+        // Activity with project but no responsible_teachers
+        UUID actId = UUID.randomUUID();
+        jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                actId, schoolId, "No Teacher", "desc", Instant.now(), Instant.now().plusSeconds(86400), "Gym", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+        var pf = seedPublishedProject();
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
+                UUID.randomUUID(), actId, pf.projectId, pf.ruleVersionId);
+
+        mvc.perform(post("/api/v1/school-admin/activities/" + actId + "/publish")
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
+                .andExpect(status().isConflict());
+    }
+
     // ── Projects ──
 
     @Test @DisplayName("add PUBLISHED project succeeds and persists correct rule_version_id")
@@ -562,16 +578,23 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         return actId;
     }
 
-    /** Complete activity with title, time range, location, and one PUBLISHED project with rule version. */
+    /** Complete activity with title, time range, location, one PUBLISHED project, and one responsible teacher. */
     private UUID seedPublishableActivity() {
         UUID actId = UUID.randomUUID();
+        UUID apId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 actId, schoolId, "Ready Activity", "desc",
                 Instant.now(), Instant.now().plusSeconds(86400), "Gym",
                 "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
         var pf = seedPublishedProject();
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
-                UUID.randomUUID(), actId, pf.projectId, pf.ruleVersionId);
+                apId, actId, pf.projectId, pf.ruleVersionId);
+        // Add a responsible teacher
+        UUID teacherMembershipId = UUID.randomUUID();
+        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)",
+                teacherMembershipId, userId, schoolId, "TEACHER", "ACTIVE");
+        jdbc.update("INSERT INTO responsible_teachers(id,activity_project_id,teacher_membership_id) VALUES (?,?,?)",
+                UUID.randomUUID(), apId, teacherMembershipId);
         return actId;
     }
 

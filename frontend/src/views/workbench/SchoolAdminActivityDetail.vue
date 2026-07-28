@@ -48,7 +48,7 @@
         <template v-else>
           <div style="margin-bottom:12px"><strong>已分配教师</strong></div>
           <div v-if="projectTeachers.length===0" style="color:#c0c4cc;margin-bottom:16px">未分配负责教师</div>
-          <el-tag v-for="t in projectTeachers" :key="t.id" closable style="margin:0 4px 4px 0" @close="handleUnassignTeacher(t.userId)">{{ t.username }}{{ t.subject?' ('+t.subject+')':'' }}</el-tag>
+          <el-tag v-for="t in projectTeachers" :key="t.id" :closable="unassigningTeacherId===null" style="margin:0 4px 4px 0" @close="handleUnassignTeacher(t.userId)">{{ t.username }}{{ t.subject?' ('+t.subject+')':'' }}{{ t.title?' - '+t.title:'' }}</el-tag>
           <el-divider />
           <div style="margin-bottom:8px"><strong>添加教师</strong></div>
           <el-input v-model="teacherKeyword" placeholder="搜索教师" clearable @change="searchTeachers" style="margin-bottom:8px" />

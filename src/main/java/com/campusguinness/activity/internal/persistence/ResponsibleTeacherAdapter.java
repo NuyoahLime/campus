@@ -25,8 +25,11 @@ class ResponsibleTeacherAdapter implements ResponsibleTeacherPort {
         e.setActivityProjectId(activityProjectId);
         e.setTeacherMembershipId(teacherMembershipId);
         e.setCreatedAt(Instant.now());
-        jpa.save(e);
-        return singleTeacherRecord(e.getId(), activityProjectId, teacherMembershipId, userId);
+        jpa.saveAndFlush(e);
+        var rows = jdbc.query(JOIN_SQL + " WHERE rt.id = ?",
+                (rs, rowNum) -> mapRecord(rs), e.getId());
+        if (rows.isEmpty()) throw new IllegalStateException("Failed to load assigned teacher record");
+        return rows.getFirst();
     }
 
     @Override @Transactional(readOnly = true)
@@ -99,11 +102,5 @@ class ResponsibleTeacherAdapter implements ResponsibleTeacherPort {
                 rs.getString("title"),
                 rs.getString("membership_status"),
                 rs.getString("account_status"));
-    }
-
-    private TeacherRecord singleTeacherRecord(UUID id, UUID activityProjectId, UUID teacherMembershipId, UUID userId) {
-        var rows = jdbc.query(JOIN_SQL + " WHERE rt.id = ?",
-                (rs, rowNum) -> mapRecord(rs), id);
-        return rows.isEmpty() ? new TeacherRecord(id, activityProjectId, teacherMembershipId, userId, "", "", "", "", "") : rows.getFirst();
     }
 }
