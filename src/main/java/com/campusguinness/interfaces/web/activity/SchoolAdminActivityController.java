@@ -200,7 +200,7 @@ public class SchoolAdminActivityController {
     public ResponseEntity<ResponsibleTeacherResponse> assignResponsibleTeacher(
             @PathVariable UUID activityId,
             @PathVariable UUID projectId,
-            @RequestBody AssignResponsibleTeacherRequest req) {
+            @Valid @RequestBody AssignResponsibleTeacherRequest req) {
         requireOwnSchool(service.findById(activityId).schoolId());
         var r = service.assignResponsibleTeacher(activityId, projectId, req.teacherId());
         return ResponseEntity.ok(new ResponsibleTeacherResponse(r.id(), r.activityProjectId(), r.teacherMembershipId(), r.userId(), r.username(), r.subject(), r.title(), r.membershipStatus(), r.accountStatus()));

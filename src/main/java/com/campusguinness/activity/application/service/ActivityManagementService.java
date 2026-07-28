@@ -227,7 +227,7 @@ public class ActivityManagementService {
         var ap = projectPort.findByActivityAndProject(activityId, projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not configured on this activity"));
 
-        UUID membershipId = membershipPort.findActiveTeacherMembershipId(teacherId, activity.schoolId())
+        UUID membershipId = membershipPort.findAssignableTeacherMembershipId(teacherId, activity.schoolId())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Teacher must be an active TEACHER at this school with NORMAL account"));
 

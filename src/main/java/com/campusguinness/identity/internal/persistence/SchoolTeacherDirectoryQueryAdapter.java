@@ -24,7 +24,7 @@ class SchoolTeacherDirectoryQueryAdapter implements SchoolTeacherDirectoryQueryP
 
         String countSql = "SELECT COUNT(*) FROM school_memberships sm "
                 + "JOIN users u ON sm.user_id = u.id "
-                + "LEFT JOIN teacher_profiles tp ON u.id = tp.user_id "
+                + "LEFT JOIN teacher_profiles tp ON tp.membership_id = sm.id "
                 + "WHERE sm.school_id = ? AND sm.role_in_school = 'TEACHER' AND sm.status = 'ACTIVE' AND u.account_status = 'NORMAL'"
                 + (kw != null ? " AND (LOWER(u.username) LIKE ? OR LOWER(COALESCE(tp.subject,'')) LIKE ? OR LOWER(COALESCE(tp.title,'')) LIKE ?)" : "");
 
@@ -36,7 +36,7 @@ class SchoolTeacherDirectoryQueryAdapter implements SchoolTeacherDirectoryQueryP
                 + "COALESCE(tp.subject,'') AS subject, COALESCE(tp.title,'') AS title "
                 + "FROM school_memberships sm "
                 + "JOIN users u ON sm.user_id = u.id "
-                + "LEFT JOIN teacher_profiles tp ON u.id = tp.user_id "
+                + "LEFT JOIN teacher_profiles tp ON tp.membership_id = sm.id "
                 + "WHERE sm.school_id = ? AND sm.role_in_school = 'TEACHER' AND sm.status = 'ACTIVE' AND u.account_status = 'NORMAL'"
                 + (kw != null ? " AND (LOWER(u.username) LIKE ? OR LOWER(COALESCE(tp.subject,'')) LIKE ? OR LOWER(COALESCE(tp.title,'')) LIKE ?)" : "")
                 + " ORDER BY u.username ASC, u.id ASC LIMIT ? OFFSET ?";

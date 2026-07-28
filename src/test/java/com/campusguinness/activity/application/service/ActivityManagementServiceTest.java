@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,11 +60,30 @@ class ActivityManagementServiceTest {
             a.updateTitle("Test Activity");
             a.updateTimeRange(Instant.now(), Instant.now().plusSeconds(3600));
             a.updateLocation("Room 101");
+            var apId = UUID.randomUUID();
             when(repo.findById(any())).thenReturn(Optional.of(a));
             when(projectPort.findByActivity(any())).thenReturn(List.of(
-                    new ActivityProjectPort.ProjectRecord(UUID.randomUUID(), a.id().value(), UUID.randomUUID())));
+                    new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(teacherPort.countAssignableByActivityProjects(any()))
+                    .thenReturn(Map.of(apId, 1L));
             assertThat(svc.publish(a.id().value()).executionStatus()).isEqualTo("PUBLISHED");
             verify(repo).save(any());
+        }
+
+        @Test void publishRejectsProjectWithoutResponsibleTeacher() {
+            var a = draft();
+            a.updateTitle("Test Activity");
+            a.updateTimeRange(Instant.now(), Instant.now().plusSeconds(3600));
+            a.updateLocation("Room 101");
+            var apId = UUID.randomUUID();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivity(any())).thenReturn(List.of(
+                    new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(teacherPort.countAssignableByActivityProjects(any()))
+                    .thenReturn(Map.of(apId, 0L));
+            assertThatThrownBy(() -> svc.publish(a.id().value()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("responsible teacher");
         }
         @Test void shouldRejectWhenNoProjects() {
             var a = draft();

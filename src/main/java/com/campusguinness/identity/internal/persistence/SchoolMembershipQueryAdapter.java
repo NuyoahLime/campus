@@ -73,9 +73,14 @@ class SchoolMembershipQueryAdapter implements SchoolMembershipQueryPort {
     }
 
     @Override
-    public boolean hasNormalAccountStatus(UUID userId) {
+    public Optional<UUID> findAssignableTeacherMembershipId(UUID userId, UUID schoolId) {
         var rows = jdbc.queryForList(
-                "SELECT account_status FROM users WHERE id = ?", String.class, userId);
-        return !rows.isEmpty() && "NORMAL".equals(rows.getFirst());
+                "SELECT sm.id FROM school_memberships sm "
+                        + "JOIN users u ON sm.user_id = u.id "
+                        + "WHERE sm.user_id = ? AND sm.school_id = ? "
+                        + "AND sm.role_in_school = 'TEACHER' AND sm.status = 'ACTIVE' "
+                        + "AND u.account_status = 'NORMAL'",
+                UUID.class, userId, schoolId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 }

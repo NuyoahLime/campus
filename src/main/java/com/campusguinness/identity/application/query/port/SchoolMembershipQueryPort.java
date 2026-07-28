@@ -27,6 +27,6 @@ public interface SchoolMembershipQueryPort {
     /** Returns userId for each membershipId (batch lookup). */
     Map<UUID, UUID> findUserIdsByMembershipIds(List<UUID> membershipIds);
 
-    /** Returns true if user has account_status = NORMAL. */
-    boolean hasNormalAccountStatus(UUID userId);
+    /** Returns the membership ID only if: ACTIVE TEACHER at this school AND NORMAL account. */
+    Optional<UUID> findAssignableTeacherMembershipId(UUID userId, UUID schoolId);
 }

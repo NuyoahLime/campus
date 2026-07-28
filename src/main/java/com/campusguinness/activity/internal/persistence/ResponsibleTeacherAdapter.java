@@ -86,7 +86,7 @@ class ResponsibleTeacherAdapter implements ResponsibleTeacherPort {
                     + "FROM responsible_teachers rt "
                     + "JOIN school_memberships sm ON rt.teacher_membership_id = sm.id "
                     + "JOIN users u ON sm.user_id = u.id "
-                    + "LEFT JOIN teacher_profiles tp ON u.id = tp.user_id";
+                    + "LEFT JOIN teacher_profiles tp ON tp.membership_id = sm.id";
 
     private TeacherRecord mapRecord(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new TeacherRecord(
