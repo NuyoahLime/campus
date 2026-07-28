@@ -3,6 +3,7 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.application.port.ProjectCurrentRuleVersionPort;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
 import com.campusguinness.activity.internal.domain.*;
 import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
@@ -29,12 +30,13 @@ class ActivityManagementServiceTest {
     @Mock ActivityRepository repo;
     @Mock ActivityProjectPort projectPort;
     @Mock ChallengeProjectRepository projectRepo;
+    @Mock ProjectCurrentRuleVersionPort ruleVersionPort;
     @Mock ResponsibleTeacherPort teacherPort;
     @Mock SchoolMembershipQueryPort membershipPort;
     ActivityManagementService svc;
 
     @BeforeEach void setUp() {
-        svc = new ActivityManagementService(repo, projectPort, projectRepo, teacherPort, membershipPort);
+        svc = new ActivityManagementService(repo, projectPort, projectRepo, ruleVersionPort, teacherPort, membershipPort);
     }
 
     private Activity draft() {

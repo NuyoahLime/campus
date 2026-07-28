@@ -70,10 +70,12 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @AfterEach void tearDown() {
-        // FK-safe deletion order: child tables first
+        // FK-safe deletion order: activity_projects → project_rule_versions → challenge_projects → activities → identities
         jdbc.update("DELETE FROM activity_projects WHERE activity_id IN (SELECT id FROM activities WHERE school_id IN (?,?))", schoolId, otherSchoolId);
         jdbc.update("DELETE FROM activities WHERE school_id IN (?,?)", schoolId, otherSchoolId);
         for (UUID pid : createdProjectIds) {
+            jdbc.update("UPDATE challenge_projects SET current_rule_version_id=NULL WHERE id=?", pid);
+            jdbc.update("DELETE FROM project_rule_versions WHERE project_id=?", pid);
             jdbc.update("DELETE FROM challenge_projects WHERE id=?", pid);
         }
         createdProjectIds.clear();
@@ -327,33 +329,54 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     // ── Projects ──
 
-    @Test @DisplayName("add PUBLISHED project succeeds and persists DB record")
+    @Test @DisplayName("add PUBLISHED project succeeds and persists correct rule_version_id")
     void addPublishedProjectSucceeds() throws Exception {
         seedActivity("Project Test", "DRAFT");
-        UUID publishedProjectId = seedPublishedProject();
+        var pf = seedPublishedProject();
 
         mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/projects")
                         .with(csrf())
                         .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"projectId\":\"" + publishedProjectId + "\"}"))
+                        .content("{\"projectId\":\"" + pf.projectId + "\"}"))
                 .andExpect(status().isOk());
 
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM activity_projects WHERE activity_id=? AND project_id=?",
-                Integer.class, activityId, publishedProjectId);
+                Integer.class, activityId, pf.projectId);
         assertThat(count).isEqualTo(1);
+
+        UUID actualRuleVersionId = jdbc.queryForObject(
+                "SELECT rule_version_id FROM activity_projects WHERE activity_id=? AND project_id=?",
+                UUID.class, activityId, pf.projectId);
+        assertThat(actualRuleVersionId).isEqualTo(pf.ruleVersionId);
+    }
+
+    @Test @DisplayName("add project without current rule version returns 409")
+    void addProjectWithoutCurrentRuleVersionReturns409() throws Exception {
+        seedActivity("Project Test", "DRAFT");
+        UUID projectId = UUID.randomUUID();
+        // Project is PUBLISHED but has no current_rule_version_id set
+        jdbc.update("INSERT INTO challenge_projects(id,name,category,score_storage_type,score_indicator_type,comparison_direction,allow_tie,effective_score_rule,project_status) VALUES (?,?,?,?,?,?,?,?,?)",
+                projectId, "No Rule Project", "SPEED", "INTEGER", "NUMERIC", "HIGHER_BETTER", true, "BEST", "PUBLISHED");
+        createdProjectIds.add(projectId);
+
+        mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/projects")
+                        .with(csrf())
+                        .with(authUser(userId, schoolId, "SCHOOL_ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":\"" + projectId + "\"}"))
+                .andExpect(status().isConflict());
     }
 
     @Test @DisplayName("remove project succeeds and verifies DB deletion")
     void removeProjectSucceeds() throws Exception {
         seedActivity("Project Test", "DRAFT");
-        UUID publishedProjectId = seedPublishedProject();
-        UUID apId = UUID.randomUUID();
-        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id) VALUES (?,?,?)",
-                apId, activityId, publishedProjectId);
+        var pf = seedPublishedProject();
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
+                UUID.randomUUID(), activityId, pf.projectId, pf.ruleVersionId);
 
-        mvc.perform(delete("/api/v1/school-admin/activities/" + activityId + "/projects/" + publishedProjectId)
+        mvc.perform(delete("/api/v1/school-admin/activities/" + activityId + "/projects/" + pf.projectId)
                         .with(csrf())
                         .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isNoContent());
@@ -373,6 +396,9 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isForbidden());
     }
 
+    /** Holds projectId + ruleVersionId for fixture wiring. */
+    record ProjectFixture(UUID projectId, UUID ruleVersionId) {}
+
     // ── helpers ──
 
     private void seedActivity(String title, String executionStatus) {
@@ -391,26 +417,37 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         return actId;
     }
 
-    /** Complete activity with title, time range, location, and one PUBLISHED project. */
+    /** Complete activity with title, time range, location, and one PUBLISHED project with rule version. */
     private UUID seedPublishableActivity() {
         UUID actId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 actId, schoolId, "Ready Activity", "desc",
                 Instant.now(), Instant.now().plusSeconds(86400), "Gym",
                 "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
-        UUID publishedProjectId = seedPublishedProject();
-        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id) VALUES (?,?,?)",
-                UUID.randomUUID(), actId, publishedProjectId);
+        var pf = seedPublishedProject();
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
+                UUID.randomUUID(), actId, pf.projectId, pf.ruleVersionId);
         return actId;
     }
 
-    /** Creates a PUBLISHED challenge_project using the real table schema. */
-    private UUID seedPublishedProject() {
+    /**
+     * Creates a PUBLISHED challenge_project with a current rule version.
+     * Returns projectId + ruleVersionId so callers can wire activity_projects correctly.
+     */
+    private ProjectFixture seedPublishedProject() {
         UUID projectId = UUID.randomUUID();
+        UUID ruleVersionId = UUID.randomUUID();
+
         jdbc.update("INSERT INTO challenge_projects(id,name,category,score_storage_type,score_indicator_type,comparison_direction,allow_tie,effective_score_rule,project_status) VALUES (?,?,?,?,?,?,?,?,?)",
                 projectId, "Test Project " + projectId.toString().substring(0, 8),
                 "SPEED", "INTEGER", "NUMERIC", "HIGHER_BETTER", true, "BEST", "PUBLISHED");
+
+        jdbc.update("INSERT INTO project_rule_versions(id,project_id,version_number,score_storage_type,score_indicator_type,comparison_direction,effective_score_rule,created_by) VALUES (?,?,?,?,?,?,?,?)",
+                ruleVersionId, projectId, 1, "INTEGER", "NUMERIC", "HIGHER_BETTER", "BEST", userId);
+
+        jdbc.update("UPDATE challenge_projects SET current_rule_version_id=? WHERE id=?", ruleVersionId, projectId);
+
         createdProjectIds.add(projectId);
-        return projectId;
+        return new ProjectFixture(projectId, ruleVersionId);
     }
 }

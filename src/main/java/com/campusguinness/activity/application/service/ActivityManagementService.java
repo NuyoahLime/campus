@@ -3,6 +3,7 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.application.port.ProjectCurrentRuleVersionPort;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
 import com.campusguinness.activity.application.result.ActivityResult;
 import com.campusguinness.activity.internal.domain.*;
@@ -23,17 +24,20 @@ public class ActivityManagementService {
     private final ActivityRepository repository;
     private final ActivityProjectPort projectPort;
     private final ChallengeProjectRepository projectRepo;
+    private final ProjectCurrentRuleVersionPort ruleVersionPort;
     private final ResponsibleTeacherPort teacherPort;
     private final SchoolMembershipQueryPort membershipPort;
 
     public ActivityManagementService(ActivityRepository repository,
                                       ActivityProjectPort projectPort,
                                       ChallengeProjectRepository projectRepo,
+                                      ProjectCurrentRuleVersionPort ruleVersionPort,
                                       ResponsibleTeacherPort teacherPort,
                                       SchoolMembershipQueryPort membershipPort) {
         this.repository = repository;
         this.projectPort = projectPort;
         this.projectRepo = projectRepo;
+        this.ruleVersionPort = ruleVersionPort;
         this.teacherPort = teacherPort;
         this.membershipPort = membershipPort;
     }
@@ -179,7 +183,10 @@ public class ActivityManagementService {
             throw new IllegalArgumentException("Project must be PUBLISHED to be added to an activity");
         }
 
-        return projectPort.add(activityId, projectId, UUID.randomUUID());
+        UUID ruleVersionId = ruleVersionPort.findCurrentRuleVersionId(projectId)
+                .orElseThrow(() -> new IllegalStateException("Project has no current rule version"));
+
+        return projectPort.add(activityId, projectId, ruleVersionId);
     }
 
     public void removeProject(UUID activityId, UUID projectId) {
