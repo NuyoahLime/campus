@@ -48,13 +48,12 @@ describe('SchoolAdminActivityList', () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(
       mockPage([sampleItem(), sampleItem({ id: '22222222-2222-4222-8222-222222222222', title: '英语竞赛' })])
     );
-    const router = makeRouter();
-    await router.push('/school-admin/activities');
-    await router.isReady();
+    const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
     const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
     expect(wrapper.text()).toContain('数学挑战赛');
     expect(wrapper.text()).toContain('英语竞赛');
+    wrapper.unmount();
   });
 
   it('listRetryCallsApiAgainAndRendersResult', async () => {
@@ -64,47 +63,41 @@ describe('SchoolAdminActivityList', () => {
       if (callCount === 1) throw new ApiError(500, '服务器错误');
       return mockPage([sampleItem({ title: 'Retry Success' })]);
     });
-    const router = makeRouter();
-    await router.push('/school-admin/activities');
-    await router.isReady();
+    const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
     const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
     expect(wrapper.text()).toContain('加载失败');
-    // Click retry button
     await wrapper.find('.el-result .el-button').trigger('click');
     await flushPromises();
     expect(spy).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain('Retry Success');
+    wrapper.unmount();
   });
 
   it('listRestoresFiltersFromRoute', async () => {
     const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-    const router = makeRouter();
-    await router.push('/school-admin/activities?executionStatus=DRAFT&keyword=math&page=1');
-    await router.isReady();
-    mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    const router = makeRouter(); await router.push('/school-admin/activities?executionStatus=DRAFT&keyword=math&page=1'); await router.isReady();
+    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ executionStatus: 'DRAFT', keyword: 'math' }), 0, 20);
+    wrapper.unmount();
   });
 
   it('listWritesFiltersToRoute', async () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-    const router = makeRouter();
-    await router.push('/school-admin/activities');
-    await router.isReady();
-    mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
+    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
-    // Empty filters should not write to URL
     expect(router.currentRoute.value.query.executionStatus).toBeUndefined();
+    wrapper.unmount();
   });
 
   it('listPaginationUsesZeroBasedApiPage', async () => {
     const spy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
-    const router = makeRouter();
-    await router.push('/school-admin/activities?page=2');
-    await router.isReady();
-    mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    const router = makeRouter(); await router.push('/school-admin/activities?page=2'); await router.isReady();
+    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(expect.anything(), 1, 20);
+    wrapper.unmount();
   });
 });

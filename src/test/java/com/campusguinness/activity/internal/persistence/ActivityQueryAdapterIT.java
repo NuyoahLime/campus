@@ -73,7 +73,7 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var draft = activity("Draft", "DRAFT", now); trackActivity(draft.getId());
         jpa.saveAll(List.of(published, ended, cancelled, draft));
 
-        var result = adapter.findPublic(0, 20, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
+        var result = adapter.findPublic(0, 1000, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
         var ids = result.items().stream().map(a -> a.id()).toList();
 
         // Our published+ended must appear; cancelled+draft must NOT appear

@@ -5,7 +5,6 @@ import { createPinia, setActivePinia } from 'pinia';
 import ElementPlus from 'element-plus';
 import SchoolAdminActivityCreate from '@/views/workbench/SchoolAdminActivityCreate.vue';
 import * as api from '@/api/school-admin-activity';
-import { ApiError } from '@/api/http';
 import type { ActivityMutationResponse } from '@/types/school-admin-activity';
 
 const ACTIVITY_ID = '11111111-1111-4111-8111-111111111111';
@@ -36,6 +35,10 @@ describe('SchoolAdminActivityCreate', () => {
     await wrapper.find('input[placeholder="请输入活动名称"]').setValue('Test Activity');
     await wrapper.find('textarea[placeholder="选填"]').setValue('Test Description');
     await wrapper.find('input[placeholder="选填"]').setValue('Room 101');
+    // Set times via component form (date pickers use value-format)
+    const vm = wrapper.vm as unknown as { form: Record<string, string> };
+    vm.form.startTime = '2026-09-01T08:00:00';
+    vm.form.endTime = '2026-09-02T18:00:00';
     await wrapper.find('form').trigger('submit');
     await flushPromises();
     expect(spy).toHaveBeenCalled();
@@ -43,6 +46,8 @@ describe('SchoolAdminActivityCreate', () => {
     expect(payload.title).toBe('Test Activity');
     expect(payload.description).toBe('Test Description');
     expect(payload.location).toBe('Room 101');
+    expect(payload.startTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(payload.endTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     wrapper.unmount();
   });
 

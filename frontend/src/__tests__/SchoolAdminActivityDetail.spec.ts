@@ -6,7 +6,6 @@ import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
 import SchoolAdminActivityDetail from '@/views/workbench/SchoolAdminActivityDetail.vue';
 import * as api from '@/api/school-admin-activity';
-import { ApiError } from '@/api/http';
 import type { SchoolAdminActivityDetail as DetailType, ActivityMutationResponse } from '@/types/school-admin-activity';
 
 const ACTIVITY_ID = '11111111-1111-4111-8111-111111111111';
@@ -160,9 +159,86 @@ describe('SchoolAdminActivityDetail', () => {
     await flushPromises();
     await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
     await flushPromises();
-    // The select shows remaining projects; Already Added must be excluded
     const selectText = wrapper.find('.el-select').text();
     expect(selectText).not.toContain('Already Added');
+    expect(selectText).toContain('Available');
+    wrapper.unmount();
+  });
+
+  it('editDialogSaveButtonUpdatesAndReloads', async () => {
+    const fetchSpy = vi.spyOn(api, 'fetchActivity')
+      .mockResolvedValueOnce(draftDetail())
+      .mockResolvedValueOnce(draftDetail({ title: 'Updated Title' }));
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
+    const updateSpy = vi.spyOn(api, 'updateActivity').mockResolvedValue(mockMutation());
+    const wrapper = mountDetail();
+    await flushPromises();
+    // Click real edit button
+    await wrapper.find('.actions .el-button').trigger('click');
+    await flushPromises();
+    // Find the title input inside the dialog and update it
+    const titleInput = wrapper.find('.el-dialog input[type="text"]');
+    expect(titleInput.exists()).toBe(true);
+    await titleInput.setValue('Updated Title');
+    // Click real save button in the dialog footer
+    const saveBtn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
+    expect(saveBtn.exists()).toBe(true);
+    await saveBtn.trigger('click');
+    await flushPromises();
+    expect(updateSpy).toHaveBeenCalledWith(ACTIVITY_ID, expect.objectContaining({ title: 'Updated Title' }));
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it('addProjectCallsCorrectApi', async () => {
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({
+      items: [{ projectId: PROJECT_ID, name: 'Test Project' }],
+      page: 0, size: 100, totalElements: 1, totalPages: 1, hasNext: false,
+    });
+    const addSpy = vi.spyOn(api, 'addProject').mockResolvedValue({ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID });
+    const wrapper = mountDetail();
+    await flushPromises();
+    // Click real "添加项目" button
+    await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
+    await flushPromises();
+    // Select the project via hidden select option click
+    const option = wrapper.find('.el-select-dropdown__item');
+    expect(option.exists()).toBe(true);
+    await option.trigger('click');
+    await flushPromises();
+    // Click real "添加" button in footer
+    const addBtn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
+    expect(addBtn.exists()).toBe(true);
+    await addBtn.trigger('click');
+    await flushPromises();
+    expect(addSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID);
+    wrapper.unmount();
+  });
+
+  it('doubleAddProjectOnlyCallsApiOnce', async () => {
+    let resolve: (v: unknown) => void = () => {};
+    const deferred = new Promise(r => { resolve = r; });
+    const addSpy = vi.spyOn(api, 'addProject').mockReturnValue(deferred as Promise<{ id: string; activityId: string; projectId: string }>);
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({
+      items: [{ projectId: PROJECT_ID, name: 'Test Project' }],
+      page: 0, size: 100, totalElements: 1, totalPages: 1, hasNext: false,
+    });
+    const wrapper = mountDetail();
+    await flushPromises();
+    await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
+    await flushPromises();
+    const option = wrapper.find('.el-select-dropdown__item');
+    expect(option.exists()).toBe(true);
+    await option.trigger('click');
+    await flushPromises();
+    const addBtn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
+    await addBtn.trigger('click');
+    await addBtn.trigger('click');
+    resolve({ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID });
+    await flushPromises();
+    expect(addSpy).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 });
