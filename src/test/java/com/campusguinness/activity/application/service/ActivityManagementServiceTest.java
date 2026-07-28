@@ -3,8 +3,8 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityProjectPort;
 import com.campusguinness.activity.application.port.ActivityRepository;
-import com.campusguinness.activity.application.port.ProjectCurrentRuleVersionPort;
 import com.campusguinness.activity.application.port.ResponsibleTeacherPort;
+import com.campusguinness.project.application.port.ProjectRuleVersionPort;
 import com.campusguinness.activity.internal.domain.*;
 import com.campusguinness.identity.application.query.port.SchoolMembershipQueryPort;
 import com.campusguinness.project.application.port.ChallengeProjectRepository;
@@ -30,7 +30,7 @@ class ActivityManagementServiceTest {
     @Mock ActivityRepository repo;
     @Mock ActivityProjectPort projectPort;
     @Mock ChallengeProjectRepository projectRepo;
-    @Mock ProjectCurrentRuleVersionPort ruleVersionPort;
+    @Mock ProjectRuleVersionPort ruleVersionPort;
     @Mock ResponsibleTeacherPort teacherPort;
     @Mock SchoolMembershipQueryPort membershipPort;
     ActivityManagementService svc;
@@ -153,6 +153,62 @@ class ActivityManagementServiceTest {
             when(repo.findById(any())).thenReturn(Optional.empty());
             assertThatThrownBy(() -> svc.publish(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class);
             verify(repo, never()).save(any());
+        }
+    }
+
+    @Nested class ProjectConfiguration {
+        private final com.campusguinness.project.internal.domain.ChallengeProject pubProject =
+                com.campusguinness.project.internal.domain.ChallengeProject.reconstitute(
+                        new com.campusguinness.project.internal.domain.ChallengeProjectId(UUID.randomUUID()),
+                        new com.campusguinness.project.internal.domain.ProjectName("Test"),
+                        new com.campusguinness.project.internal.domain.ProjectCategory("SPEED"),
+                        new com.campusguinness.project.internal.domain.ScoreConfig(
+                                com.campusguinness.project.internal.domain.ScoreStorageType.INTEGER,
+                                com.campusguinness.project.internal.domain.ScoreIndicatorType.NUMERIC,
+                                com.campusguinness.project.internal.domain.ComparisonDirection.HIGHER_BETTER,
+                                null, null, "BEST", null, null, true),
+                        null, null, null,
+                        com.campusguinness.project.internal.domain.ProjectStatus.PUBLISHED);
+
+        @Test void addProjectUsesCurrentRuleVersionId() {
+            var a = draft();
+            UUID ruleVersionId = UUID.randomUUID();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectRepo.findById(any())).thenReturn(java.util.Optional.of(pubProject));
+            when(ruleVersionPort.findCurrentRuleVersionId(any())).thenReturn(Optional.of(ruleVersionId));
+            when(projectPort.add(any(), any(), eq(ruleVersionId)))
+                    .thenReturn(new ActivityProjectPort.ProjectRecord(UUID.randomUUID(), a.id().value(), pubProject.id().value()));
+            svc.addProject(a.id().value(), pubProject.id().value());
+            verify(projectPort).add(any(), any(), eq(ruleVersionId));
+        }
+
+        @Test void addProjectRejectsMissingCurrentRuleVersion() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectRepo.findById(any())).thenReturn(java.util.Optional.of(pubProject));
+            when(ruleVersionPort.findCurrentRuleVersionId(any())).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.addProject(a.id().value(), pubProject.id().value()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("no current rule version");
+        }
+
+        @Test void addProjectRequiresDraftActivity() {
+            var a = draft();
+            a.publish();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectRepo.findById(any())).thenReturn(java.util.Optional.of(pubProject));
+            assertThatThrownBy(() -> svc.addProject(a.id().value(), pubProject.id().value()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("DRAFT");
+        }
+
+        @Test void removeProjectRequiresDraftActivity() {
+            var a = draft();
+            a.publish();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            assertThatThrownBy(() -> svc.removeProject(a.id().value(), UUID.randomUUID()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("DRAFT");
         }
     }
 }

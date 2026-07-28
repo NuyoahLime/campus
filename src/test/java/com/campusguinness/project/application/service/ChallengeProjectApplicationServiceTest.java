@@ -3,6 +3,7 @@ package com.campusguinness.project.application.service;
 import com.campusguinness.project.application.command.CreateChallengeProjectCommand;
 import com.campusguinness.project.application.exception.ChallengeProjectNotFoundException;
 import com.campusguinness.project.application.port.ChallengeProjectRepository;
+import com.campusguinness.project.application.port.ProjectRuleVersionPort;
 import com.campusguinness.project.application.result.ChallengeProjectResult;
 import com.campusguinness.project.internal.domain.*;
 
@@ -28,12 +29,14 @@ class ChallengeProjectApplicationServiceTest {
 
     @Mock
     private ChallengeProjectRepository repository;
+    @Mock
+    private ProjectRuleVersionPort ruleVersionPort;
 
     private ChallengeProjectApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new ChallengeProjectApplicationService(repository);
+        service = new ChallengeProjectApplicationService(repository, ruleVersionPort);
     }
 
     private CreateChallengeProjectCommand validCommand() {
@@ -132,10 +135,11 @@ class ChallengeProjectApplicationServiceTest {
                     "desc", null, null);
             when(repository.findById(any())).thenReturn(Optional.of(project));
 
-            ChallengeProjectResult result = service.publish(id);
+            ChallengeProjectResult result = service.publish(id, UUID.randomUUID());
 
             assertThat(result.status()).isEqualTo("PUBLISHED");
             verify(repository).save(any(ChallengeProject.class));
+            verify(ruleVersionPort).createInitialRuleVersion(any(), any(), any());
         }
     }
 }

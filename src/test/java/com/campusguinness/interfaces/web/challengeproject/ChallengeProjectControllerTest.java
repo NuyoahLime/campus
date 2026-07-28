@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.challengeproject;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.project.application.query.ChallengeProjectQueryService;
 import com.campusguinness.project.application.query.model.ChallengeProjectListResult;
 import com.campusguinness.project.application.result.ChallengeProjectResult;
@@ -17,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -28,6 +30,7 @@ class ChallengeProjectControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ChallengeProjectApplicationService service;
     @MockitoBean ChallengeProjectQueryService queryService;
+    @MockitoBean CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Nested class Create {
@@ -71,7 +74,9 @@ class ChallengeProjectControllerTest {
     @Nested class Publish {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.publish(id)).thenReturn(new ChallengeProjectResult(id, "test", "PUBLISHED"));
+            UUID actorId = UUID.randomUUID();
+            when(currentActor.requireUserId()).thenReturn(actorId);
+            when(service.publish(eq(id), eq(actorId))).thenReturn(new ChallengeProjectResult(id, "test", "PUBLISHED"));
             mvc.perform(post("/api/v1/challenge-projects/" + id + "/publish"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("PUBLISHED"));

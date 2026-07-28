@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.challengeproject;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.interfaces.web.common.PageResponse;
 import com.campusguinness.project.application.command.CreateChallengeProjectCommand;
 import com.campusguinness.project.application.query.ChallengeProjectQueryService;
@@ -20,10 +21,14 @@ public class ChallengeProjectController {
 
     private final ChallengeProjectApplicationService service;
     private final ChallengeProjectQueryService queryService;
+    private final CurrentActor currentActor;
 
-    public ChallengeProjectController(ChallengeProjectApplicationService service, ChallengeProjectQueryService queryService) {
+    public ChallengeProjectController(ChallengeProjectApplicationService service,
+                                       ChallengeProjectQueryService queryService,
+                                       CurrentActor currentActor) {
         this.service = service;
         this.queryService = queryService;
+        this.currentActor = currentActor;
     }
 
     @GetMapping
@@ -61,7 +66,7 @@ public class ChallengeProjectController {
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ChallengeProjectResponse> publish(@PathVariable UUID id) {
-        ChallengeProjectResult result = service.publish(id);
+        ChallengeProjectResult result = service.publish(id, currentActor.requireUserId());
         return ResponseEntity.ok(new ChallengeProjectResponse(result.id(), result.name(), result.status()));
     }
 }

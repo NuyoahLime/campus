@@ -3,6 +3,7 @@ package com.campusguinness.project.application.service;
 import com.campusguinness.project.application.command.CreateChallengeProjectCommand;
 import com.campusguinness.project.application.exception.ChallengeProjectNotFoundException;
 import com.campusguinness.project.application.port.ChallengeProjectRepository;
+import com.campusguinness.project.application.port.ProjectRuleVersionPort;
 import com.campusguinness.project.application.result.ChallengeProjectResult;
 import com.campusguinness.project.internal.domain.*;
 
@@ -20,9 +21,12 @@ import java.util.UUID;
 public class ChallengeProjectApplicationService {
 
     private final ChallengeProjectRepository repository;
+    private final ProjectRuleVersionPort ruleVersionPort;
 
-    public ChallengeProjectApplicationService(ChallengeProjectRepository repository) {
+    public ChallengeProjectApplicationService(ChallengeProjectRepository repository,
+                                               ProjectRuleVersionPort ruleVersionPort) {
         this.repository = repository;
+        this.ruleVersionPort = ruleVersionPort;
     }
 
     /** Create a new ChallengeProject in DRAFT status. */
@@ -52,11 +56,17 @@ public class ChallengeProjectApplicationService {
                         "ChallengeProject not found: " + id));
     }
 
-    /** Publish: DRAFT → PUBLISHED. */
-    public ChallengeProjectResult publish(UUID id) {
+    /** Publish: DRAFT → PUBLISHED. Creates initial rule version if none exists. */
+    public ChallengeProjectResult publish(UUID id, UUID actorId) {
         ChallengeProject project = findById(id);
         project.publish();
         repository.save(project);
+
+        // Create initial rule version snapshot when publishing for the first time
+        ruleVersionPort.findCurrentRuleVersionId(id).ifPresentOrElse(
+                existing -> { /* already has rule version — re-publish keeps existing */ },
+                () -> ruleVersionPort.createInitialRuleVersion(id, project.scoreConfig(), actorId));
+
         return new ChallengeProjectResult(id, project.name().value(), project.status().name());
     }
 }
