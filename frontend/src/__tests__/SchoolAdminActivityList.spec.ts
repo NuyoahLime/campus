@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 import ElementPlus from 'element-plus';
@@ -99,9 +100,12 @@ describe('SchoolAdminActivityList', () => {
       expect(options.length).toBeGreaterThan(0);
       const draftOption = options.find(o => o.textContent?.trim() === '草稿');
       expect(draftOption).toBeDefined();
-      draftOption!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      draftOption!.click();
+      await nextTick();
       await flushPromises();
-      expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
+      });
     } finally {
       wrapper.unmount();
       host.remove();
