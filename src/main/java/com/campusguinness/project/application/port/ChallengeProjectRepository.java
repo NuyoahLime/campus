@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface ChallengeProjectRepository {
     void save(ChallengeProject project);
     Optional<ChallengeProject> findById(ChallengeProjectId id);
+    void flush();
 }

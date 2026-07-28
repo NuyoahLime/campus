@@ -22,8 +22,14 @@ public class ChallengeProjectRepositoryAdapter implements ChallengeProjectReposi
     @Override
     @Transactional
     public void save(ChallengeProject project) {
-        jpaRepository.save(ChallengeProjectPersistenceMapper.toEntity(project));
+        jpaRepository.findById(project.id().value()).ifPresentOrElse(
+                existing -> ChallengeProjectPersistenceMapper.copyMutableFields(project, existing),
+                () -> jpaRepository.save(ChallengeProjectPersistenceMapper.toEntity(project)));
     }
+
+    @Override
+    @Transactional
+    public void flush() { jpaRepository.flush(); }
 
     @Override
     @Transactional(readOnly = true)

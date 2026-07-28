@@ -7,7 +7,7 @@
       <el-form-item label="关键词"><el-input v-model="f.keyword" placeholder="活动标题" clearable @change="search" /></el-form-item>
     </el-form></el-card>
     <div v-if="loading"><el-skeleton :rows="5" animated /></div>
-    <div v-else-if="error"><el-result icon="error" title="加载失败" :sub-title="error"><template #extra><el-button type="primary" @click="load">重试</el-button></template></el-result></div>
+    <div v-else-if="error"><el-result icon="error" title="加载失败" :sub-title="error"><template #extra><el-button type="primary" @click="applyQueryAndLoad">重试</el-button></template></el-result></div>
     <div v-else-if="items.length===0"><el-empty description="暂无活动" /></div>
     <template v-else>
       <el-table :data="items" @row-click="(r: Item) => $router.push(`/school-admin/activities/${r.id}`)" style="cursor:pointer">

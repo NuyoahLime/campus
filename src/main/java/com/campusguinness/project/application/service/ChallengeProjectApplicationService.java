@@ -61,11 +61,20 @@ public class ChallengeProjectApplicationService {
         ChallengeProject project = findById(id);
         project.publish();
         repository.save(project);
+        repository.flush();
 
         // Create initial rule version snapshot when publishing for the first time
         ruleVersionPort.findCurrentRuleVersionId(id).ifPresentOrElse(
                 existing -> { /* already has rule version — re-publish keeps existing */ },
-                () -> ruleVersionPort.createInitialRuleVersion(id, project.scoreConfig(), actorId));
+                () -> {
+                    var sc = project.scoreConfig();
+                    var snapshot = new ProjectRuleVersionPort.InitialRuleVersionSnapshot(
+                            sc.storageType().name(), sc.indicatorType().name(),
+                            sc.comparisonDirection().name(), sc.effectiveScoreRule(),
+                            sc.scoreUnit(), sc.decimalPlaces(), sc.gradeOrder(), sc.rulesText(),
+                            project.venueRequirements(), project.equipmentRequirements());
+                    ruleVersionPort.createInitialRuleVersion(id, snapshot, actorId);
+                });
 
         return new ChallengeProjectResult(id, project.name().value(), project.status().name());
     }

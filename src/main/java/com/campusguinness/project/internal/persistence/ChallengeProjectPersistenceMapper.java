@@ -11,6 +11,14 @@ final class ChallengeProjectPersistenceMapper {
     static ChallengeProjectEntity toEntity(ChallengeProject domain) {
         ChallengeProjectEntity e = new ChallengeProjectEntity();
         e.setId(domain.id().value());
+        copyMutableFields(domain, e);
+        e.setCreatedAt(Instant.now());
+        e.setUpdatedAt(Instant.now());
+        return e;
+    }
+
+    /** Copy domain fields onto an existing managed entity — preserves currentRuleVersionId, createdAt, version. */
+    static void copyMutableFields(ChallengeProject domain, ChallengeProjectEntity e) {
         e.setName(domain.name().value());
         e.setCategory(domain.category().value());
         e.setDescription(domain.description());
@@ -26,9 +34,7 @@ final class ChallengeProjectPersistenceMapper {
         e.setEffectiveScoreRule(domain.scoreConfig().effectiveScoreRule());
         e.setRulesText(domain.scoreConfig().rulesText());
         e.setProjectStatus(domain.status().name());
-        e.setCreatedAt(Instant.now());
         e.setUpdatedAt(Instant.now());
-        return e;
     }
 
     static ChallengeProject toDomain(ChallengeProjectEntity entity) {

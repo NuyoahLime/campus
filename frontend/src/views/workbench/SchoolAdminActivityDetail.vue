@@ -1,6 +1,7 @@
 <template>
   <div>
-    <div v-if="loading"><el-skeleton :rows="6" animated /></div>
+    <div v-if="!isValidId"><el-result icon="error" title="无效的活动ID"><template #extra><el-button type="primary" @click="$router.push('/school-admin/activities')">返回活动列表</el-button></template></el-result></div>
+    <div v-else-if="loading"><el-skeleton :rows="6" animated /></div>
     <div v-else-if="error"><el-result icon="error" title="加载失败" :sub-title="error"><template #extra><el-button type="primary" @click="load">重试</el-button></template></el-result></div>
     <template v-else-if="detail">
       <el-page-header @back="$router.push('/school-admin/activities')" title="返回活动列表" />
@@ -16,23 +17,26 @@
       </div>
       <el-alert v-if="actionErr" :title="actionErr" type="error" show-icon :closable="false" style="margin-top:12px" />
 
-      <el-dialog v-model="showEdit" title="编辑活动" width="520px"><el-form ref="efRef" :model="eForm" :rules="editRules" label-position="top" @submit.prevent="handleUpdate">
-        <el-form-item label="活动名称" prop="title"><el-input v-model="eForm.title" maxlength="200" /></el-form-item>
-        <el-form-item label="活动说明" prop="description"><el-input v-model="eForm.description" type="textarea" :rows="3" /></el-form-item>
-        <el-row :gutter="16"><el-col :span="12"><el-form-item label="开始时间" prop="startTime"><el-date-picker v-model="eForm.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col><el-col :span="12"><el-form-item label="结束时间" prop="endTime"><el-date-picker v-model="eForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col></el-row>
-        <el-form-item label="地点" prop="location"><el-input v-model="eForm.location" /></el-form-item>
-        <el-alert v-if="editErr" :title="editErr" type="error" show-icon style="margin-bottom:12px" />
-        <template #footer><el-button @click="showEdit=false">取消</el-button><el-button native-type="submit" type="primary" :loading="updating" :disabled="updating">保存</el-button></template>
-      </el-form></el-dialog>
+      <el-dialog v-model="showEdit" title="编辑活动" width="520px">
+        <el-form ref="efRef" :model="eForm" :rules="editRules" label-position="top" @submit.prevent="handleUpdate">
+          <el-form-item label="活动名称" prop="title"><el-input v-model="eForm.title" maxlength="200" /></el-form-item>
+          <el-form-item label="活动说明" prop="description"><el-input v-model="eForm.description" type="textarea" :rows="3" /></el-form-item>
+          <el-row :gutter="16"><el-col :span="12"><el-form-item label="开始时间" prop="startTime"><el-date-picker v-model="eForm.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col><el-col :span="12"><el-form-item label="结束时间" prop="endTime"><el-date-picker v-model="eForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item></el-col></el-row>
+          <el-form-item label="地点" prop="location"><el-input v-model="eForm.location" /></el-form-item>
+          <el-alert v-if="editErr" :title="editErr" type="error" show-icon style="margin-bottom:12px" />
+        </el-form>
+        <template #footer><el-button @click="showEdit=false">取消</el-button><el-button native-type="submit" type="primary" :loading="updating" :disabled="updating" @click="handleUpdate">保存</el-button></template>
+      </el-dialog>
 
       <section class="sec"><h3>已配置项目</h3>
         <div v-if="detail.projects.length===0" class="empty">暂无项目</div>
-        <el-table v-else :data="detail.projects"><el-table-column prop="projectId" label="项目ID" /><el-table-column v-if="detail.executionStatus==='DRAFT'" label="操作" width="100"><template #default="{row}"><el-button size="small" type="danger" @click="handleRemoveProject(row.projectId)">移除</el-button></template></el-table-column></el-table>
+        <el-table v-else :data="detail.projects"><el-table-column prop="projectId" label="项目ID" /><el-table-column v-if="detail.executionStatus==='DRAFT'" label="操作" width="100"><template #default="{row}"><el-button size="small" type="danger" :loading="removingProjectId===row.projectId" :disabled="removingProjectId!==null" @click="handleRemoveProject(row.projectId)">移除</el-button></template></el-table-column></el-table>
       </section>
 
       <el-dialog v-model="showAddProject" title="添加项目" width="400px">
         <el-alert v-if="projErr" :title="projErr" type="error" show-icon style="margin-bottom:12px"><template #default><el-button size="small" @click="loadProjects" style="margin-top:4px">重新加载</el-button></template></el-alert>
-        <el-select v-model="selectedProjectId" placeholder="选择挑战项目" filterable style="width:100%" :loading="projLoading"><el-option v-for="p in projects" :key="p.projectId" :label="p.name" :value="p.projectId" /></el-select>
+        <div v-if="availableProjects.length===0 && !projLoading" style="color:#909399;text-align:center;padding:20px">暂无可添加项目</div>
+        <el-select v-else v-model="selectedProjectId" placeholder="选择挑战项目" filterable style="width:100%" :loading="projLoading"><el-option v-for="p in availableProjects" :key="p.projectId" :label="p.name" :value="p.projectId" /></el-select>
         <template #footer><el-button @click="showAddProject=false">取消</el-button><el-button type="primary" :loading="addingProject" :disabled="addingProject||!selectedProjectId" @click="handleAddProject">添加</el-button></template>
       </el-dialog>
     </template>
@@ -40,8 +44,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { fetchActivity, updateActivity, addProject, removeProject, publishActivity, fetchAvailableProjects } from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
 import { executionLabel, publicLabel, execTagType, publicTagType } from '@/utils/activity-status';
@@ -49,16 +53,29 @@ import { localDateTimeToInstant, instantToLocalDateTime } from '@/utils/activity
 import { ElMessageBox } from 'element-plus'; import type { FormInstance, FormRules } from 'element-plus';
 import type { SchoolAdminActivityDetail } from '@/types/school-admin-activity';
 
-const route=useRoute(); const id=route.params.activityId as string;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const props = defineProps<{ activityId: string }>();
+const router = useRouter();
+const id = props.activityId;
+const isValidId = computed(() => UUID_PATTERN.test(id));
+
 const detail=ref<SchoolAdminActivityDetail|null>(null); const loading=ref(true); const error=ref<string|null>(null);
 const showEdit=ref(false); const showAddProject=ref(false); const updating=ref(false); const publishing=ref(false); const addingProject=ref(false); const efRef=ref<FormInstance>();
 const actionErr=ref<string|null>(null); const editErr=ref<string|null>(null); const projErr=ref<string|null>(null);
 const selectedProjectId=ref(''); const projects=ref<{projectId:string;name:string}[]>([]);
+const removingProjectId=ref<string|null>(null);
 const projLoading=ref(false);
 const eForm=reactive({title:'',description:'',startTime:'',endTime:'',location:''});
 const editRules: FormRules = { title: [{ required: true, message: '请输入活动名称', trigger: 'blur' }, { max: 200 }], description: [{ max: 2000 }], startTime: [], endTime: [] };
 
-async function load() { loading.value=true;error.value=null;try{detail.value=await fetchActivity(id)}catch(err:unknown){error.value=err instanceof ApiError?err.message:'加载失败'}finally{loading.value=false} }
+const availableProjects = computed(() => {
+  if (!detail.value) return projects.value;
+  const addedIds = new Set(detail.value.projects.map(p => p.projectId));
+  return projects.value.filter(p => !addedIds.has(p.projectId));
+});
+
+async function load() { if (!isValidId.value) return; loading.value=true;error.value=null;try{detail.value=await fetchActivity(id)}catch(err:unknown){error.value=err instanceof ApiError?err.message:'加载失败'}finally{loading.value=false} }
 async function loadProjects() { if (projLoading.value) return; projLoading.value=true;projErr.value=null;try{const r=await fetchAvailableProjects();projects.value=r.items}catch(err:unknown){projErr.value=err instanceof ApiError?err.message:'加载项目列表失败'}finally{projLoading.value=false} }
 
 function openEdit() { if(!detail.value)return;eForm.title=detail.value.title||'';eForm.description=detail.value.description||'';eForm.startTime=instantToLocalDateTime(detail.value.startTime);eForm.endTime=instantToLocalDateTime(detail.value.endTime);eForm.location=detail.value.location||'';showEdit.value=true; }
@@ -78,28 +95,35 @@ async function handleUpdate() {
 async function openAddProject() { showAddProject.value=true; selectedProjectId.value=''; projErr.value=null; await loadProjects(); }
 
 async function handlePublish() {
-  try{await ElMessageBox.confirm('确认发布？','确认',{type:'warning'})}catch{return}
-  publishing.value=true; actionErr.value=null;
-  try { await publishActivity(id); await load(); }
-  catch(err:unknown) { actionErr.value = err instanceof ApiError ? err.message : '发布失败'; }
-  finally { publishing.value = false; }
+  if (publishing.value) return;
+  publishing.value = true; actionErr.value = null;
+  try {
+    await ElMessageBox.confirm('确认发布？','确认',{type:'warning'});
+    await publishActivity(id); await load();
+  } catch(err:unknown) {
+    if (err !== 'cancel' && err !== 'close') actionErr.value = err instanceof ApiError ? err.message : '发布失败';
+  } finally { publishing.value = false; }
 }
 
 async function handleAddProject() {
-  if(!selectedProjectId.value)return; addingProject.value=true; projErr.value=null;
+  if (addingProject.value || !selectedProjectId.value) return;
+  addingProject.value=true; projErr.value=null;
   try { await addProject(id,selectedProjectId.value); showAddProject.value=false; selectedProjectId.value=''; await load(); }
   catch(err:unknown) { projErr.value = err instanceof ApiError ? err.message : '添加失败'; }
   finally { addingProject.value = false; }
 }
 
 async function handleRemoveProject(pid:string) {
-  try{await ElMessageBox.confirm('确认移除？','确认',{type:'warning'})}catch{return}
+  if (removingProjectId.value !== null) return;
+  try { await ElMessageBox.confirm('确认移除？','确认',{type:'warning'}); } catch { return; }
+  removingProjectId.value = pid; actionErr.value = null;
   try { await removeProject(id,pid); await load(); }
   catch(err:unknown) { actionErr.value = err instanceof ApiError ? err.message : '移除失败'; }
+  finally { removingProjectId.value = null; }
 }
 
 function fmt(iso:string|null) { return iso ? new Date(iso).toLocaleDateString('zh-CN') : '-'; }
-onMounted(()=>{load();loadProjects();});
+onMounted(()=>{if(isValidId.value){load();loadProjects();}});
 </script>
 
 <style scoped>h1{font-size:24px;margin:16px 0 8px}.tags{margin-bottom:16px}.actions{margin:16px 0;display:flex;gap:12px}.sec{margin-top:24px}.sec h3{font-size:16px;font-weight:600;margin-bottom:12px}.empty{color:#c0c4cc}</style>

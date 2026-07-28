@@ -33,14 +33,28 @@ class ChallengeProjectRepositoryAdapterTest {
 
     @Nested @DisplayName("save")
     class Save {
-        @Test @DisplayName("maps domain to entity and calls JpaRepository.save")
-        void shouldSave() {
+        @Test @DisplayName("creates new entity when project not yet persisted")
+        void shouldSaveNew() {
             var project = createDraft();
+            when(jpaRepository.findById(project.id().value())).thenReturn(Optional.empty());
             adapter.save(project);
             ArgumentCaptor<ChallengeProjectEntity> captor = ArgumentCaptor.forClass(ChallengeProjectEntity.class);
             verify(jpaRepository).save(captor.capture());
             assertThat(captor.getValue().getId()).isEqualTo(project.id().value());
             assertThat(captor.getValue().getProjectStatus()).isEqualTo("DRAFT");
+        }
+
+        @Test @DisplayName("updates managed entity preserving currentRuleVersionId")
+        void shouldUpdateExisting() {
+            var project = createDraft();
+            project.publish();
+            var existingEntity = buildEntity(project.id().value(), "DRAFT");
+            existingEntity.setCurrentRuleVersionId(UUID.randomUUID());
+            when(jpaRepository.findById(project.id().value())).thenReturn(Optional.of(existingEntity));
+            adapter.save(project);
+            verify(jpaRepository, never()).save(any(ChallengeProjectEntity.class));
+            assertThat(existingEntity.getProjectStatus()).isEqualTo("PUBLISHED");
+            assertThat(existingEntity.getCurrentRuleVersionId()).isNotNull(); // preserved
         }
     }
 

@@ -1,7 +1,6 @@
 package com.campusguinness.project.internal.persistence;
 
 import com.campusguinness.project.application.port.ProjectRuleVersionPort;
-import com.campusguinness.project.internal.domain.ScoreConfig;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -19,15 +18,16 @@ class ProjectRuleVersionAdapter implements ProjectRuleVersionPort {
 
     @Override
     @Transactional
-    public UUID createInitialRuleVersion(UUID projectId, ScoreConfig sc, UUID createdBy) {
+    public UUID createInitialRuleVersion(UUID projectId, InitialRuleVersionSnapshot s, UUID createdBy) {
         UUID ruleVersionId = UUID.randomUUID();
 
         jdbc.update(
-                "INSERT INTO project_rule_versions(id,project_id,version_number,score_storage_type,score_indicator_type,comparison_direction,effective_score_rule,score_unit,decimal_places,grade_order,rules_text,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO project_rule_versions(id,project_id,version_number,score_storage_type,score_indicator_type,comparison_direction,effective_score_rule,score_unit,decimal_places,grade_order,rules_text,venue_requirements,equipment_requirements,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 ruleVersionId, projectId, 1,
-                sc.storageType().name(), sc.indicatorType().name(),
-                sc.comparisonDirection().name(), sc.effectiveScoreRule(),
-                sc.scoreUnit(), sc.decimalPlaces(), sc.gradeOrder(), sc.rulesText(),
+                s.scoreStorageType(), s.scoreIndicatorType(),
+                s.comparisonDirection(), s.effectiveScoreRule(),
+                s.scoreUnit(), s.decimalPlaces(), s.gradeOrder(), s.rulesText(),
+                s.venueRequirements(), s.equipmentRequirements(),
                 createdBy);
 
         jdbc.update(

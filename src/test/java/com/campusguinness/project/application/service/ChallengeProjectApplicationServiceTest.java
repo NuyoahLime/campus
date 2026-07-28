@@ -139,7 +139,7 @@ class ChallengeProjectApplicationServiceTest {
 
             assertThat(result.status()).isEqualTo("PUBLISHED");
             verify(repository).save(any(ChallengeProject.class));
-            verify(ruleVersionPort).createInitialRuleVersion(any(), any(), any());
+            verify(ruleVersionPort).createInitialRuleVersion(any(), any(ProjectRuleVersionPort.InitialRuleVersionSnapshot.class), any());
         }
     }
 }

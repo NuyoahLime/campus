@@ -102,7 +102,7 @@ jobs:
           cache: maven
 
       - name: Run targeted activity tests
-        run: mvn --batch-mode --no-transfer-progress -Dtest='*ActivityTest,*ActivityQueryService*,*ActivityQueryAdapter*,*SchoolAdminActivity*' test
+        run: mvn --batch-mode --no-transfer-progress -Dtest='*ActivityTest,*ActivityManagementService*,*ActivityQueryService*,*ActivityQueryAdapter*,*SchoolAdminActivity*,*ChallengeProjectApplicationService*,*ChallengeProjectController*,*ProjectRuleVersion*' test
         env:
           MAVEN_OPTS: -Xmx2048m -XX:MaxMetaspaceSize=512m
 
