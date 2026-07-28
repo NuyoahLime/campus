@@ -32,7 +32,7 @@
         <div v-if="detail.projects.length===0" class="empty">暂无项目</div>
         <el-table v-else :data="detail.projects"><el-table-column prop="projectId" label="项目ID" width="300" />
           <el-table-column label="负责教师"><template #default="{row}">
-            <span v-if="row._teachers && row._teachers.length">{{ row._teachers.map((t:any) => t.username + (t.subject?' ('+t.subject+')':'') + (t.title?' - '+t.title:'')).join(', ') }}</span>
+            <span v-if="row._teachers && row._teachers.length">{{ row._teachers.map(t => t.username + (t.subject?' ('+t.subject+')':'') + (t.title?' - '+t.title:'')).join(', ') }}</span>
             <span v-else class="empty">未分配负责教师</span>
           </template></el-table-column>
           <el-table-column v-if="detail.executionStatus!=='ENDED' && detail.executionStatus!=='CANCELLED'" label="管理" width="180"><template #default="{row}">
@@ -152,7 +152,7 @@ const teacherKeyword=ref(''); const selectedTeacherId=ref(''); const teacherList
 const allTeachers=ref<import('@/types/school-admin-activity').SchoolTeacherItem[]>([]); const assigningTeacher=ref(false);
 const availableTeachers = computed(() => { const assignedIds = new Set(projectTeachers.value.map(t => t.userId)); return allTeachers.value.filter(t => !assignedIds.has(t.userId)); });
 const unassigningTeacherId=ref<string|null>(null);
-const publishBlocked = computed(() => detail.value && detail.value.executionStatus==='DRAFT' && detail.value.projects.some(p => !p._teachers || !p._teachers.some((t:any)=>t.membershipStatus==='ACTIVE' && t.accountStatus==='NORMAL')));
+const publishBlocked = computed(() => detail.value && detail.value.executionStatus==='DRAFT' && detail.value.projects.some(p => !p._teachers || !p._teachers.some(t=>t.membershipStatus==='ACTIVE' && t.accountStatus==='NORMAL')));
 
 async function loadTeacherData() { teacherLoading.value=true; teacherErr.value=null; try { const [teachers, all] = await Promise.all([fetchResponsibleTeachers(id, manageProjectId.value), fetchSchoolTeachers()]); projectTeachers.value=teachers; allTeachers.value=all.items; selectedTeacherId.value=''; } catch(err:unknown) { teacherErr.value = err instanceof ApiError ? err.message : '加载失败'; } finally { teacherLoading.value=false; } }
 async function searchTeachers() { teacherListLoading.value=true;try{const r=await fetchSchoolTeachers(teacherKeyword.value);allTeachers.value=r.items;}catch(err:unknown){teacherErr.value=err instanceof ApiError?err.message:'搜索失败';teacherListLoading.value=false;}finally{if(teacherListLoading.value)teacherListLoading.value=false;} }

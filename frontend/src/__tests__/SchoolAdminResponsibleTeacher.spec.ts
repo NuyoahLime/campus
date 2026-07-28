@@ -7,7 +7,7 @@ import { ElMessageBox } from 'element-plus';
 import SchoolAdminActivityDetail from '@/views/workbench/SchoolAdminActivityDetail.vue';
 import * as api from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
-import type { SchoolAdminActivityDetail, ResponsibleTeacherItem, ActivityMutationResponse } from '@/types/school-admin-activity';
+import type { SchoolAdminActivityDetail, ResponsibleTeacherItem } from '@/types/school-admin-activity';
 
 const ACTIVITY_ID = '11111111-1111-4111-8111-111111111111';
 const PROJECT_ID = '22222222-2222-4222-8222-222222222222';
@@ -19,10 +19,6 @@ function makeRouter() {
     { path: '/school-admin/activities', component: { template: '<div>list</div>' } },
     { path: '/school-admin/activities/:activityId', component: SchoolAdminActivityDetail, props: true },
   ]});
-}
-
-function makeTeacher(userId: string, overrides: Partial<ResponsibleTeacherItem> = {}): ResponsibleTeacherItem {
-  return { id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL', ...overrides };
 }
 
 function draftDetail(overrides: Partial<SchoolAdminActivityDetail> = {}): SchoolAdminActivityDetail {
