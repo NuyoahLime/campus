@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { nextTick } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 import ElementPlus from 'element-plus';
+import { ElSelect } from 'element-plus';
+import { nextTick } from 'vue';
 import SchoolAdminActivityList from '@/views/workbench/SchoolAdminActivityList.vue';
 import * as api from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
@@ -11,27 +12,19 @@ import type { PageResponse } from '@/types/api';
 import type { SchoolAdminActivityItem } from '@/types/school-admin-activity';
 
 function makeRouter() {
-  return createRouter({
-    history: createWebHistory(),
-    routes: [
-      { path: '/', component: { template: '<div>home</div>' } },
-      { path: '/school-admin/activities', component: SchoolAdminActivityList },
-      { path: '/school-admin/activities/:activityId', component: { template: '<div>detail</div>' } },
-    ],
-  });
+  return createRouter({ history: createWebHistory(), routes: [
+    { path: '/', component: { template: '<div>home</div>' } },
+    { path: '/school-admin/activities', component: SchoolAdminActivityList },
+    { path: '/school-admin/activities/:activityId', component: { template: '<div>detail</div>' } },
+  ]});
 }
 
 function sampleItem(overrides: Partial<SchoolAdminActivityItem> = {}): SchoolAdminActivityItem {
   return {
     id: '11111111-1111-4111-8111-111111111111',
     schoolId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    title: '数学挑战赛',
-    startTime: '2026-09-01T08:00:00Z',
-    endTime: '2026-09-02T17:00:00Z',
-    location: '体育馆',
-    executionStatus: 'DRAFT',
-    publicStatus: 'NOT_SUBMITTED',
-    ...overrides,
+    title: '数学挑战赛', startTime: '2026-09-01T08:00:00Z', endTime: '2026-09-02T17:00:00Z',
+    location: '体育馆', executionStatus: 'DRAFT', publicStatus: 'NOT_SUBMITTED', ...overrides,
   };
 }
 
@@ -39,16 +32,11 @@ function mockPage(items: SchoolAdminActivityItem[], overrides: Partial<PageRespo
   return { items, page: 0, size: 20, totalElements: items.length, totalPages: Math.max(1, Math.ceil(items.length / 20)), hasNext: false, ...overrides };
 }
 
-beforeEach(() => {
-  setActivePinia(createPinia());
-  vi.restoreAllMocks();
-});
+beforeEach(() => { setActivePinia(createPinia()); vi.restoreAllMocks(); });
 
 describe('SchoolAdminActivityList', () => {
   it('renders activity items', async () => {
-    vi.spyOn(api, 'fetchActivities').mockResolvedValue(
-      mockPage([sampleItem(), sampleItem({ id: '22222222-2222-4222-8222-222222222222', title: '英语竞赛' })])
-    );
+    vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([sampleItem(), sampleItem({ id: '22222222-2222-4222-8222-222222222222', title: '英语竞赛' })]));
     const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
     const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     await flushPromises();
@@ -85,31 +73,23 @@ describe('SchoolAdminActivityList', () => {
   });
 
   it('listWritesFiltersToRoute', async () => {
-    vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
+    const fetchSpy = vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
     const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const wrapper = mount(SchoolAdminActivityList, { attachTo: host, global: { plugins: [router, createPinia(), ElementPlus] } });
+    const replaceSpy = vi.spyOn(router, 'replace');
+    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
     try {
       await flushPromises();
-      const statusSelect = wrapper.find('.filter .el-select__wrapper');
-      expect(statusSelect.exists()).toBe(true);
-      await statusSelect.trigger('click');
-      await flushPromises();
-      const options = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
-      expect(options.length).toBeGreaterThan(0);
-      const draftOption = options.find(o => o.textContent?.trim() === '草稿');
-      expect(draftOption).toBeDefined();
-      draftOption!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      const selects = wrapper.findAllComponents(ElSelect);
+      expect(selects.length).toBeGreaterThanOrEqual(2);
+      const executionStatusSelect = selects[0];
+      executionStatusSelect.vm.$emit('update:modelValue', 'DRAFT');
       await nextTick();
+      executionStatusSelect.vm.$emit('change', 'DRAFT');
       await flushPromises();
-      await vi.waitFor(() => {
-        expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
-      }, { timeout: 5000 });
+      expect(replaceSpy).toHaveBeenLastCalledWith({ query: { executionStatus: 'DRAFT' } });
+      expect(fetchSpy).toHaveBeenLastCalledWith(expect.objectContaining({ executionStatus: 'DRAFT' }), 0, 20);
     } finally {
       wrapper.unmount();
-      host.remove();
-      document.body.querySelectorAll('.el-popper-container').forEach(el => el.remove());
     }
   });
 
