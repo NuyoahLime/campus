@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -38,6 +39,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     UUID schoolId, userId, otherSchoolId, studentId, teacherId;
     UUID activityId;
+    final List<UUID> createdProjectIds = new ArrayList<>();
 
     @BeforeEach void setUp() {
         schoolId = UUID.randomUUID();
@@ -68,8 +70,13 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @AfterEach void tearDown() {
+        // FK-safe deletion order: child tables first
         jdbc.update("DELETE FROM activity_projects WHERE activity_id IN (SELECT id FROM activities WHERE school_id IN (?,?))", schoolId, otherSchoolId);
         jdbc.update("DELETE FROM activities WHERE school_id IN (?,?)", schoolId, otherSchoolId);
+        for (UUID pid : createdProjectIds) {
+            jdbc.update("DELETE FROM challenge_projects WHERE id=?", pid);
+        }
+        createdProjectIds.clear();
         jdbc.update("DELETE FROM school_memberships WHERE user_id IN (?,?,?)", userId, studentId, teacherId);
         jdbc.update("DELETE FROM users WHERE id IN (?,?,?)", userId, studentId, teacherId);
         jdbc.update("DELETE FROM schools WHERE id IN (?,?)", schoolId, otherSchoolId);
@@ -160,8 +167,8 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     @Test @DisplayName("list filters by publicStatus")
     void listFiltersByPublicStatus() throws Exception {
-        var a1 = activityId; seedActivity("NotSub", "DRAFT");
-        jdbc.update("UPDATE activities SET public_status='PENDING_PLATFORM_REVIEW' WHERE id=?", a1);
+        seedActivity("Pending", "PUBLISHED");
+        jdbc.update("UPDATE activities SET public_status=? WHERE id=?", "PENDING_PLATFORM_REVIEW", activityId);
         UUID a2 = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?)",
                 a2, schoolId, "Public", "PUBLISHED", "PUBLIC", userId, Instant.now(), Instant.now(), 1);
@@ -310,9 +317,9 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     @Test @DisplayName("publish without project returns 409")
     void publishWithoutProjectReturns409() throws Exception {
-        seedActivity("Bare Draft", "DRAFT");
+        UUID actId = seedCompleteActivityWithoutProject();
 
-        mvc.perform(post("/api/v1/school-admin/activities/" + activityId + "/publish")
+        mvc.perform(post("/api/v1/school-admin/activities/" + actId + "/publish")
                         .with(csrf())
                         .with(authUser(userId, schoolId, "SCHOOL_ADMIN")))
                 .andExpect(status().isConflict());
@@ -320,7 +327,7 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
 
     // ── Projects ──
 
-    @Test @DisplayName("add PUBLISHED project succeeds")
+    @Test @DisplayName("add PUBLISHED project succeeds and persists DB record")
     void addPublishedProjectSucceeds() throws Exception {
         seedActivity("Project Test", "DRAFT");
         UUID publishedProjectId = seedPublishedProject();
@@ -331,9 +338,14 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"projectId\":\"" + publishedProjectId + "\"}"))
                 .andExpect(status().isOk());
+
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM activity_projects WHERE activity_id=? AND project_id=?",
+                Integer.class, activityId, publishedProjectId);
+        assertThat(count).isEqualTo(1);
     }
 
-    @Test @DisplayName("remove project succeeds")
+    @Test @DisplayName("remove project succeeds and verifies DB deletion")
     void removeProjectSucceeds() throws Exception {
         seedActivity("Project Test", "DRAFT");
         UUID publishedProjectId = seedPublishedProject();
@@ -369,20 +381,36 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
                 activityId, schoolId, title, executionStatus, "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
     }
 
+    /** Complete activity with title, time range, location — but no project. */
+    private UUID seedCompleteActivityWithoutProject() {
+        UUID actId = UUID.randomUUID();
+        jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                actId, schoolId, "Complete Without Project", "desc",
+                Instant.now(), Instant.now().plusSeconds(86400), "Gym",
+                "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+        return actId;
+    }
+
+    /** Complete activity with title, time range, location, and one PUBLISHED project. */
     private UUID seedPublishableActivity() {
         UUID actId = UUID.randomUUID();
         jdbc.update("INSERT INTO activities(id,school_id,title,description,start_time,end_time,location,execution_status,public_status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                actId, schoolId, "Ready Activity", "desc", Instant.now(), Instant.now().plusSeconds(86400), "Gym", "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
+                actId, schoolId, "Ready Activity", "desc",
+                Instant.now(), Instant.now().plusSeconds(86400), "Gym",
+                "DRAFT", "NOT_SUBMITTED", userId, Instant.now(), Instant.now(), 1);
         UUID publishedProjectId = seedPublishedProject();
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id) VALUES (?,?,?)",
                 UUID.randomUUID(), actId, publishedProjectId);
         return actId;
     }
 
+    /** Creates a PUBLISHED challenge_project using the real table schema. */
     private UUID seedPublishedProject() {
         UUID projectId = UUID.randomUUID();
-        jdbc.update("INSERT INTO challenge_projects(id,school_id,title,status,created_by,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?)",
-                projectId, schoolId, "Test Project", "PUBLISHED", userId, Instant.now(), Instant.now(), 1);
+        jdbc.update("INSERT INTO challenge_projects(id,name,category,score_storage_type,score_indicator_type,comparison_direction,allow_tie,effective_score_rule,project_status) VALUES (?,?,?,?,?,?,?,?,?)",
+                projectId, "Test Project " + projectId.toString().substring(0, 8),
+                "SPEED", "INTEGER", "NUMERIC", "HIGHER_BETTER", true, "BEST", "PUBLISHED");
+        createdProjectIds.add(projectId);
         return projectId;
     }
 }
