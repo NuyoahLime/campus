@@ -86,19 +86,21 @@ describe('SchoolAdminActivityList', () => {
   it('listWritesFiltersToRoute', async () => {
     vi.spyOn(api, 'fetchActivities').mockResolvedValue(mockPage([]));
     const router = makeRouter(); await router.push('/school-admin/activities'); await router.isReady();
-    const wrapper = mount(SchoolAdminActivityList, { global: { plugins: [router, createPinia(), ElementPlus] } });
+    const wrapper = mount(SchoolAdminActivityList, {
+      global: { plugins: [router, createPinia(), ElementPlus], stubs: { teleport: true } },
+    });
     await flushPromises();
-    // Change executionStatus filter
     const statusSelect = wrapper.find('.filter .el-select__wrapper');
     expect(statusSelect.exists()).toBe(true);
     await statusSelect.trigger('click');
     await flushPromises();
-    const draftOption = wrapper.find('.el-select-dropdown__item');
-    if (draftOption.exists()) {
-      await draftOption.trigger('click');
-      await flushPromises();
-      expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
-    }
+    const options = wrapper.findAll('.el-select-dropdown__item');
+    expect(options.length).toBeGreaterThan(0);
+    const draftOption = options.find(o => o.text() === '草稿');
+    expect(draftOption).toBeDefined();
+    await draftOption!.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.query.executionStatus).toBe('DRAFT');
     wrapper.unmount();
   });
 
