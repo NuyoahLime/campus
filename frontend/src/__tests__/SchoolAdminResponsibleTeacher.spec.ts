@@ -100,4 +100,88 @@ describe('SchoolAdminResponsibleTeacher', () => {
     expect(wrapper.text()).toContain('重新加载');
     wrapper.unmount();
   });
+
+  it('assignTeacherCallsCorrectApiAndReloads', async () => {
+    const actSpy = vi.spyOn(api, 'fetchActivity')
+      .mockResolvedValueOnce(draftDetail())
+      .mockResolvedValueOnce(draftDetail({ responsibleTeachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm2', userId: '44444444-4444-4444-8444-444444444444', username: 't2', subject: 'Sci', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }], projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm2', userId: '44444444-4444-4444-8444-444444444444', username: 't2', subject: 'Sci', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }] }] }));
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: '44444444-4444-4444-8444-444444444444', membershipId: 'm2', username: 't2', subject: 'Sci', title: '' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
+    vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm2', userId: '44444444-4444-4444-8444-444444444444', username: 't2', subject: 'Sci', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }]);
+    const assignSpy = vi.spyOn(api, 'assignResponsibleTeacher').mockResolvedValue({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm2', userId: '44444444-4444-4444-8444-444444444444', username: 't2', subject: 'Sci', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
+    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
+    await flushPromises();
+    await wrapper.find('.el-button--small').trigger('click');
+    await flushPromises();
+    const vm = wrapper.vm as unknown as { selectedTeacherId: string; handleAssignTeacher: () => Promise<void> };
+    vm.selectedTeacherId = '44444444-4444-4444-8444-444444444444';
+    await wrapper.find('.el-dialog .el-dialog__footer .el-button--primary').trigger('click');
+    await flushPromises();
+    expect(assignSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID, '44444444-4444-4444-8444-444444444444');
+    expect(actSpy).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it('unassignTeacherCallsCorrectApiAndReloads', async () => {
+    const actSpy = vi.spyOn(api, 'fetchActivity')
+      .mockResolvedValueOnce(draftDetail({ responsibleTeachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }], projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }] }] }))
+      .mockResolvedValueOnce(draftDetail());
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [], page: 0, size: 50, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValueOnce([{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }]).mockResolvedValueOnce([]);
+    const unassignSpy = vi.spyOn(api, 'unassignResponsibleTeacher').mockResolvedValue(undefined);
+    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
+    await flushPromises();
+    await wrapper.find('.el-button--small').trigger('click');
+    await flushPromises();
+    await wrapper.find('.el-tag__close').trigger('click');
+    await flushPromises();
+    expect(unassignSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID, TEACHER_ID);
+    expect(actSpy).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it('doubleAssignTeacherOnlyCallsApiOnce', async () => {
+    let resolve: (v: unknown) => void = () => {};
+    const deferred = new Promise(r => { resolve = r; });
+    const assignSpy = vi.spyOn(api, 'assignResponsibleTeacher').mockReturnValue(deferred as Promise<any>);
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: TEACHER_ID, membershipId: 'm1', username: 't', subject: '', title: '' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
+    vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValue([]);
+    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
+    await flushPromises();
+    await wrapper.find('.el-button--small').trigger('click');
+    await flushPromises();
+    const vm = wrapper.vm as unknown as { selectedTeacherId: string; handleAssignTeacher: () => Promise<void> };
+    vm.selectedTeacherId = TEACHER_ID;
+    const btn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
+    await btn.trigger('click');
+    await btn.trigger('click');
+    resolve({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
+    await flushPromises();
+    expect(assignSpy).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
+  it('doubleUnassignTeacherOnlyCallsApiOnce', async () => {
+    let resolve: (v: void) => void = () => {};
+    const deferred = new Promise<void>(r => { resolve = r; });
+    const unassignSpy = vi.spyOn(api, 'unassignResponsibleTeacher').mockReturnValue(deferred);
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail({ responsibleTeachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }], projects: [{ id: 'ap1', activityId: ACTIVITY_ID, projectId: PROJECT_ID, _teachers: [{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }] }] }));
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [], page: 0, size: 50, totalElements: 0, totalPages: 0, hasNext: false });
+    vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValue([{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 'teacher1', subject: 'Math', title: 'Sr', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }]);
+    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
+    await flushPromises();
+    await wrapper.find('.el-button--small').trigger('click');
+    await flushPromises();
+    const closeBtn = wrapper.find('.el-tag__close');
+    await closeBtn.trigger('click');
+    await closeBtn.trigger('click');
+    resolve();
+    await flushPromises();
+    expect(unassignSpy).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
 });

@@ -20,10 +20,6 @@ class ResponsibleTeacherAdapterIT extends PostgreSqlIntegrationTestSupport {
     UUID schoolId, userId, teacher1Id, teacher2Id;
     UUID membership1, membership2, projectId, ruleVersionId, actId, apId;
     final List<UUID> createdAssignmentIds = new ArrayList<>();
-    final List<UUID> createdProjectIds = new ArrayList<>();
-    final List<UUID> createdSchoolIds = new ArrayList<>();
-    final List<UUID> createdUserIds = new ArrayList<>();
-    final List<UUID> createdMembershipIds = new ArrayList<>();
 
     @BeforeEach void setUp() {
         schoolId = UUID.randomUUID(); userId = UUID.randomUUID();
@@ -31,11 +27,6 @@ class ResponsibleTeacherAdapterIT extends PostgreSqlIntegrationTestSupport {
         membership1 = UUID.randomUUID(); membership2 = UUID.randomUUID();
         projectId = UUID.randomUUID(); ruleVersionId = UUID.randomUUID();
         actId = UUID.randomUUID(); apId = UUID.randomUUID();
-
-        createdSchoolIds.add(schoolId);
-        createdUserIds.addAll(List.of(userId, teacher1Id, teacher2Id));
-        createdMembershipIds.addAll(List.of(membership1, membership2));
-        createdProjectIds.addAll(List.of(projectId, actId, apId));
 
         jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 schoolId, "School", "USCC", "UC", "INT", "PRIMARY", "BJ", "addr", "n", "p", "e", "NORMAL");
@@ -60,22 +51,16 @@ class ResponsibleTeacherAdapterIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @AfterEach void tearDown() {
-        for (UUID aid : createdAssignmentIds) { jdbc.update("DELETE FROM responsible_teachers WHERE id=?", aid); }
-        createdAssignmentIds.clear();
-        for (UUID pid : createdProjectIds) {
-            jdbc.update("DELETE FROM activity_projects WHERE id=?", pid);
-            jdbc.update("DELETE FROM activities WHERE id=?", pid);
-        }
-        createdProjectIds.clear();
+        // Strict reverse-FK order
+        jdbc.update("DELETE FROM responsible_teachers WHERE activity_project_id=?", apId);
+        jdbc.update("DELETE FROM activity_projects WHERE id=?", apId);
+        jdbc.update("DELETE FROM activities WHERE id=?", actId);
         jdbc.update("DELETE FROM teacher_profiles WHERE membership_id IN (?,?)", membership1, membership2);
-        for (UUID cid : List.of(projectId)) {
-            jdbc.update("UPDATE challenge_projects SET current_rule_version_id=NULL WHERE id=?", cid);
-            jdbc.update("DELETE FROM project_rule_versions WHERE project_id=?", cid);
-            jdbc.update("DELETE FROM challenge_projects WHERE id=?", cid);
-        }
-        for (UUID mid : createdMembershipIds) { jdbc.update("DELETE FROM school_memberships WHERE id=?", mid); }
-        for (UUID uid : createdUserIds) { jdbc.update("DELETE FROM users WHERE id=?", uid); }
-        for (UUID sid : createdSchoolIds) { jdbc.update("DELETE FROM schools WHERE id=?", sid); }
+        jdbc.update("DELETE FROM project_rule_versions WHERE id=?", ruleVersionId);
+        jdbc.update("DELETE FROM challenge_projects WHERE id=?", projectId);
+        jdbc.update("DELETE FROM school_memberships WHERE id IN (?,?)", membership1, membership2);
+        jdbc.update("DELETE FROM users WHERE id IN (?,?,?)", userId, teacher1Id, teacher2Id);
+        jdbc.update("DELETE FROM schools WHERE id=?", schoolId);
     }
 
     @Test void assignSavesMembershipIdAndReturnsRichRecord() {

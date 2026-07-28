@@ -315,6 +315,17 @@ class ActivityManagementServiceTest {
                     .hasMessageContaining("last assignable teacher");
         }
 
+        @Test void assignRejectsStudent() {
+            var a = draft();
+            when(repo.findById(any())).thenReturn(Optional.of(a));
+            when(projectPort.findByActivityAndProject(any(), any()))
+                    .thenReturn(Optional.of(new ActivityProjectPort.ProjectRecord(apId, a.id().value(), UUID.randomUUID())));
+            when(membershipPort.findAssignableTeacherMembershipId(any(), any()))
+                    .thenReturn(Optional.empty()); // STUDENT won't match TEACHER+NORMAL
+            assertThatThrownBy(() -> svc.assignResponsibleTeacher(a.id().value(), UUID.randomUUID(), UUID.randomUUID()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
         @Test void removeProjectDeletesTeachersBeforeProject() {
             var a = draft();
             when(repo.findById(any())).thenReturn(Optional.of(a));
