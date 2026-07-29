@@ -55,7 +55,7 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     void flywayExecutedAll15Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(19);
+        assertThat(count).isEqualTo(21);
     }
 
     @Test
@@ -67,7 +67,7 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
                 "SELECT count(*) FROM information_schema.tables " +
                         "WHERE table_schema='public' AND table_type='BASE TABLE'", Integer.class);
         // flyway_schema_history is in public schema
-        assertThat(totalTables).isEqualTo(38);
+        assertThat(totalTables).isEqualTo(40);
     }
 
     @Test
