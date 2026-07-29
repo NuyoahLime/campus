@@ -18,7 +18,7 @@ class AccountProvisioningServiceIT extends PostgreSqlIntegrationTestSupport {
     @BeforeEach void setup() {
         schoolId = UUID.randomUUID(); actorId = UUID.randomUUID();
         u = UUID.randomUUID().toString().substring(0,8);
-        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,'USCC','SC-"+u+"','INT-"+u+"','PRIMARY','Test','Addr','Name','12345','a@b.com','NORMAL')", schoolId);
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,'USCC','SC-"+u+"','INT-"+u+"','PRIMARY','Test','Addr','Name','12345','a@b.com','NORMAL')", schoolId, "Provisioning Test School " + u);
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", actorId, "prov-"+u, "$2a$10$hAnonDummyHashForTest", "NORMAL", "SUPER_ADMIN");
     }
 

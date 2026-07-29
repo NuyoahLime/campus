@@ -22,7 +22,7 @@ class AccountProvisioningSecurityIT extends PostgreSqlIntegrationTestSupport {
     @BeforeEach void setup() {
         schoolId = UUID.randomUUID(); studentId = UUID.randomUUID();
         u = UUID.randomUUID().toString().substring(0,8);
-        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,'USCC','SC-"+u+"','INT-"+u+"','PRIMARY','Test','Addr','Name','12345','a@b.com','NORMAL')", schoolId);
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status) VALUES (?,?,'USCC','SC-"+u+"','INT-"+u+"','PRIMARY','Test','Addr','Name','12345','a@b.com','NORMAL')", schoolId, "Security Test School " + u);
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)", studentId, "secs-"+u, "$2a$10$hAnonDummyHashForTest", "NORMAL");
         jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), studentId, schoolId, "STUDENT", "ACTIVE");
     }

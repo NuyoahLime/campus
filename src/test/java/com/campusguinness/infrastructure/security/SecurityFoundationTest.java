@@ -35,7 +35,7 @@ class SecurityFoundationTest {
     @Test void csrfEndpointReturnsToken() throws Exception {
         mvc.perform(get("/api/v1/auth/csrf"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.headerName").value("X-XSRF-TOKEN"))
                 .andExpect(jsonPath("$.token").isNotEmpty());
     }
 
