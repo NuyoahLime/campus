@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
+import { nextTick } from 'vue';
 import SchoolAdminActivityDetail from '@/views/workbench/SchoolAdminActivityDetail.vue';
 import * as api from '@/api/school-admin-activity';
 import { ApiError } from '@/api/http';
@@ -37,9 +38,26 @@ beforeEach(() => {
   vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
 });
 
-afterEach(() => {
-  document.body.querySelectorAll('.el-popper-container').forEach(el => el.remove());
-});
+function cleanupTeleport() {
+  document.body.querySelectorAll('.el-overlay,.el-popper-container,.el-select__popper,.el-tooltip__popper').forEach(el => el.remove());
+}
+
+afterEach(() => { cleanupTeleport(); });
+
+async function mountResponsibleTeacherWithRealTeleport() {
+  const router = makeRouter();
+  await router.push(`/school-admin/activities/${ACTIVITY_ID}`);
+  await router.isReady();
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const wrapper = mount(SchoolAdminActivityDetail, {
+    attachTo: host,
+    props: { activityId: ACTIVITY_ID },
+    global: { plugins: [router, createPinia(), ElementPlus] },
+  });
+  await flushPromises();
+  return { wrapper, host };
+}
 
 describe('SchoolAdminResponsibleTeacher', () => {
   it('teacherDirectoryLoadsSameSchoolTeachers', async () => {
@@ -118,24 +136,35 @@ describe('SchoolAdminResponsibleTeacher', () => {
     vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: '44444444-4444-4444-8444-444444444444', membershipId: 'm2', username: 't2', subject: 'Sci', title: '' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
     vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm2', userId: '44444444-4444-4444-8444-444444444444', username: 't2', subject: 'Sci', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' }]);
     const assignSpy = vi.spyOn(api, 'assignResponsibleTeacher').mockResolvedValue({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm2', userId: '44444444-4444-4444-8444-444444444444', username: 't2', subject: 'Sci', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
-    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
-    await flushPromises();
-    await wrapper.find('.el-button--small').trigger('click');
-    await flushPromises();
-    const select = wrapper.find('.el-dialog .el-select__wrapper');
-    expect(select.exists()).toBe(true);
-    await select.trigger('click');
-    await flushPromises();
-    const options = wrapper.findAll('.el-select-dropdown__item');
-    const target = options.find(o => o.text().includes('t2'));
-    expect(target).toBeDefined();
-    await target!.trigger('click');
-    await flushPromises();
-    await wrapper.find('.el-dialog .el-dialog__footer .el-button--primary').trigger('click');
-    await flushPromises();
-    expect(assignSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID, '44444444-4444-4444-8444-444444444444');
-    expect(actSpy).toHaveBeenCalledTimes(2);
-    wrapper.unmount();
+    const { wrapper, host } = await mountResponsibleTeacherWithRealTeleport();
+    try {
+      await wrapper.find('.el-button--small').trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => { expect(document.body.querySelector('.el-dialog')).not.toBeNull(); });
+      const selectTrigger = document.body.querySelector<HTMLElement>('.el-dialog .el-select__wrapper');
+      expect(selectTrigger).not.toBeNull();
+      selectTrigger!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      const options = await vi.waitFor(() => {
+        const found = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
+        expect(found.length).toBeGreaterThan(0);
+        return found;
+      });
+      const target = options.find(o => o.textContent?.includes('t2'));
+      expect(target).toBeDefined();
+      target!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await nextTick(); await flushPromises();
+      const addBtn = await vi.waitFor(() => {
+        const btn = document.body.querySelector<HTMLButtonElement>('.el-dialog .el-dialog__footer .el-button--primary');
+        expect(btn).not.toBeNull();
+        expect(btn!.disabled).toBe(false);
+        return btn!;
+      });
+      addBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      expect(assignSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID, '44444444-4444-4444-8444-444444444444');
+      expect(actSpy).toHaveBeenCalledTimes(2);
+    } finally { wrapper.unmount(); host.remove(); cleanupTeleport(); }
   });
 
   it('unassignTeacherCallsCorrectApiAndReloads', async () => {
@@ -165,25 +194,30 @@ describe('SchoolAdminResponsibleTeacher', () => {
     vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
     vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: TEACHER_ID, membershipId: 'm1', username: 't', subject: '', title: '' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
     vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValue([]);
-    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
-    await flushPromises();
-    await wrapper.find('.el-button--small').trigger('click');
-    await flushPromises();
-    const sel = wrapper.find('.el-dialog .el-select__wrapper');
-    expect(sel.exists()).toBe(true);
-    await sel.trigger('click');
-    await flushPromises();
-    const opts = wrapper.findAll('.el-select-dropdown__item');
-    expect(opts.length).toBeGreaterThan(0);
-    await opts[0].trigger('click');
-    await flushPromises();
-    const btn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
-    await btn.trigger('click');
-    await btn.trigger('click');
-    resolveAssign({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
-    await flushPromises();
-    expect(assignSpy).toHaveBeenCalledTimes(1);
-    wrapper.unmount();
+    const { wrapper, host } = await mountResponsibleTeacherWithRealTeleport();
+    try {
+      await wrapper.find('.el-button--small').trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => { expect(document.body.querySelector('.el-dialog')).not.toBeNull(); });
+      const sel = document.body.querySelector<HTMLElement>('.el-dialog .el-select__wrapper');
+      expect(sel).not.toBeNull();
+      sel!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      const opts = await vi.waitFor(() => {
+        const found = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
+        expect(found.length).toBeGreaterThan(0);
+        return found;
+      });
+      opts[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await nextTick(); await flushPromises();
+      const btn = document.body.querySelector<HTMLButtonElement>('.el-dialog .el-dialog__footer .el-button--primary');
+      expect(btn).not.toBeNull();
+      btn!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      btn!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      resolveAssign({ id: 'r1', activityProjectId: 'ap1', teacherMembershipId: 'm1', userId: TEACHER_ID, username: 't', subject: '', title: '', membershipStatus: 'ACTIVE', accountStatus: 'NORMAL' });
+      await flushPromises();
+      expect(assignSpy).toHaveBeenCalledTimes(1);
+    } finally { wrapper.unmount(); host.remove(); cleanupTeleport(); }
   });
 
   it('doubleUnassignTeacherOnlyCallsApiOnce', async () => {
