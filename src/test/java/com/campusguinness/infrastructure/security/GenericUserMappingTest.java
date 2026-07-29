@@ -2,6 +2,7 @@ package com.campusguinness.infrastructure.security;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -12,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 class GenericUserMappingTest {
 
-    @Autowired RequestMappingHandlerMapping handlerMapping;
+    @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping;
 
     @Test void noGenericUserCreationMapping() {
         var mappings = handlerMapping.getHandlerMethods();

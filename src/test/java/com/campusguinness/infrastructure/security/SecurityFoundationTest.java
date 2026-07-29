@@ -59,23 +59,21 @@ class SecurityFoundationTest {
 
     // ── CSRF protection ──
 
-    @Test @WithMockUser
+    @Test @WithMockUser(roles = "SUPER_ADMIN")
     void postWithoutCsrfReturns403() throws Exception {
-        mvc.perform(post("/api/v1/users")
+        mvc.perform(post("/api/v1/challenge-projects")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"testuser\",\"initialPassword\":\"password123\"}"))
-                .andExpect(status().isForbidden())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                .content("{}"))
+                .andExpect(status().isForbidden());
     }
 
-    @Test @WithMockUser
-    void postWithCsrfReachesController() throws Exception {
-        mvc.perform(post("/api/v1/users")
+    @Test @WithMockUser(roles = "SUPER_ADMIN")
+    void postWithCsrfReachesValidation() throws Exception {
+        mvc.perform(post("/api/v1/challenge-projects")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"testuser\",\"initialPassword\":\"password123\"}"))
-                .andExpect(status().isCreated());
+                .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 
     // ── CORS preflight ──

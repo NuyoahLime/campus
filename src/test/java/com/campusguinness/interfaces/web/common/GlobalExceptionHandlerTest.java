@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.common;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.interfaces.web.challengeproject.ChallengeProjectController;
 import com.campusguinness.project.application.query.ChallengeProjectQueryService;
 import com.campusguinness.project.application.service.ChallengeProjectApplicationService;
@@ -22,6 +23,7 @@ class GlobalExceptionHandlerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ChallengeProjectApplicationService service;
     @MockitoBean ChallengeProjectQueryService queryService;
+    @MockitoBean CurrentActor currentActor;
 
     @Test void malformedJsonReturns400() throws Exception {
         mvc.perform(post("/api/v1/challenge-projects")
