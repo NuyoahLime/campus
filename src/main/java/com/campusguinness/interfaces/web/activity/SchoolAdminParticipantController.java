@@ -56,7 +56,11 @@ public class SchoolAdminParticipantController {
         requireOwnSchool(participantService.findActivity(activityId).schoolId());
         if (page < 0) throw new IllegalArgumentException("page must be >= 0");
         if (size < 1 || size > 100) throw new IllegalArgumentException("size must be between 1 and 100");
-        var result = participantService.listParticipants(activityId, keyword, page, size);
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        if (normalizedKeyword != null && normalizedKeyword.length() > 100) {
+            throw new IllegalArgumentException("keyword must not exceed 100 characters");
+        }
+        var result = participantService.listParticipants(activityId, normalizedKeyword, page, size);
         var items = result.items().stream()
                 .map(r -> new ParticipantItem(r.studentId(), r.displayName(), r.grade(),
                         r.className(), r.studentNumber(), r.assignedProjectCount(),

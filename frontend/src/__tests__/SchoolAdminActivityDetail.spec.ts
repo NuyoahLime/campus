@@ -66,6 +66,9 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.restoreAllMocks();
   vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+  vi.spyOn(api, 'fetchActivityParticipants').mockResolvedValue({
+    items: [], page: 0, size: 20, totalElements: 0, totalPages: 0, hasNext: false,
+  });
 });
 
 describe('SchoolAdminActivityDetail', () => {

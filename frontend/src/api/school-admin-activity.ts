@@ -1,6 +1,17 @@
 import http from './http';
 import type { PageResponse } from '@/types/api';
-import type { SchoolAdminActivityItem, SchoolAdminActivityDetail, CreateActivityPayload, UpdateActivityPayload, ActivityListFilter, ActivityProjectItem, ActivityMutationResponse } from '@/types/school-admin-activity';
+import type {
+  ActivityListFilter,
+  ActivityMutationResponse,
+  ActivityParticipantItem,
+  ActivityProjectItem,
+  CreateActivityPayload,
+  ProjectParticipantItem,
+  SchoolAdminActivityDetail,
+  SchoolAdminActivityItem,
+  SchoolStudentAccountItem,
+  UpdateActivityPayload,
+} from '@/types/school-admin-activity';
 
 export async function fetchActivities(filter: ActivityListFilter, page = 0, size = 20): Promise<PageResponse<SchoolAdminActivityItem>> {
   const params: Record<string, string | number> = { page, size };
@@ -66,5 +77,86 @@ export async function assignResponsibleTeacher(activityId: string, projectId: st
 
 export async function unassignResponsibleTeacher(activityId: string, projectId: string, teacherId: string): Promise<void> {
   await http.delete(`/v1/school-admin/activities/${activityId}/projects/${projectId}/responsible-teachers/${teacherId}`);
+}
+
+export async function fetchActivityParticipants(
+  activityId: string,
+  keyword = '',
+  page = 0,
+  size = 20,
+): Promise<PageResponse<ActivityParticipantItem>> {
+  const params: Record<string, string | number> = { page, size };
+  if (keyword.trim()) params.keyword = keyword.trim();
+  const res = await http.get<PageResponse<ActivityParticipantItem>>(
+    `/v1/school-admin/activities/${activityId}/participants`,
+    { params },
+  );
+  return res.data;
+}
+
+export async function addActivityParticipant(
+  activityId: string,
+  studentId: string,
+): Promise<ActivityParticipantItem> {
+  const res = await http.post<ActivityParticipantItem>(
+    `/v1/school-admin/activities/${activityId}/participants`,
+    { studentId },
+  );
+  return res.data;
+}
+
+export async function removeActivityParticipant(
+  activityId: string,
+  studentId: string,
+): Promise<void> {
+  await http.delete(`/v1/school-admin/activities/${activityId}/participants/${studentId}`);
+}
+
+export async function fetchProjectParticipants(
+  activityId: string,
+  projectId: string,
+): Promise<ProjectParticipantItem[]> {
+  const res = await http.get<ProjectParticipantItem[]>(
+    `/v1/school-admin/activities/${activityId}/projects/${projectId}/participants`,
+  );
+  return res.data;
+}
+
+export async function assignProjectParticipant(
+  activityId: string,
+  projectId: string,
+  studentId: string,
+): Promise<ProjectParticipantItem> {
+  const res = await http.post<ProjectParticipantItem>(
+    `/v1/school-admin/activities/${activityId}/projects/${projectId}/participants`,
+    { studentId },
+  );
+  return res.data;
+}
+
+export async function unassignProjectParticipant(
+  activityId: string,
+  projectId: string,
+  studentId: string,
+): Promise<void> {
+  await http.delete(
+    `/v1/school-admin/activities/${activityId}/projects/${projectId}/participants/${studentId}`,
+  );
+}
+
+export async function fetchActiveSchoolStudents(
+  keyword = '',
+  page = 0,
+  size = 100,
+): Promise<SchoolStudentAccountItem[]> {
+  const params: Record<string, string | number> = {
+    role: 'STUDENT',
+    status: 'NORMAL',
+    page,
+    size,
+  };
+  if (keyword.trim()) params.keyword = keyword.trim();
+  const res = await http.get<SchoolStudentAccountItem[]>('/v1/school-admin/accounts', { params });
+  return res.data;
 }
 

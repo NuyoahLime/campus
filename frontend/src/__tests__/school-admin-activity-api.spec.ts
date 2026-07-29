@@ -23,6 +23,13 @@ import {
   removeProject,
   publishActivity,
   fetchAvailableProjects,
+  fetchActivityParticipants,
+  addActivityParticipant,
+  removeActivityParticipant,
+  fetchProjectParticipants,
+  assignProjectParticipant,
+  unassignProjectParticipant,
+  fetchActiveSchoolStudents,
 } from '@/api/school-admin-activity';
 
 beforeEach(() => {
@@ -120,6 +127,73 @@ describe('school-admin-activity API', () => {
       mockGet.mockResolvedValue({ data: { items: [], page: 0, size: 100, totalElements: 0 } });
       await fetchAvailableProjects();
       expect(mockGet).toHaveBeenCalledWith('/v1/challenge-projects', { params: { page: 0, size: 100 } });
+    });
+  });
+
+  describe('participant roster endpoints', () => {
+    it('fetches activity roster with trimmed keyword and pagination', async () => {
+      mockGet.mockResolvedValue({ data: { items: [], page: 2, size: 15, totalElements: 0 } });
+      await fetchActivityParticipants('activity-1', '  Alice  ', 2, 15);
+      expect(mockGet).toHaveBeenCalledWith(
+        '/v1/school-admin/activities/activity-1/participants',
+        { params: { page: 2, size: 15, keyword: 'Alice' } },
+      );
+    });
+
+    it('adds an activity participant with studentId', async () => {
+      mockPost.mockResolvedValue({ data: { studentId: 'student-1' } });
+      await addActivityParticipant('activity-1', 'student-1');
+      expect(mockPost).toHaveBeenCalledWith(
+        '/v1/school-admin/activities/activity-1/participants',
+        { studentId: 'student-1' },
+      );
+    });
+
+    it('removes an activity participant by studentId', async () => {
+      mockDelete.mockResolvedValue({});
+      await removeActivityParticipant('activity-1', 'student-1');
+      expect(mockDelete).toHaveBeenCalledWith(
+        '/v1/school-admin/activities/activity-1/participants/student-1',
+      );
+    });
+
+    it('fetches the project roster through the challenge project ID path', async () => {
+      mockGet.mockResolvedValue({ data: [] });
+      await fetchProjectParticipants('activity-1', 'project-1');
+      expect(mockGet).toHaveBeenCalledWith(
+        '/v1/school-admin/activities/activity-1/projects/project-1/participants',
+      );
+    });
+
+    it('assigns a project participant with studentId', async () => {
+      mockPost.mockResolvedValue({ data: { studentId: 'student-1' } });
+      await assignProjectParticipant('activity-1', 'project-1', 'student-1');
+      expect(mockPost).toHaveBeenCalledWith(
+        '/v1/school-admin/activities/activity-1/projects/project-1/participants',
+        { studentId: 'student-1' },
+      );
+    });
+
+    it('unassigns a project participant by studentId', async () => {
+      mockDelete.mockResolvedValue({});
+      await unassignProjectParticipant('activity-1', 'project-1', 'student-1');
+      expect(mockDelete).toHaveBeenCalledWith(
+        '/v1/school-admin/activities/activity-1/projects/project-1/participants/student-1',
+      );
+    });
+
+    it('fetches active school students with fixed role and status', async () => {
+      mockGet.mockResolvedValue({ data: [] });
+      await fetchActiveSchoolStudents('  bob  ', 1, 25);
+      expect(mockGet).toHaveBeenCalledWith('/v1/school-admin/accounts', {
+        params: {
+          role: 'STUDENT',
+          status: 'NORMAL',
+          page: 1,
+          size: 25,
+          keyword: 'bob',
+        },
+      });
     });
   });
 });
