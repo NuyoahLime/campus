@@ -65,12 +65,13 @@ describe('SchoolAdminResponsibleTeacher', () => {
     vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
     const dirSpy = vi.spyOn(api, 'fetchSchoolTeachers').mockResolvedValue({ items: [{ userId: TEACHER_ID, membershipId: 'm1', username: 'teacher1', subject: 'Math', title: 'Sr' }], page: 0, size: 50, totalElements: 1, totalPages: 1, hasNext: false });
     vi.spyOn(api, 'fetchResponsibleTeachers').mockResolvedValue([]);
-    const wrapper = mount(SchoolAdminActivityDetail, { props: { activityId: ACTIVITY_ID }, global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } } });
-    await flushPromises();
-    await wrapper.find('.el-button--small').trigger('click'); // manage teachers
-    await flushPromises();
-    expect(dirSpy).toHaveBeenCalled();
-    wrapper.unmount();
+    const { wrapper, host } = await mountResponsibleTeacherWithRealTeleport();
+    try {
+      await wrapper.find('.el-button--small').trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => { expect(document.body.querySelector('.el-dialog')).not.toBeNull(); });
+      expect(dirSpy).toHaveBeenCalled();
+    } finally { wrapper.unmount(); host.remove(); cleanupTeleport(); }
   });
 
   it('assignedTeachersRenderUnderCorrectProject', async () => {
