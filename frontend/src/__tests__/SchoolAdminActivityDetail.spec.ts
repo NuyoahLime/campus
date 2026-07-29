@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { mount, flushPromises, VueWrapper } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
+import { nextTick } from 'vue';
 import SchoolAdminActivityDetail from '@/views/workbench/SchoolAdminActivityDetail.vue';
 import * as api from '@/api/school-admin-activity';
 import type { SchoolAdminActivityDetail as DetailType, ActivityMutationResponse } from '@/types/school-admin-activity';
@@ -38,11 +39,27 @@ function mockMutation(): ActivityMutationResponse {
 function mountDetail() {
   return mount(SchoolAdminActivityDetail, {
     props: { activityId: ACTIVITY_ID },
-    global: {
-      plugins: [makeRouter(), createPinia(), ElementPlus],
-      stubs: { teleport: true },
-    },
+    global: { plugins: [makeRouter(), createPinia(), ElementPlus], stubs: { teleport: true } },
   });
+}
+
+async function mountDetailWithRealTeleport() {
+  const router = makeRouter();
+  await router.push(`/school-admin/activities/${ACTIVITY_ID}`);
+  await router.isReady();
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const wrapper = mount(SchoolAdminActivityDetail, {
+    attachTo: host,
+    props: { activityId: ACTIVITY_ID },
+    global: { plugins: [router, createPinia(), ElementPlus] },
+  });
+  await flushPromises();
+  return { wrapper, host, router };
+}
+
+function cleanupTeleport() {
+  document.body.querySelectorAll('.el-overlay,.el-popper-container,.el-select__popper,.el-tooltip__popper').forEach(el => el.remove());
 }
 
 beforeEach(() => {
@@ -96,8 +113,8 @@ describe('SchoolAdminActivityDetail', () => {
   });
 
   it('doublePublishOnlyCallsApiOnce', async () => {
-    let resolve: (v: ActivityMutationResponse) => void = () => {};
-    const deferred = new Promise<ActivityMutationResponse>(r => { resolve = r; });
+    let resolvePublish: (v: ActivityMutationResponse) => void = () => undefined;
+    const deferred = new Promise<ActivityMutationResponse>(r => { resolvePublish = r; });
     const pubSpy = vi.spyOn(api, 'publishActivity').mockReturnValue(deferred);
     vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
     vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0, hasNext: false });
@@ -105,7 +122,7 @@ describe('SchoolAdminActivityDetail', () => {
     await flushPromises();
     await wrapper.find('.actions .el-button--success').trigger('click');
     await wrapper.find('.actions .el-button--success').trigger('click');
-    resolve(mockMutation());
+    resolvePublish(mockMutation());
     await flushPromises();
     expect(pubSpy).toHaveBeenCalledTimes(1);
     wrapper.unmount();
@@ -128,8 +145,8 @@ describe('SchoolAdminActivityDetail', () => {
   });
 
   it('doubleRemoveProjectOnlyCallsApiOnce', async () => {
-    let resolve: (v: void) => void = () => {};
-    const deferred = new Promise<void>(r => { resolve = r; });
+    let resolveRemove: () => void = () => undefined;
+    const deferred = new Promise<void>(r => { resolveRemove = r; });
     const removeSpy = vi.spyOn(api, 'removeProject').mockReturnValue(deferred);
     vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail({
       projects: [{ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID }],
@@ -141,7 +158,7 @@ describe('SchoolAdminActivityDetail', () => {
     expect(removeBtn.exists()).toBe(true);
     await removeBtn.trigger('click');
     await removeBtn.trigger('click');
-    resolve();
+    resolveRemove();
     await flushPromises();
     expect(removeSpy).toHaveBeenCalledTimes(1);
     wrapper.unmount();
@@ -155,21 +172,104 @@ describe('SchoolAdminActivityDetail', () => {
       items: [{ projectId: PROJECT_ID, name: 'Already Added' }, { projectId: OTHER_PROJECT_ID, name: 'Available' }],
       page: 0, size: 100, totalElements: 2, totalPages: 1, hasNext: false,
     });
-    const wrapper = mountDetail();
-    await flushPromises();
-    await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
-    await flushPromises();
-    // Open the select dropdown to see real options
-    const selectTrigger = wrapper.find('.el-select__wrapper');
-    expect(selectTrigger.exists()).toBe(true);
-    await selectTrigger.trigger('click');
-    await flushPromises();
-    // Collect visible option texts
-    const options = wrapper.findAll('.el-select-dropdown__item');
-    const optionTexts = options.map(o => o.text());
-    expect(optionTexts).toContain('Available');
-    expect(optionTexts).not.toContain('Already Added');
-    wrapper.unmount();
+    const { wrapper, host } = await mountDetailWithRealTeleport();
+    try {
+      await wrapper.findAll('.actions .el-button').at(1)!.trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => { expect(document.body.querySelector('.el-dialog')).not.toBeNull(); });
+      const selectTrigger = document.body.querySelector<HTMLElement>('.el-dialog .el-select__wrapper');
+      expect(selectTrigger).not.toBeNull();
+      selectTrigger!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      const options = await vi.waitFor(() => {
+        const found = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
+        expect(found.length).toBeGreaterThan(0);
+        return found;
+      });
+      const texts = options.map(o => o.textContent?.trim());
+      expect(texts).toContain('Available');
+      expect(texts).not.toContain('Already Added');
+    } finally {
+      wrapper.unmount(); host.remove(); cleanupTeleport();
+    }
+  });
+
+  it('addProjectCallsCorrectApi', async () => {
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({
+      items: [{ projectId: PROJECT_ID, name: 'Test Project' }],
+      page: 0, size: 100, totalElements: 1, totalPages: 1, hasNext: false,
+    });
+    const addSpy = vi.spyOn(api, 'addProject').mockResolvedValue({ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID });
+    const { wrapper, host } = await mountDetailWithRealTeleport();
+    try {
+      await wrapper.findAll('.actions .el-button').at(1)!.trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => { expect(document.body.querySelector('.el-dialog')).not.toBeNull(); });
+      const selectTrigger = document.body.querySelector<HTMLElement>('.el-dialog .el-select__wrapper');
+      expect(selectTrigger).not.toBeNull();
+      selectTrigger!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      const options = await vi.waitFor(() => {
+        const found = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
+        expect(found.length).toBeGreaterThan(0);
+        return found;
+      });
+      const option = options.find(o => o.textContent?.trim() === 'Test Project');
+      expect(option).toBeDefined();
+      option!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await nextTick(); await flushPromises();
+      const addBtn = await vi.waitFor(() => {
+        const btn = document.body.querySelector<HTMLButtonElement>('.el-dialog .el-dialog__footer .el-button--primary');
+        expect(btn).not.toBeNull();
+        expect(btn!.disabled).toBe(false);
+        return btn!;
+      });
+      addBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      expect(addSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID);
+    } finally {
+      wrapper.unmount(); host.remove(); cleanupTeleport();
+    }
+  });
+
+  it('doubleAddProjectOnlyCallsApiOnce', async () => {
+    let resolveAdd: (v: { id: string; activityId: string; projectId: string }) => void = () => undefined;
+    const deferred = new Promise<{ id: string; activityId: string; projectId: string }>(r => { resolveAdd = r; });
+    const addSpy = vi.spyOn(api, 'addProject').mockReturnValue(deferred);
+    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
+    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({
+      items: [{ projectId: PROJECT_ID, name: 'Test Project' }],
+      page: 0, size: 100, totalElements: 1, totalPages: 1, hasNext: false,
+    });
+    const { wrapper, host } = await mountDetailWithRealTeleport();
+    try {
+      await wrapper.findAll('.actions .el-button').at(1)!.trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => { expect(document.body.querySelector('.el-dialog')).not.toBeNull(); });
+      const selectTrigger = document.body.querySelector<HTMLElement>('.el-dialog .el-select__wrapper');
+      expect(selectTrigger).not.toBeNull();
+      selectTrigger!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushPromises();
+      const options = await vi.waitFor(() => {
+        const found = Array.from(document.body.querySelectorAll<HTMLElement>('.el-select-dropdown__item'));
+        expect(found.length).toBeGreaterThan(0);
+        return found;
+      });
+      const option = options.find(o => o.textContent?.trim() === 'Test Project');
+      expect(option).toBeDefined();
+      option!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await nextTick(); await flushPromises();
+      const addBtn = document.body.querySelector<HTMLButtonElement>('.el-dialog .el-dialog__footer .el-button--primary');
+      expect(addBtn).not.toBeNull();
+      addBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      addBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      resolveAdd({ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID });
+      await flushPromises();
+      expect(addSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      wrapper.unmount(); host.remove(); cleanupTeleport();
+    }
   });
 
   it('editDialogSaveButtonUpdatesAndReloads', async () => {
@@ -180,81 +280,17 @@ describe('SchoolAdminActivityDetail', () => {
     const updateSpy = vi.spyOn(api, 'updateActivity').mockResolvedValue(mockMutation());
     const wrapper = mountDetail();
     await flushPromises();
-    // Click real edit button
     await wrapper.find('.actions .el-button').trigger('click');
     await flushPromises();
-    // Find the title input inside the dialog and update it
     const titleInput = wrapper.find('.el-dialog input[type="text"]');
     expect(titleInput.exists()).toBe(true);
     await titleInput.setValue('Updated Title');
-    // Click real save button in the dialog footer
     const saveBtn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
     expect(saveBtn.exists()).toBe(true);
     await saveBtn.trigger('click');
     await flushPromises();
     expect(updateSpy).toHaveBeenCalledWith(ACTIVITY_ID, expect.objectContaining({ title: 'Updated Title' }));
     expect(fetchSpy).toHaveBeenCalledTimes(2);
-    wrapper.unmount();
-  });
-
-  it('addProjectCallsCorrectApi', async () => {
-    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
-    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({
-      items: [{ projectId: PROJECT_ID, name: 'Test Project' }],
-      page: 0, size: 100, totalElements: 1, totalPages: 1, hasNext: false,
-    });
-    const addSpy = vi.spyOn(api, 'addProject').mockResolvedValue({ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID });
-    const wrapper = mountDetail();
-    await flushPromises();
-    // Click real "添加项目" button
-    await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
-    await flushPromises();
-    // Open the select dropdown
-    const selectTrigger = wrapper.find('.el-select__wrapper');
-    expect(selectTrigger.exists()).toBe(true);
-    await selectTrigger.trigger('click');
-    await flushPromises();
-    // Click the project option in the dropdown
-    const option = wrapper.find('.el-select-dropdown__item');
-    expect(option.exists()).toBe(true);
-    await option.trigger('click');
-    await flushPromises();
-    // Click real "添加" button in footer
-    const addBtn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
-    expect(addBtn.exists()).toBe(true);
-    await addBtn.trigger('click');
-    await flushPromises();
-    expect(addSpy).toHaveBeenCalledWith(ACTIVITY_ID, PROJECT_ID);
-    wrapper.unmount();
-  });
-
-  it('doubleAddProjectOnlyCallsApiOnce', async () => {
-    let resolve: (v: unknown) => void = () => {};
-    const deferred = new Promise(r => { resolve = r; });
-    const addSpy = vi.spyOn(api, 'addProject').mockReturnValue(deferred as Promise<{ id: string; activityId: string; projectId: string }>);
-    vi.spyOn(api, 'fetchActivity').mockResolvedValue(draftDetail());
-    vi.spyOn(api, 'fetchAvailableProjects').mockResolvedValue({
-      items: [{ projectId: PROJECT_ID, name: 'Test Project' }],
-      page: 0, size: 100, totalElements: 1, totalPages: 1, hasNext: false,
-    });
-    const wrapper = mountDetail();
-    await flushPromises();
-    await wrapper.findAll('.actions .el-button').at(1)?.trigger('click');
-    await flushPromises();
-    const selectTrigger = wrapper.find('.el-select__wrapper');
-    expect(selectTrigger.exists()).toBe(true);
-    await selectTrigger.trigger('click');
-    await flushPromises();
-    const option = wrapper.find('.el-select-dropdown__item');
-    expect(option.exists()).toBe(true);
-    await option.trigger('click');
-    await flushPromises();
-    const addBtn = wrapper.find('.el-dialog .el-dialog__footer .el-button--primary');
-    await addBtn.trigger('click');
-    await addBtn.trigger('click');
-    resolve({ id: 'p1', activityId: ACTIVITY_ID, projectId: PROJECT_ID });
-    await flushPromises();
-    expect(addSpy).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 });

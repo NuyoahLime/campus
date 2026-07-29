@@ -90,7 +90,7 @@ async function handleUpdate() {
   finally { updating.value = false; }
 }
 
-async function openAddProject() { showAddProject.value=true; selectedProjectId.value=''; projErr.value=null; await loadProjects(); }
+async function openAddProject() { selectedProjectId.value=''; projErr.value=null; await loadProjects(); showAddProject.value=true; }
 
 async function handlePublish() {
   if (publishing.value) return;

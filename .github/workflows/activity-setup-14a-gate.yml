@@ -65,10 +65,12 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
-      - name: Prepare frontend reports
-        run: mkdir -p vitest-results
       - name: Run tests
-        run: npm run test -- --run
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p vitest-results
+          npm run test -- --run --reporter=verbose 2>&1 | tee vitest-results/console.log
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
@@ -82,9 +84,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: frontend-reports
-          path: |
-            frontend/vitest-results/
-            frontend/coverage/
+          path: frontend/vitest-results/
           if-no-files-found: error
           retention-days: 7
 
