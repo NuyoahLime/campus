@@ -32,7 +32,7 @@
         <div v-if="detail.projects.length===0" class="empty">暂无项目</div>
         <el-table v-else :data="detail.projects"><el-table-column prop="projectId" label="项目ID" width="300" />
           <el-table-column label="负责教师"><template #default="{row}">
-            <span v-if="row._teachers && row._teachers.length">{{ row._teachers.map(t => t.username + (t.subject?' ('+t.subject+')':'') + (t.title?' - '+t.title:'')).join(', ') }}</span>
+            <span v-if="row._teachers && row._teachers.length">{{ formatResponsibleTeachers(row._teachers) }}</span>
             <span v-else class="empty">未分配负责教师</span>
           </template></el-table-column>
           <el-table-column v-if="detail.executionStatus!=='ENDED' && detail.executionStatus!=='CANCELLED'" label="管理" width="180"><template #default="{row}">
@@ -75,7 +75,7 @@ import { ApiError } from '@/api/http';
 import { executionLabel, publicLabel, execTagType, publicTagType } from '@/utils/activity-status';
 import { localDateTimeToInstant, instantToLocalDateTime } from '@/utils/activity-time';
 import { ElMessageBox } from 'element-plus'; import type { FormInstance, FormRules } from 'element-plus';
-import type { SchoolAdminActivityDetail } from '@/types/school-admin-activity';
+import type { ResponsibleTeacherItem, SchoolAdminActivityDetail } from '@/types/school-admin-activity';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -89,6 +89,11 @@ const actionErr=ref<string|null>(null); const editErr=ref<string|null>(null); co
 const selectedProjectId=ref(''); const projects=ref<{projectId:string;name:string}[]>([]);
 const removingProjectId=ref<string|null>(null);
 const projLoading=ref(false);
+function formatResponsibleTeachers(teachers: ResponsibleTeacherItem[]): string {
+  return teachers
+    .map(t => t.username + (t.subject ? ` (${t.subject})` : '') + (t.title ? ` - ${t.title}` : ''))
+    .join(', ');
+}
 const eForm=reactive({title:'',description:'',startTime:'',endTime:'',location:''});
 const editRules: FormRules = { title: [{ required: true, message: '请输入活动名称', trigger: 'blur' }, { max: 200 }], description: [{ max: 2000 }], startTime: [], endTime: [] };
 
