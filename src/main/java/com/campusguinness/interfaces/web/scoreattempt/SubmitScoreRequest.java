@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.scoreattempt;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -15,7 +16,7 @@ public record SubmitScoreRequest(
         @NotBlank String scoreStorageType,
         Long integerValue,
         BigDecimal decimalValue,
-        @Positive Long durationMs,
+        @PositiveOrZero Long durationMs,
         String grade,
         Instant scoreBusinessTime,
         String timeSource) {}

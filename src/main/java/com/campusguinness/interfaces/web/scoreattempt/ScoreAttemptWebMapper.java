@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.scoreattempt;
 
+import com.campusguinness.score.application.command.CreateTeacherScoreCommand;
 import com.campusguinness.score.application.command.SubmitScoreCommand;
 import com.campusguinness.score.internal.domain.ScoreStorageType;
 import com.campusguinness.score.internal.domain.ScoreValue;
@@ -15,6 +16,18 @@ class ScoreAttemptWebMapper {
         ScoreValue value = toScoreValue(type, req);
         return new SubmitScoreCommand(UUID.randomUUID(), req.activityProjectId(), req.studentId(),
                 req.attemptNumber(), type, value, req.scoreBusinessTime(), req.timeSource(), enteredBy);
+    }
+
+    static CreateTeacherScoreCommand toTeacherCommand(SubmitScoreRequest req) {
+        return new CreateTeacherScoreCommand(
+                req.activityProjectId(),
+                req.studentId(),
+                req.integerValue(),
+                req.decimalValue(),
+                req.durationMs(),
+                req.grade(),
+                req.scoreBusinessTime(),
+                req.timeSource());
     }
 
     private static ScoreValue toScoreValue(ScoreStorageType type, SubmitScoreRequest req) {

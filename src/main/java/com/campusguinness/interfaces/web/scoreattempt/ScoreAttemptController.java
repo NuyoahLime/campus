@@ -3,8 +3,10 @@ package com.campusguinness.interfaces.web.scoreattempt;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.score.application.result.ScoreAttemptResult;
 import com.campusguinness.score.application.service.ScoreAttemptApplicationService;
+import com.campusguinness.score.application.service.TeacherScoreEntryApplicationService;
 
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +20,15 @@ import java.util.UUID;
 public class ScoreAttemptController {
 
     private final ScoreAttemptApplicationService service;
+    private final TeacherScoreEntryApplicationService teacherScoreEntryService;
     private final CurrentActor currentActor;
 
-    public ScoreAttemptController(ScoreAttemptApplicationService service, CurrentActor currentActor) {
+    public ScoreAttemptController(
+            ScoreAttemptApplicationService service,
+            ObjectProvider<TeacherScoreEntryApplicationService> teacherScoreEntryService,
+            CurrentActor currentActor) {
         this.service = service;
+        this.teacherScoreEntryService = teacherScoreEntryService.getIfAvailable();
         this.currentActor = currentActor;
     }
 
@@ -59,8 +66,20 @@ public class ScoreAttemptController {
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ScoreAttemptResponse> submit(@Valid @RequestBody SubmitScoreRequest req) {
         UUID actorId = currentActor.requireUserId();
-        ScoreAttemptResult r = service.submit(ScoreAttemptWebMapper.toCommand(req, actorId));
-        return ResponseEntity.created(URI.create("/api/v1/score-attempts/" + r.id()))
-                .body(new ScoreAttemptResponse(r.id(), r.status(), r.scoreType()));
+        if (teacherScoreEntryService == null) {
+            ScoreAttemptResult result = service.submit(
+                    ScoreAttemptWebMapper.toCommand(req, actorId));
+            return ResponseEntity.created(
+                            URI.create("/api/v1/score-attempts/" + result.id()))
+                    .body(new ScoreAttemptResponse(
+                            result.id(), result.status(), result.scoreType()));
+        }
+        UUID attemptId = teacherScoreEntryService.createAndSubmitLegacy(
+                actorId,
+                ScoreAttemptWebMapper.toTeacherCommand(req),
+                req.scoreStorageType());
+        return ResponseEntity.created(URI.create("/api/v1/score-attempts/" + attemptId))
+                .body(new ScoreAttemptResponse(
+                        attemptId, "PENDING_REVIEW", req.scoreStorageType()));
     }
 }

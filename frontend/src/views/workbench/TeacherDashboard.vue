@@ -18,6 +18,12 @@
     <div class="section">
       <div class="sh"><h3>快捷入口</h3></div>
       <el-button type="primary" @click="$router.push('/teacher/applications/new')">新建活动申请</el-button>
+      <el-button class="responsible-project-shortcut" @click="$router.push('/teacher/responsible')">
+        我的负责项目
+      </el-button>
+      <el-button class="score-entry-shortcut" @click="$router.push('/teacher/scores')">
+        成绩录入
+      </el-button>
     </div>
   </div>
 </template>
