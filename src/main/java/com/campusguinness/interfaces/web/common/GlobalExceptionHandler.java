@@ -2,6 +2,8 @@ package com.campusguinness.interfaces.web.common;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,6 +16,22 @@ import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(com.campusguinness.score.application.exception.ScoreReviewNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleScoreReviewNotFound(
+            RuntimeException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of("NOT_FOUND", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler({
+            com.campusguinness.score.application.exception.ScoreReviewConflictException.class,
+            com.campusguinness.score.application.exception.ScoreConfigurationException.class})
+    public ResponseEntity<ApiErrorResponse> handleScoreReviewConflict(
+            RuntimeException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of("CONFLICT", ex.getMessage(), req.getRequestURI()));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
@@ -91,7 +109,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({OptimisticLockingFailureException.class,
             ObjectOptimisticLockingFailureException.class,
-            jakarta.persistence.OptimisticLockException.class})
+            jakarta.persistence.OptimisticLockException.class,
+            PessimisticLockingFailureException.class,
+            DataIntegrityViolationException.class})
     public ResponseEntity<ApiErrorResponse> handleOptimisticLock(RuntimeException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiErrorResponse.of("CONCURRENT_MODIFICATION",

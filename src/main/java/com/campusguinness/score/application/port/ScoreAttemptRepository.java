@@ -10,6 +10,8 @@ import java.util.UUID;
 public interface ScoreAttemptRepository {
     void save(ScoreAttempt scoreAttempt);
     Optional<ScoreAttempt> findById(ScoreAttemptId id);
+    Optional<ScoreAttempt> findByIdForUpdate(ScoreAttemptId id);
+    Optional<ScoreAttempt> findCurrentEffectiveForUpdate(UUID activityProjectId, UUID studentId);
     Optional<ScoreAttempt> findByIdAndStudentId(UUID id, UUID studentId);
     List<ScoreAttempt> findByStudentId(UUID studentId);
     List<ScoreAttempt> findApprovedByStudentId(UUID studentId);

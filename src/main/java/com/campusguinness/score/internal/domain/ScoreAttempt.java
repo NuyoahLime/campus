@@ -133,14 +133,29 @@ public final class ScoreAttempt {
         domainEvents.add(new ScoreAttemptSubmitted(id));
     }
 
-    /** CG-SCORE-002: PENDING_REVIEW → APPROVED. Sets isCurrentEffective=true. */
+    /** CG-SCORE-002: PENDING_REVIEW → APPROVED. Kept for backwards compatibility. */
     public void approve() {
+        approve(true);
+    }
+
+    /** CG-SCORE-002: PENDING_REVIEW → APPROVED with an explicitly selected effective flag. */
+    public void approve(boolean currentEffective) {
         if (status != AttemptStatus.PENDING_REVIEW) {
             throw new InvalidScoreAttemptStateTransitionException(status, "approve");
         }
         this.status = AttemptStatus.APPROVED;
-        this.currentEffective = true;
+        this.currentEffective = currentEffective;
         domainEvents.add(new ScoreAttemptApproved(id));
+    }
+
+    /**
+     * Changes effective-score selection without invalidating an approved historical attempt.
+     */
+    public void changeCurrentEffective(boolean currentEffective) {
+        if (status != AttemptStatus.APPROVED) {
+            throw new InvalidScoreAttemptStateTransitionException(status, "change current effective");
+        }
+        this.currentEffective = currentEffective;
     }
 
     /** CG-SCORE-003: PENDING_REVIEW → REJECTED. Reason is mandatory. */
@@ -150,6 +165,7 @@ public final class ScoreAttempt {
         }
         if (reason == null || reason.isBlank()) throw new IllegalArgumentException("reject reason required");
         this.status = AttemptStatus.REJECTED;
+        this.currentEffective = false;
         domainEvents.add(new ScoreAttemptRejected(id, reason));
     }
 

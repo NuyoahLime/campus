@@ -27,6 +27,15 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
     @Override @Transactional(readOnly = true) public Optional<ScoreAttempt> findById(ScoreAttemptId id) {
         return jpaRepository.findById(id.value()).map(ScoreAttemptPersistenceMapper::toDomain);
     }
+    @Override
+    public Optional<ScoreAttempt> findByIdForUpdate(ScoreAttemptId id) {
+        return jpaRepository.findByIdForUpdate(id.value()).map(ScoreAttemptPersistenceMapper::toDomain);
+    }
+    @Override
+    public Optional<ScoreAttempt> findCurrentEffectiveForUpdate(UUID activityProjectId, UUID studentId) {
+        return jpaRepository.findCurrentEffectiveForUpdate(activityProjectId, studentId)
+                .map(ScoreAttemptPersistenceMapper::toDomain);
+    }
     @Override @Transactional(readOnly = true)
     public Optional<ScoreAttempt> findByIdAndStudentId(UUID id, UUID studentId) {
         return jpaRepository.findByIdAndStudentId(id, studentId)
