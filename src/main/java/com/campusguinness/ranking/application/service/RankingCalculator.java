@@ -1,87 +1,196 @@
 package com.campusguinness.ranking.application.service;
 
-import com.campusguinness.project.internal.domain.ComparisonDirection;
-import com.campusguinness.score.internal.domain.ScoreAttempt;
-import com.campusguinness.score.internal.domain.ScoreStorageType;
-import com.campusguinness.score.internal.domain.ScoreValue;
+import com.campusguinness.ranking.application.exception.RankingConfigurationException;
+import com.campusguinness.ranking.application.exception.RankingConflictException;
+import com.campusguinness.ranking.application.exception.RankingDataConflictException;
+import com.campusguinness.ranking.application.query.model.CalculatedRankingEntry;
+import com.campusguinness.ranking.application.query.model.RankingScoreSource;
+import com.campusguinness.score.application.query.ScoreDisplayFormatter;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
- * Pure domain ranking calculator — no framework, database, or JPA dependencies.
+ * Deterministic calculator for already-selected current effective score sources.
  */
-public class RankingCalculator {
+public final class RankingCalculator {
 
-    public record RankingEntry(int rank, UUID studentId, UUID scoreAttemptId, String scoreDisplay) {}
+    private static final Set<String> NUMERIC_STORAGE_TYPES =
+            Set.of("INTEGER", "DECIMAL", "DURATION");
 
-    private RankingCalculator() {}
+    private RankingCalculator() {
+    }
 
-    /**
-     * Compute competition ranking (1, 2, 2, 4) for the given APPROVED score attempts.
-     */
-    public static List<RankingEntry> rank(List<ScoreAttempt> attempts, ComparisonDirection direction) {
-        if (attempts.isEmpty()) return List.of();
-
-        // Validate all same storage type
-        ScoreStorageType type = attempts.getFirst().scoreStorageType();
-        for (var a : attempts) {
-            if (a.scoreStorageType() != type) {
-                throw new IllegalArgumentException("Mixed score storage types not supported for ranking");
-            }
+    public static List<CalculatedRankingEntry> rank(
+            List<RankingScoreSource> sources,
+            String scoreStorageType,
+            String comparisonDirection,
+            String gradeOrder,
+            boolean allowTie,
+            Integer decimalPlaces) {
+        validateConfiguration(scoreStorageType, comparisonDirection, gradeOrder);
+        if (sources.isEmpty()) {
+            return List.of();
         }
 
-        // Pick best attempt per student
-        Map<UUID, ScoreAttempt> bestPerStudent = pickBestPerStudent(attempts, direction);
+        ensureOneSourcePerStudent(sources);
+        for (RankingScoreSource source : sources) {
+            if (!scoreStorageType.equals(source.scoreStorageType())) {
+                throw new RankingDataConflictException(
+                        "Ranking sources contain mixed or unexpected score storage types");
+            }
+            requireScoreValue(source);
+        }
 
-        // Sort by comparison value
-        List<ScoreAttempt> sorted = new ArrayList<>(bestPerStudent.values());
-        sorted.sort((a, b) -> compare(b, a, direction)); // descending for rank
+        Map<String, Integer> gradeRanks = "GRADE_ORDER".equals(comparisonDirection)
+                ? parseGradeOrder(gradeOrder)
+                : Map.of();
+        if ("GRADE_ORDER".equals(comparisonDirection)) {
+            for (RankingScoreSource source : sources) {
+                if (!gradeRanks.containsKey(source.scoreGrade())) {
+                    throw new RankingConfigurationException(
+                            "Current effective score grade is absent from gradeOrder");
+                }
+            }
+        }
+        Comparator<RankingScoreSource> scoreComparator =
+                scoreComparator(scoreStorageType, comparisonDirection, gradeRanks);
+        Comparator<RankingScoreSource> stableTieBreaker = Comparator
+                .comparing(RankingScoreSource::scoreBusinessTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(source -> source.scoreAttemptId().toString());
 
-        // Assign competition ranks (1, 2, 2, 4)
-        List<RankingEntry> entries = new ArrayList<>();
+        List<RankingScoreSource> sorted = new ArrayList<>(sources);
+        sorted.sort(scoreComparator.thenComparing(stableTieBreaker));
+
+        List<CalculatedRankingEntry> result = new ArrayList<>(sorted.size());
         int rank = 1;
-        for (int i = 0; i < sorted.size(); i++) {
-            if (i > 0 && compare(sorted.get(i - 1), sorted.get(i), direction) != 0) {
-                rank = i + 1;
+        for (int index = 0; index < sorted.size(); index++) {
+            RankingScoreSource source = sorted.get(index);
+            if (allowTie) {
+                if (index > 0 && scoreComparator.compare(sorted.get(index - 1), source) != 0) {
+                    rank = index + 1;
+                }
+            } else {
+                rank = index + 1;
             }
-            entries.add(new RankingEntry(rank, sorted.get(i).studentId(),
-                    sorted.get(i).id().value(), displayScore(sorted.get(i))));
+            result.add(new CalculatedRankingEntry(
+                    rank,
+                    source.studentId(),
+                    source.studentDisplayName(),
+                    source.schoolName(),
+                    source.scoreAttemptId(),
+                    ScoreDisplayFormatter.format(
+                            source.scoreStorageType(),
+                            source.scoreValue(),
+                            source.scoreDurationMs(),
+                            source.scoreGrade(),
+                            decimalPlaces),
+                    source.scoreBusinessTime(),
+                    source.currentRuleVersionId()));
         }
-        return entries;
+        return List.copyOf(result);
     }
 
-    private static Map<UUID, ScoreAttempt> pickBestPerStudent(List<ScoreAttempt> attempts, ComparisonDirection dir) {
-        return attempts.stream().collect(Collectors.toMap(
-                ScoreAttempt::studentId, a -> a,
-                (a, b) -> compare(a, b, dir) >= 0 ? a : b,
-                LinkedHashMap::new));
+    private static void validateConfiguration(
+            String storageType, String direction, String gradeOrder) {
+        if ("NO_RANKING".equals(direction)) {
+            throw new RankingConflictException(
+                    "RANKING_DISABLED_FOR_PROJECT", "Ranking is disabled for this project");
+        }
+        if ("GRADE".equals(storageType)) {
+            if (!"GRADE_ORDER".equals(direction)) {
+                throw new RankingConfigurationException(
+                        "GRADE scores require GRADE_ORDER comparison");
+            }
+            parseGradeOrder(gradeOrder);
+            return;
+        }
+        if (!NUMERIC_STORAGE_TYPES.contains(storageType)) {
+            throw new RankingConfigurationException("Unsupported score storage type");
+        }
+        if (!"HIGHER_BETTER".equals(direction) && !"LOWER_BETTER".equals(direction)) {
+            throw new RankingConfigurationException(
+                    "Numeric and duration scores require HIGHER_BETTER or LOWER_BETTER");
+        }
     }
 
-    /** Positive if a is "better" than b according to the direction. */
-    private static int compare(ScoreAttempt a, ScoreAttempt b, ComparisonDirection dir) {
-        int cmp = compareValues(a.scoreValue(), b.scoreValue());
-        return dir == ComparisonDirection.LOWER_BETTER ? -cmp : cmp;
+    private static Map<String, Integer> parseGradeOrder(String gradeOrder) {
+        if (gradeOrder == null || gradeOrder.isBlank()) {
+            throw new RankingConfigurationException("gradeOrder is required for grade ranking");
+        }
+        String[] values = gradeOrder.split(",", -1);
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (int index = 0; index < values.length; index++) {
+            String grade = values[index].trim();
+            if (grade.isEmpty()) {
+                throw new RankingConfigurationException(
+                        "gradeOrder cannot contain blank grades");
+            }
+            if (result.putIfAbsent(grade, index) != null) {
+                throw new RankingConfigurationException(
+                        "gradeOrder cannot contain duplicate grades");
+            }
+        }
+        return Map.copyOf(result);
     }
 
-    private static int compareValues(ScoreValue a, ScoreValue b) {
-        if (a instanceof ScoreValue.IntegerScore ai && b instanceof ScoreValue.IntegerScore bi)
-            return Long.compare(ai.value(), bi.value());
-        if (a instanceof ScoreValue.DecimalScore ad && b instanceof ScoreValue.DecimalScore bd)
-            return ad.value().compareTo(bd.value());
-        if (a instanceof ScoreValue.DurationScore ad && b instanceof ScoreValue.DurationScore bd)
-            return Long.compare(ad.durationMs(), bd.durationMs());
-        if (a instanceof ScoreValue.GradeScore ag && b instanceof ScoreValue.GradeScore bg)
-            return ag.grade().compareTo(bg.grade());
-        return 0;
-    }
+    private static Comparator<RankingScoreSource> scoreComparator(
+            String storageType,
+            String direction,
+            Map<String, Integer> gradeRanks) {
+        if ("GRADE".equals(storageType)) {
+            return Comparator.comparingInt(source -> {
+                Integer rank = gradeRanks.get(source.scoreGrade());
+                if (rank == null) {
+                    throw new RankingConfigurationException(
+                            "Current effective score grade is absent from gradeOrder");
+                }
+                return rank;
+            });
+        }
 
-    private static String displayScore(ScoreAttempt a) {
-        return switch (a.scoreValue()) {
-            case ScoreValue.IntegerScore s -> String.valueOf(s.value());
-            case ScoreValue.DecimalScore s -> s.value().toPlainString();
-            case ScoreValue.DurationScore s -> s.durationMs() + "ms";
-            case ScoreValue.GradeScore s -> s.grade();
+        Comparator<RankingScoreSource> comparator = switch (storageType) {
+            case "INTEGER", "DECIMAL" -> Comparator.comparing(
+                    RankingScoreSource::scoreValue, BigDecimal::compareTo);
+            case "DURATION" -> Comparator.comparingLong(
+                    RankingScoreSource::scoreDurationMs);
+            default -> throw new RankingConfigurationException(
+                    "Unsupported score storage type");
         };
+        return "HIGHER_BETTER".equals(direction) ? comparator.reversed() : comparator;
+    }
+
+    private static void ensureOneSourcePerStudent(List<RankingScoreSource> sources) {
+        Map<UUID, UUID> attemptsByStudent = new HashMap<>();
+        for (RankingScoreSource source : sources) {
+            UUID previous = attemptsByStudent.putIfAbsent(
+                    source.studentId(), source.scoreAttemptId());
+            if (previous != null) {
+                throw new RankingDataConflictException(
+                        "Multiple current effective scores exist for the same student");
+            }
+        }
+    }
+
+    private static void requireScoreValue(RankingScoreSource source) {
+        boolean present = switch (source.scoreStorageType()) {
+            case "INTEGER", "DECIMAL" -> source.scoreValue() != null;
+            case "DURATION" -> source.scoreDurationMs() != null;
+            case "GRADE" -> source.scoreGrade() != null && !source.scoreGrade().isBlank();
+            default -> false;
+        };
+        if (!present) {
+            throw new RankingDataConflictException(
+                    "Ranking source does not contain a value for its storage type");
+        }
     }
 }

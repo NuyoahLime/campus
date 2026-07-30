@@ -8,6 +8,7 @@ public class RankingDefinitionEntity {
     @Column(name = "name", nullable = false, length = 200) private String name;
     @Column(name = "school_id") private UUID schoolId;
     @Column(name = "project_id", nullable = false) private UUID projectId;
+    @Column(name = "activity_project_id") private UUID activityProjectId;
     @Column(name = "dimension_filters", columnDefinition = "jsonb") private String dimensionFilters;
     @Column(name = "tie_break_rule", length = 32) private String tieBreakRule;
     @Column(name = "is_enabled", nullable = false) private boolean enabled;

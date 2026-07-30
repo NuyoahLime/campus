@@ -5,6 +5,7 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -37,7 +38,7 @@ http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 // Response interceptor: normalize errors and handle 401
 http.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<{ message?: string }>) => {
+  (error: AxiosError<{ message?: string; code?: string }>) => {
     if (!error.response) {
       throw new ApiError(0, '网络连接失败，请检查网络后重试');
     }
@@ -53,7 +54,7 @@ http.interceptors.response.use(
       });
     }
 
-    throw new ApiError(status, message);
+    throw new ApiError(status, message, error.response.data?.code);
   },
 );
 

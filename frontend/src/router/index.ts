@@ -111,7 +111,7 @@ const router = createRouter({
         { path: 'projects', name: 'school-admin-projects', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'teachers', name: 'school-admin-teachers', component: () => import('@/views/NotImplementedView.vue') },
         { path: 'scores', name: 'school-admin-scores', component: () => import('@/views/workbench/SchoolAdminScoreReview.vue') },
-        { path: 'rankings', name: 'school-admin-rankings', component: () => import('@/views/NotImplementedView.vue') },
+        { path: 'rankings', name: 'school-admin-rankings', component: () => import('@/views/workbench/SchoolAdminRankingManagement.vue') },
         { path: 'accounts', name: 'school-admin-accounts', component: () => import('@/views/workbench/SchoolAdminAccounts.vue') },
       ],
     },

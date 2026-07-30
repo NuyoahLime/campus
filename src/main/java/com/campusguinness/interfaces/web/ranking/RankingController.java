@@ -1,6 +1,7 @@
 package com.campusguinness.interfaces.web.ranking;
 
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.ranking.application.query.model.CalculatedRankingEntry;
 import com.campusguinness.ranking.application.service.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,21 +31,21 @@ public class RankingController {
     // ── Admin ──
 
     @GetMapping("/activity-projects/{activityProjectId}/ranking-preview")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public RankingResponse preview(@PathVariable UUID activityProjectId) {
         var r = previewService.preview(activityProjectId);
         return toResponse(r.activityProjectId(), r.direction(), r.totalRanked(), r.entries());
     }
 
     @PostMapping("/activity-projects/{activityProjectId}/ranking-publish")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public RankingResponse publish(@PathVariable UUID activityProjectId) {
         var r = publicationService.publish(activityProjectId, currentActor.requireUserId());
         return toResponse(r.activityProjectId(), r.direction(), r.totalRanked(), r.entries());
     }
 
     @GetMapping("/activity-projects/{activityProjectId}/ranking-current")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<RankingResponse> getCurrent(@PathVariable UUID activityProjectId) {
         return publicationService.getCurrent(activityProjectId)
                 .map(r -> ResponseEntity.ok(toResponse(r.activityProjectId(), r.direction(), r.totalRanked(), r.entries())))
@@ -52,7 +53,7 @@ public class RankingController {
     }
 
     @PostMapping("/activity-projects/{activityProjectId}/ranking-withdraw")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<Void> withdraw(@PathVariable UUID activityProjectId,
                                           @RequestBody WithdrawRequest req) {
         publicationService.withdraw(activityProjectId, currentActor.requireUserId(), req.reason());
@@ -60,7 +61,7 @@ public class RankingController {
     }
 
     @GetMapping("/activity-projects/{activityProjectId}/ranking-history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public List<RankingPublicationService.HistoryItem> getHistory(@PathVariable UUID activityProjectId) {
         return publicationService.getHistory(activityProjectId);
     }
@@ -101,9 +102,18 @@ public class RankingController {
 
     // ── DTOs ──
 
-    private RankingResponse toResponse(UUID apId, String dir, int total, List<? extends RankingCalculator.RankingEntry> entries) {
+    private RankingResponse toResponse(
+            UUID apId,
+            String dir,
+            int total,
+            List<CalculatedRankingEntry> entries) {
         return new RankingResponse(apId, dir, total, entries.stream()
-                .map(e -> new RankEntry(e.rank(), e.studentId(), e.scoreAttemptId(), e.scoreDisplay())).toList());
+                .map(e -> new RankEntry(
+                        e.rankPosition(),
+                        e.studentId(),
+                        e.scoreAttemptId(),
+                        e.scoreDisplayValue()))
+                .toList());
     }
 
     public record RankingResponse(UUID activityProjectId, String direction, int totalRanked, List<RankEntry> entries) {}

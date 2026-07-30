@@ -17,6 +17,23 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.campusguinness.ranking.application.exception.RankingNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleRankingNotFound(
+            com.campusguinness.ranking.application.exception.RankingNotFoundException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of("NOT_FOUND", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(com.campusguinness.ranking.application.exception.RankingConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleRankingConflict(
+            com.campusguinness.ranking.application.exception.RankingConflictException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        ex.errorCode(), ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler(com.campusguinness.score.application.exception.ScoreEntryNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleScoreEntryNotFound(
             RuntimeException ex, HttpServletRequest req) {

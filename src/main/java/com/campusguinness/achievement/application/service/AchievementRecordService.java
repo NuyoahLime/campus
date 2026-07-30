@@ -18,18 +18,22 @@ public class AchievementRecordService {
             String status, Instant issuedAt, UUID issuedBy, Instant revokedAt, String revocationReason) {}
 
     public Record issue(UUID activityProjectId, UUID rankingEntryId, UUID issuedBy) {
-        // Find current non-withdrawn ranking version
         var vRows = jdbc.queryForList(
-                "SELECT id, version_number FROM ranking_versions " +
-                "WHERE definition_id = ? AND version_status = 'PUBLISHED' AND withdrawn_at IS NULL " +
-                "ORDER BY version_number DESC LIMIT 1", activityProjectId);
+                "SELECT version.id, version.version_number, "
+                        + "version.calculation_params ->> 'scoreStorageType' AS score_storage_type "
+                        + "FROM ranking_definitions definition "
+                        + "JOIN ranking_versions version ON version.id = definition.current_version_id "
+                        + "WHERE definition.activity_project_id = ? "
+                        + "AND version.version_status = 'PUBLISHED' "
+                        + "AND version.withdrawn_at IS NULL",
+                activityProjectId);
         if (vRows.isEmpty()) throw new IllegalStateException("No current published ranking");
         UUID versionId = (UUID) vRows.getFirst().get("id");
 
-        // Load ranking entry
         var eRows = jdbc.queryForList(
-                "SELECT student_id, rank, score_value, score_storage_type FROM ranking_entries " +
-                "WHERE id = ? AND version_id = ?", rankingEntryId, versionId);
+                "SELECT student_id, rank_position, score_display_value "
+                        + "FROM ranking_entries WHERE id = ? AND version_id = ?",
+                rankingEntryId, versionId);
         if (eRows.isEmpty()) throw new IllegalArgumentException("Ranking entry not found in current version");
 
         var entry = eRows.getFirst();
@@ -41,11 +45,17 @@ public class AchievementRecordService {
                 "student_id, rank_snapshot, score_value_snapshot, score_storage_type, record_title, verification_code, " +
                 "status, issued_at, issued_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 id, activityProjectId, versionId, rankingEntryId, entry.get("student_id"),
-                entry.get("rank"), entry.get("score_value"), entry.get("score_storage_type"),
+                entry.get("rank_position"), entry.get("score_display_value"),
+                vRows.getFirst().get("score_storage_type"),
                 "Achievement Record", code, "ACTIVE", now, issuedBy);
 
-        return new Record(id, activityProjectId, (UUID)entry.get("student_id"), (int)entry.get("rank"),
-                (String)entry.get("score_value"), (String)entry.get("score_storage_type"),
+        return new Record(
+                id,
+                activityProjectId,
+                (UUID) entry.get("student_id"),
+                (int) entry.get("rank_position"),
+                (String) entry.get("score_display_value"),
+                (String) vRows.getFirst().get("score_storage_type"),
                 "Achievement Record", code, "ACTIVE", now, issuedBy, null, null);
     }
 

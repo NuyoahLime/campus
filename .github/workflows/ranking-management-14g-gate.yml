@@ -1,0 +1,181 @@
+name: School Admin Ranking Management 14G Gate
+
+on:
+  push:
+    branches:
+      - feat/school-admin-ranking-management-14g
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ranking-management-14g-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  banned-patterns:
+    name: Forbidden Pattern Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Check forbidden test and ranking patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          BANNED=$(grep -rn -E '@Disabled|assertThat\(true\)|expect\(true\)\.toBe\(true\)|\.skip\(|\.todo\(|describe\.only\(|it\.only\(|test\.only\(|it\.skip\(|test\.skip\(|describe\.skip\(' src/test frontend/src --include='*.java' --include='*.ts' --include='*.vue' 2>/dev/null || true)
+          if [ -n "$BANNED" ]; then echo "Forbidden patterns found:"; echo "$BANNED"; exit 1; fi
+          if grep -rn 'dangerouslyIgnoreUnhandledErrors' frontend --include='*.ts' --include='*.vue'; then exit 1; fi
+          if grep -n 'teleport: true' frontend/src/__tests__/SchoolAdminRankingManagement.spec.ts; then exit 1; fi
+          if grep -rn -E 'INSERT INTO ranking_entries.*(rank,|score_value)' src/main/java/com/campusguinness/ranking --include='*.java'; then exit 1; fi
+          echo "No forbidden patterns found."
+
+  frontend:
+    name: Frontend Lint, Type-check, Tests & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run type-check
+      - name: Run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p vitest-results
+          npm run test -- --run --reporter=verbose 2>&1 | tee vitest-results/console.log
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - name: Upload frontend reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: frontend-reports
+          path: frontend/vitest-results/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Build
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+  backend-targeted:
+    name: Targeted Backend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: campus
+          POSTGRES_PASSWORD: campus
+          POSTGRES_DB: campus_guinness
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run targeted tests
+        run: mvn --batch-mode --no-transfer-progress -Dtest='RankingCalculatorTest,SchoolAdminRankingApplicationServiceTest,SchoolAdminRankingQueryAdapterIT,RankingPublicationAdapterIT,SchoolAdminRankingControllerIT,RankingPublicationConcurrencyIT,StudentRankingWithdrawalRegressionIT,ScoreReviewApplicationServiceTest' test
+        env:
+          MAVEN_OPTS: -Xmx2048m -XX:MaxMetaspaceSize=512m
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/campus_guinness
+          SPRING_DATASOURCE_USERNAME: campus
+          SPRING_DATASOURCE_PASSWORD: campus
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      - name: Upload targeted backend reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-targeted-reports
+          path: target/surefire-reports/
+          if-no-files-found: error
+          retention-days: 7
+
+  backend-full:
+    name: Maven Clean Verify
+    needs: backend-targeted
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: campus
+          POSTGRES_PASSWORD: campus
+          POSTGRES_DB: campus_guinness
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run Maven clean verify
+        run: mvn --batch-mode --no-transfer-progress clean verify
+        env:
+          MAVEN_OPTS: -Xmx2048m -XX:MaxMetaspaceSize=512m
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/campus_guinness
+          SPRING_DATASOURCE_USERNAME: campus
+          SPRING_DATASOURCE_PASSWORD: campus
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-full-surefire
+          path: target/surefire-reports/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-full-failsafe
+          path: target/failsafe-reports/
+          retention-days: 7
+
+  gate:
+    name: Gate
+    needs: [banned-patterns, frontend, backend-targeted, backend-full]
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Verify all jobs passed
+        shell: bash
+        run: |
+          if [ "${{ needs.banned-patterns.result }}" != "success" ]; then echo "FORBIDDEN PATTERN CHECK FAILED"; exit 1; fi
+          if [ "${{ needs.frontend.result }}" != "success" ]; then echo "FRONTEND FAILED"; exit 1; fi
+          if [ "${{ needs.backend-targeted.result }}" != "success" ]; then echo "BACKEND TARGETED FAILED"; exit 1; fi
+          if [ "${{ needs.backend-full.result }}" != "success" ]; then echo "MAVEN CLEAN VERIFY FAILED"; exit 1; fi
+          echo "ALL GATES PASSED"

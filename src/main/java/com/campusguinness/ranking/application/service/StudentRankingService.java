@@ -21,49 +21,66 @@ public class StudentRankingService {
 
     public Optional<StudentRankingResult> getCurrentRanking(UUID activityProjectId, UUID currentStudentId) {
         var pubRows = jdbc.queryForList(
-                "SELECT id, version_number, comparison_direction, ranked_student_count " +
-                "FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
-                "ORDER BY version_number DESC LIMIT 1", activityProjectId);
+                "SELECT version.id, version.version_number, "
+                        + "version.calculation_params ->> 'comparisonDirection' AS comparison_direction, "
+                        + "(SELECT COUNT(*) FROM ranking_entries entry "
+                        + " WHERE entry.version_id = version.id) AS ranked_student_count "
+                        + "FROM ranking_definitions definition "
+                        + "JOIN ranking_versions version ON version.id = definition.current_version_id "
+                        + "WHERE definition.activity_project_id = ? "
+                        + "AND version.version_status = 'PUBLISHED' "
+                        + "AND version.withdrawn_at IS NULL",
+                activityProjectId);
         if (pubRows.isEmpty()) return Optional.empty();
 
         var pub = pubRows.getFirst();
         UUID versionId = (UUID) pub.get("id");
 
         var entryRows = jdbc.queryForList(
-                "SELECT rank, student_id, score_value FROM ranking_entries " +
-                "WHERE version_id = ? ORDER BY rank, student_id", versionId);
+                "SELECT rank_position, student_id, score_display_value "
+                        + "FROM ranking_entries "
+                        + "WHERE version_id = ? ORDER BY rank_position, id",
+                versionId);
 
         List<StudentRankEntry> entries = entryRows.stream()
                 .map(r -> new StudentRankEntry(
-                        (int) r.get("rank"), (UUID) r.get("student_id"),
-                        (String) r.get("score_value"),
+                        (int) r.get("rank_position"), (UUID) r.get("student_id"),
+                        (String) r.get("score_display_value"),
                         currentStudentId != null && currentStudentId.equals(r.get("student_id"))))
                 .toList();
 
         return Optional.of(new StudentRankingResult(activityProjectId,
                 (int) pub.get("version_number"), (String) pub.get("comparison_direction"),
-                (int) pub.get("ranked_student_count"), entries));
+                ((Number) pub.get("ranked_student_count")).intValue(), entries));
     }
 
     public Optional<StudentOwnRankResult> getMyRank(UUID activityProjectId, UUID currentStudentId) {
         var pubRows = jdbc.queryForList(
-                "SELECT id, version_number, comparison_direction, ranked_student_count " +
-                "FROM ranking_versions WHERE definition_id = ? AND version_status = 'PUBLISHED' " +
-                "ORDER BY version_number DESC LIMIT 1", activityProjectId);
+                "SELECT version.id, version.version_number, "
+                        + "version.calculation_params ->> 'comparisonDirection' AS comparison_direction, "
+                        + "(SELECT COUNT(*) FROM ranking_entries entry "
+                        + " WHERE entry.version_id = version.id) AS ranked_student_count "
+                        + "FROM ranking_definitions definition "
+                        + "JOIN ranking_versions version ON version.id = definition.current_version_id "
+                        + "WHERE definition.activity_project_id = ? "
+                        + "AND version.version_status = 'PUBLISHED' "
+                        + "AND version.withdrawn_at IS NULL",
+                activityProjectId);
         if (pubRows.isEmpty()) return Optional.empty();
 
         var pub = pubRows.getFirst();
         UUID versionId = (UUID) pub.get("id");
 
         var entryRows = jdbc.queryForList(
-                "SELECT rank, score_value FROM ranking_entries " +
+                "SELECT rank_position, score_display_value FROM ranking_entries " +
                 "WHERE version_id = ? AND student_id = ?", versionId, currentStudentId);
         if (entryRows.isEmpty()) return Optional.empty();
 
         var entry = entryRows.getFirst();
         return Optional.of(new StudentOwnRankResult(activityProjectId,
                 (int) pub.get("version_number"), (String) pub.get("comparison_direction"),
-                (int) pub.get("ranked_student_count"), (int) entry.get("rank"),
-                (String) entry.get("score_value")));
+                ((Number) pub.get("ranked_student_count")).intValue(),
+                (int) entry.get("rank_position"),
+                (String) entry.get("score_display_value")));
     }
 }
