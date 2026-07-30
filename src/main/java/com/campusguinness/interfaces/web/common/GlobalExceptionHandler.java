@@ -17,6 +17,30 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.campusguinness.score.application.exception.ScoreEntryNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleScoreEntryNotFound(
+            RuntimeException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of("NOT_FOUND", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(com.campusguinness.score.application.exception.ScoreEntryConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleScoreEntryConflict(
+            com.campusguinness.score.application.exception.ScoreEntryConflictException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        ex.errorCode(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(com.campusguinness.score.application.exception.ScoreEntryConfigurationException.class)
+    public ResponseEntity<ApiErrorResponse> handleScoreEntryConfiguration(
+            RuntimeException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        "SCORE_CONFIGURATION_ERROR", ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler(com.campusguinness.score.application.exception.ScoreReviewNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleScoreReviewNotFound(
             RuntimeException ex, HttpServletRequest req) {

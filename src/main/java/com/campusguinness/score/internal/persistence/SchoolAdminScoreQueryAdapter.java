@@ -32,7 +32,9 @@ class SchoolAdminScoreQueryAdapter implements SchoolAdminScoreQueryPort {
             JOIN users entrant ON entrant.id = sa.entered_by
             WHERE sa.school_id = :schoolId
               AND a.school_id = :schoolId
-              AND sa.score_status = :status
+              AND (:allStatuses = true OR sa.score_status = :status)
+              AND (CAST(:enteredBy AS uuid) IS NULL
+                   OR sa.entered_by = CAST(:enteredBy AS uuid))
               AND (CAST(:activityId AS uuid) IS NULL OR a.id = CAST(:activityId AS uuid))
               AND (CAST(:projectId AS uuid) IS NULL OR cp.id = CAST(:projectId AS uuid))
               AND (CAST(:keyword AS text) IS NULL
@@ -64,12 +66,40 @@ class SchoolAdminScoreQueryAdapter implements SchoolAdminScoreQueryPort {
             UUID schoolId, String status, UUID activityId, UUID projectId,
             String keyword, int page, int size) {
         var params = parameters(schoolId, status, activityId, projectId, keyword)
+                .addValue("allStatuses", false)
+                .addValue("enteredBy", null)
                 .addValue("limit", size)
                 .addValue("offset", (long) page * size);
         Long total = jdbc.queryForObject("SELECT COUNT(*) " + FROM_AND_WHERE, params, Long.class);
         List<SchoolAdminScoreAttemptItem> items = jdbc.query(
                 SELECT_FIELDS + FROM_AND_WHERE + """
                         ORDER BY sa.submitted_at DESC NULLS LAST, sa.created_at DESC, sa.id DESC
+                        LIMIT :limit OFFSET :offset
+                        """,
+                params,
+                (rs, rowNum) -> toItem(rs));
+        return new QueryPage<>(items, page, size, total == null ? 0 : total);
+    }
+
+    @Override
+    public QueryPage<SchoolAdminScoreAttemptItem> findEnteredBySchoolAdmin(
+            UUID schoolId,
+            UUID enteredBy,
+            String status,
+            UUID activityId,
+            UUID projectId,
+            String keyword,
+            int page,
+            int size) {
+        var params = parameters(schoolId, status, activityId, projectId, keyword)
+                .addValue("allStatuses", status == null)
+                .addValue("enteredBy", enteredBy)
+                .addValue("limit", size)
+                .addValue("offset", (long) page * size);
+        Long total = jdbc.queryForObject("SELECT COUNT(*) " + FROM_AND_WHERE, params, Long.class);
+        List<SchoolAdminScoreAttemptItem> items = jdbc.query(
+                SELECT_FIELDS + FROM_AND_WHERE + """
+                        ORDER BY sa.updated_at DESC, sa.created_at DESC, sa.id DESC
                         LIMIT :limit OFFSET :offset
                         """,
                 params,

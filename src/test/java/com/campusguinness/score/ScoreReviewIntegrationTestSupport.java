@@ -58,7 +58,7 @@ public abstract class ScoreReviewIntegrationTestSupport extends PostgreSqlIntegr
                   comparison_direction,score_unit,decimal_places,allow_tie,
                   effective_score_rule,project_status,created_at,updated_at,version)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, projectId, "Review Project " + suffix, "SPORT", "INTEGER", "COUNT",
+                """, projectId, "Review Project " + suffix, "SPORT", "INTEGER", "NUMERIC",
                 "HIGHER_BETTER", "次", 0, true, "BEST", "PUBLISHED",
                 ts(Instant.now()), ts(Instant.now()), 1);
         jdbc.update("""
@@ -67,7 +67,7 @@ public abstract class ScoreReviewIntegrationTestSupport extends PostgreSqlIntegr
                   comparison_direction,effective_score_rule,score_unit,decimal_places,
                   created_by,created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                """, ruleVersionId, projectId, 1, "INTEGER", "COUNT",
+                """, ruleVersionId, projectId, 1, "INTEGER", "NUMERIC",
                 "HIGHER_BETTER", "BEST", "次", 0, adminId, ts(Instant.now()));
         jdbc.update("UPDATE challenge_projects SET current_rule_version_id=? WHERE id=?",
                 ruleVersionId, projectId);

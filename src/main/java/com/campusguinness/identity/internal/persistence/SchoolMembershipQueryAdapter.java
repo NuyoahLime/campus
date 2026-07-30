@@ -83,4 +83,19 @@ class SchoolMembershipQueryAdapter implements SchoolMembershipQueryPort {
                 UUID.class, userId, schoolId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
+
+    @Override
+    public boolean existsOtherActiveSchoolAdmin(UUID schoolId, UUID excludedUserId) {
+        Boolean exists = jdbc.queryForObject("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM school_memberships sm
+                  WHERE sm.school_id = ?
+                    AND sm.role_in_school = 'SCHOOL_ADMIN'
+                    AND sm.status = 'ACTIVE'
+                    AND sm.user_id <> ?
+                )
+                """, Boolean.class, schoolId, excludedUserId);
+        return Boolean.TRUE.equals(exists);
+    }
 }

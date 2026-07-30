@@ -29,6 +29,8 @@ final class ScoreAttemptPersistenceMapper {
         e.setScoreStatus(domain.status().name());
         e.setSubmittedAt(domain.submittedAt());
         e.setManualMakeup(domain.isManualMakeup());
+        e.setScoreBusinessTime(domain.scoreBusinessTime());
+        e.setTimeSource(domain.timeSource());
         e.setUpdatedAt(Instant.now());
     }
 

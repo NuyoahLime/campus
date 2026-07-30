@@ -38,8 +38,8 @@ public final class ScoreAttempt {
     private final int attemptNumber;
     private final ScoreStorageType scoreStorageType;
     private ScoreValue scoreValue;
-    private final Instant scoreBusinessTime;
-    private final String timeSource;
+    private Instant scoreBusinessTime;
+    private String timeSource;
     private boolean currentEffective;
     private final UUID replacesId;
     private AttemptStatus status;
@@ -119,6 +119,34 @@ public final class ScoreAttempt {
         if (newValue == null) throw new IllegalArgumentException("scoreValue required");
         validateScoreConsistency(scoreStorageType, newValue);
         this.scoreValue = newValue;
+    }
+
+    /**
+     * Updates the mutable draft fields without changing ownership, identity, status, or
+     * effective-score selection.
+     */
+    public void updateDraft(
+            ScoreValue newValue,
+            Instant newBusinessTime,
+            String newTimeSource) {
+        if (status != AttemptStatus.DRAFT) {
+            throw new InvalidScoreAttemptStateTransitionException(status, "update draft");
+        }
+        if (newValue == null) throw new IllegalArgumentException("scoreValue required");
+        if (newBusinessTime == null) {
+            throw new IllegalArgumentException("scoreBusinessTime required");
+        }
+        String normalizedTimeSource = newTimeSource == null ? null : newTimeSource.trim();
+        if (normalizedTimeSource == null || normalizedTimeSource.isEmpty()) {
+            throw new IllegalArgumentException("timeSource required");
+        }
+        if (normalizedTimeSource.length() > 32) {
+            throw new IllegalArgumentException("timeSource must not exceed 32 characters");
+        }
+        validateScoreConsistency(scoreStorageType, newValue);
+        this.scoreValue = newValue;
+        this.scoreBusinessTime = newBusinessTime;
+        this.timeSource = normalizedTimeSource;
     }
 
     // ── State transitions ──

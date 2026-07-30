@@ -29,4 +29,7 @@ public interface SchoolMembershipQueryPort {
 
     /** Returns the membership ID only if: ACTIVE TEACHER at this school AND NORMAL account. */
     Optional<UUID> findAssignableTeacherMembershipId(UUID userId, UUID schoolId);
+
+    /** Returns whether another ACTIVE SCHOOL_ADMIN can review an entrant's score. */
+    boolean existsOtherActiveSchoolAdmin(UUID schoolId, UUID excludedUserId);
 }

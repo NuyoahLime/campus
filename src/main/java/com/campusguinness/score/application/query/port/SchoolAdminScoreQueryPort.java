@@ -17,5 +17,15 @@ public interface SchoolAdminScoreQueryPort {
             int page,
             int size);
 
+    QueryPage<SchoolAdminScoreAttemptItem> findEnteredBySchoolAdmin(
+            UUID schoolId,
+            UUID enteredBy,
+            String status,
+            UUID activityId,
+            UUID projectId,
+            String keyword,
+            int page,
+            int size);
+
     Optional<SchoolAdminScoreAttemptDetail> findDetail(UUID schoolId, UUID attemptId);
 }
