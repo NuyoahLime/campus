@@ -1,6 +1,7 @@
 package com.campusguinness.interfaces.web.ranking;
 
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.ranking.application.exception.RankingNotFoundException;
 import com.campusguinness.ranking.application.query.model.CalculatedRankingEntry;
 import com.campusguinness.ranking.application.service.*;
 import org.springframework.http.ResponseEntity;
@@ -93,11 +94,9 @@ public class RankingController {
 
     @GetMapping("/public/activity-projects/{activityProjectId}/ranking")
     public ResponseEntity<PublicRankingResponse> publicGetRanking(@PathVariable UUID activityProjectId) {
-        return studentRankingService.getCurrentRanking(activityProjectId, null)
-                .map(r -> ResponseEntity.ok(new PublicRankingResponse(r.activityProjectId(), r.version(),
-                        r.direction(), r.totalRanked(), r.entries().stream()
-                        .map(e -> new PublicRankEntry(e.rank(), e.scoreValue())).toList())))
-                .orElse(ResponseEntity.notFound().build());
+        // Public ranking requires an L3 ranking definition and approved authorization.
+        // L1 activity-project rankings are school-scoped.
+        throw new RankingNotFoundException("Ranking not found");
     }
 
     // ── DTOs ──

@@ -24,7 +24,15 @@
       </section>
       <section>
         <h3>我的成绩</h3>
-        <el-button type="primary" @click="$router.push(`/student/scores?projectId=${detail.projectId}`)">查看成绩记录</el-button>
+        <el-space wrap>
+          <el-button type="primary" @click="$router.push(`/student/scores?projectId=${detail.projectId}`)">查看成绩记录</el-button>
+          <el-button
+            data-testid="project-ranking-button"
+            @click="$router.push(`/student/rankings/${detail.activityProjectId}`)"
+          >
+            查看项目排名
+          </el-button>
+        </el-space>
       </section>
     </template>
   </div>

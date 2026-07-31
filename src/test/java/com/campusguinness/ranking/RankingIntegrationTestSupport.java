@@ -31,13 +31,14 @@ public abstract class RankingIntegrationTestSupport
     protected UUID otherAdminId;
     protected UUID teacherId;
     protected UUID studentId;
+    protected UUID studentMembershipId;
     protected UUID activityId;
     protected UUID projectId;
     protected UUID ruleVersionId;
     protected UUID activityProjectId;
     protected UUID scoreAttemptId;
 
-    private String fixtureSuffix;
+    protected String fixtureSuffix;
 
     @BeforeEach
     void seedRankingFixture() {
@@ -51,7 +52,7 @@ public abstract class RankingIntegrationTestSupport
         membership(adminId, schoolId, "SCHOOL_ADMIN", "ACTIVE");
         membership(otherAdminId, otherSchoolId, "SCHOOL_ADMIN", "ACTIVE");
         membership(teacherId, schoolId, "TEACHER", "ACTIVE");
-        UUID studentMembership = membership(
+        studentMembershipId = membership(
                 studentId, schoolId, "STUDENT", "ACTIVE");
 
         projectId = createProject(
@@ -75,7 +76,7 @@ public abstract class RankingIntegrationTestSupport
         activityProjectId = attachProject(
                 activityId, projectId, ruleVersionId);
         assignStudent(
-                activityId, activityProjectId, studentMembership, adminId);
+                activityId, activityProjectId, studentMembershipId, adminId);
         scoreAttemptId = createScore(
                 activityProjectId,
                 schoolId,

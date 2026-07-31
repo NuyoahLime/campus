@@ -11,11 +11,21 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(com.campusguinness.ranking.application.exception.StudentRankingAccessException.class)
+    public ResponseEntity<ApiErrorResponse> handleStudentRankingAccess(
+            com.campusguinness.ranking.application.exception.StudentRankingAccessException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorResponse.of(
+                        "ACCESS_DENIED", ex.getMessage(), req.getRequestURI()));
+    }
 
     @ExceptionHandler(com.campusguinness.ranking.application.exception.RankingNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleRankingNotFound(
@@ -135,6 +145,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(Exception ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiErrorResponse.of("ACCESS_DENIED", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNoResource(
+            NoResourceFoundException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of("NOT_FOUND", "Resource not found", req.getRequestURI()));
     }
 
     @ExceptionHandler(RuntimeException.class)
