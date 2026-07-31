@@ -373,7 +373,8 @@ class SchoolAdminRankingQueryAdapter implements SchoolAdminRankingQueryPort {
 
     private List<RankingEntryItem> findEntries(UUID versionId) {
         return jdbc.query("""
-                SELECT entry.rank_position,
+                SELECT entry.id AS ranking_entry_id,
+                       entry.rank_position,
                        entry.student_id,
                        entry.student_display_name,
                        entry.school_name,
@@ -388,6 +389,7 @@ class SchoolAdminRankingQueryAdapter implements SchoolAdminRankingQueryPort {
                 """,
                 new MapSqlParameterSource("versionId", versionId),
                 (rs, rowNumber) -> new RankingEntryItem(
+                        rs.getObject("ranking_entry_id", UUID.class),
                         rs.getInt("rank_position"),
                         rs.getObject("student_id", UUID.class),
                         rs.getString("student_display_name"),

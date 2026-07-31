@@ -18,6 +18,15 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.campusguinness.achievement.application.exception.AchievementNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleAchievementNotFound(
+            com.campusguinness.achievement.application.exception.AchievementNotFoundException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of(
+                        "NOT_FOUND", ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler(com.campusguinness.ranking.application.exception.StudentRankingAccessException.class)
     public ResponseEntity<ApiErrorResponse> handleStudentRankingAccess(
             com.campusguinness.ranking.application.exception.StudentRankingAccessException ex,

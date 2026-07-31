@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { ApiError } from '@/api/http';
+import * as achievementApi from '@/api/school-admin-achievement';
 import * as api from '@/api/school-admin-ranking';
 import type {
   RankingPreviewResult,
@@ -12,9 +13,12 @@ import type {
   RankingVersionSummary,
 } from '@/types/school-admin-ranking';
 import SchoolAdminRankingManagement from '@/views/workbench/SchoolAdminRankingManagement.vue';
+import type { SchoolAdminAchievementDetail } from '@/types/student-achievement';
 
 const PROJECT_ID = '11111111-1111-4111-8111-111111111111';
 const VERSION_ID = '22222222-2222-4222-8222-222222222222';
+const ENTRY_ID = '33333333-3333-4333-8333-333333333333';
+const SECOND_ENTRY_ID = '44444444-4444-4444-8444-444444444444';
 const FINGERPRINT = 'a'.repeat(64);
 
 let unhandledErrors: unknown[] = [];
@@ -114,7 +118,10 @@ function version(overrides: Partial<RankingVersionDetail> = {}): RankingVersionD
     decimalPlaces: 0,
     currentRuleVersionId: 'rule-1',
     sourceFingerprint: FINGERPRINT,
-    entries: preview().entries,
+    entries: preview().entries.map((entry, index) => ({
+      ...entry,
+      rankingEntryId: index === 0 ? ENTRY_ID : SECOND_ENTRY_ID,
+    })),
     ...overrides,
   };
 }
@@ -181,6 +188,49 @@ function mockBase(rows: RankingProjectItem[] = [project()], total = rows.length)
   vi.spyOn(api, 'fetchRankingVersions').mockResolvedValue(historyPage());
   vi.spyOn(api, 'fetchRankingVersion').mockResolvedValue(version());
   vi.spyOn(api, 'withdrawRanking').mockResolvedValue();
+  vi.spyOn(
+    achievementApi,
+    'fetchRankingVersionAchievementStatuses',
+  ).mockResolvedValue([]);
+  vi.spyOn(
+    achievementApi,
+    'issueAchievementForRankingEntry',
+  ).mockResolvedValue(achievementDetail());
+  vi.spyOn(
+    achievementApi,
+    'fetchSchoolAchievementRecord',
+  ).mockResolvedValue(achievementDetail());
+}
+
+function achievementDetail(
+  overrides: Partial<SchoolAdminAchievementDetail> = {},
+): SchoolAdminAchievementDetail {
+  return {
+    recordId: '55555555-5555-4555-8555-555555555555',
+    activityProjectId: PROJECT_ID,
+    rankingVersionId: VERSION_ID,
+    rankingVersionNumber: 1,
+    rankingEntryId: ENTRY_ID,
+    studentId: 'student-2',
+    studentDisplayName: 'Bob',
+    schoolName: '学校',
+    activityTitle: '校园跳绳赛',
+    projectName: '一分钟跳绳',
+    rankPosition: 1,
+    scoreDisplayValue: '99',
+    scoreStorageType: 'INTEGER',
+    recordTitle: '校园跳绳赛 · 一分钟跳绳 · 第1名',
+    verificationCode: 'a'.repeat(32),
+    status: 'ACTIVE',
+    issuedAt: '2026-07-30T08:20:00Z',
+    issuedBy: 'admin-1',
+    issuedByName: 'Admin Li',
+    revokedAt: null,
+    revokedBy: null,
+    revocationReason: null,
+    created: true,
+    ...overrides,
+  };
 }
 
 function cleanupOverlays() {
@@ -484,6 +534,130 @@ describe('SchoolAdminRankingManagement', () => {
       expect(api.previewRanking).not.toHaveBeenCalled();
       expect(document.body.querySelector('.ranking-current-dialog')?.textContent)
         .toContain('Admin Li');
+    });
+  });
+
+  it('currentRankingLoadsAchievementStatusesOnce', async () => {
+    mockBase();
+    await withMounted(async wrapper => {
+      await wrapper.find('.current-button').trigger('click');
+      await flushPromises();
+
+      expect(
+        achievementApi.fetchRankingVersionAchievementStatuses,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        achievementApi.fetchRankingVersionAchievementStatuses,
+      ).toHaveBeenCalledWith(VERSION_ID);
+    });
+  });
+
+  it('unissuedEntryShowsIssueButtonAndConfirmationSnapshot', async () => {
+    mockBase();
+    await withMounted(async wrapper => {
+      await wrapper.find('.current-button').trigger('click');
+      await flushPromises();
+
+      bodyButton(
+        `.ranking-current-dialog [data-ranking-entry-id="${ENTRY_ID}"]`,
+      ).click();
+      await flushPromises();
+
+      const dialog = document.body.querySelector('.achievement-issue-dialog');
+      expect(dialog).not.toBeNull();
+      expect(dialog?.textContent).toContain('Bob');
+      expect(dialog?.textContent).toContain('校园跳绳赛');
+      expect(dialog?.textContent).toContain('一分钟跳绳');
+      expect(dialog?.textContent).toContain('第1名');
+      expect(dialog?.textContent).toContain('99');
+    });
+  });
+
+  it('issuedEntryShowsExistingStatus', async () => {
+    mockBase();
+    vi.mocked(
+      achievementApi.fetchRankingVersionAchievementStatuses,
+    ).mockResolvedValue([
+      {
+        rankingEntryId: ENTRY_ID,
+        achievementRecordId: 'record-1',
+        achievementStatus: 'ACTIVE',
+        verificationCode: 'a'.repeat(32),
+        issuedAt: '2026-07-30T08:20:00Z',
+      },
+    ]);
+
+    await withMounted(async wrapper => {
+      await wrapper.find('.current-button').trigger('click');
+      await flushPromises();
+
+      expect(
+        document.body.querySelector('.ranking-current-dialog')?.textContent,
+      ).toContain('已签发 · 有效');
+      expect(
+        document.body.querySelector(
+          `.ranking-current-dialog [data-ranking-entry-id="${ENTRY_ID}"]`,
+        ),
+      ).toBeNull();
+    });
+  });
+
+  it('doubleIssueOnlyCallsApiOnceAndUsesRankingEntryId', async () => {
+    mockBase();
+    const pending = deferred<SchoolAdminAchievementDetail>();
+    vi.mocked(
+      achievementApi.issueAchievementForRankingEntry,
+    ).mockReturnValue(pending.promise);
+    await withMounted(async wrapper => {
+      await wrapper.find('.current-button').trigger('click');
+      await flushPromises();
+      bodyButton(
+        `.ranking-current-dialog [data-ranking-entry-id="${ENTRY_ID}"]`,
+      ).click();
+      await flushPromises();
+
+      const confirm = bodyButton('.confirm-achievement-issue');
+      confirm.click();
+      confirm.click();
+      await nextTick();
+
+      expect(
+        achievementApi.issueAchievementForRankingEntry,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        achievementApi.issueAchievementForRankingEntry,
+      ).toHaveBeenCalledWith(ENTRY_ID);
+      pending.resolve(achievementDetail());
+      await flushPromises();
+    });
+  });
+
+  it('issueSuccessUpdatesEntryWithoutReloadAndHasNoPayload', async () => {
+    mockBase();
+    await withMounted(async wrapper => {
+      await wrapper.find('.current-button').trigger('click');
+      await flushPromises();
+      bodyButton(
+        `.ranking-current-dialog [data-ranking-entry-id="${ENTRY_ID}"]`,
+      ).click();
+      await flushPromises();
+      bodyButton('.confirm-achievement-issue').click();
+      await flushPromises();
+
+      expect(
+        achievementApi.issueAchievementForRankingEntry,
+      ).toHaveBeenCalledWith(ENTRY_ID);
+      expect(
+        vi.mocked(achievementApi.issueAchievementForRankingEntry).mock
+          .calls[0],
+      ).toHaveLength(1);
+      expect(api.fetchCurrentRanking).toHaveBeenCalledTimes(1);
+      expect(
+        achievementApi.fetchRankingVersionAchievementStatuses,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        document.body.querySelector('.ranking-current-dialog')?.textContent,
+      ).toContain('已签发 · 有效');
     });
   });
 

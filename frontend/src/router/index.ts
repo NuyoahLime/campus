@@ -32,6 +32,16 @@ const router = createRouter({
       component: () => import('@/views/activities/ActivityDetailView.vue'),
       props: true,
     },
+    {
+      path: '/achievements/verify',
+      name: 'achievement-verification',
+      component: () => import('@/views/AchievementVerificationView.vue'),
+    },
+    {
+      path: '/achievements/verify/:verificationCode',
+      name: 'achievement-verification-code',
+      component: () => import('@/views/AchievementVerificationView.vue'),
+    },
     // Auth routes
     {
       path: '/login',
@@ -76,7 +86,8 @@ const router = createRouter({
         { path: 'rankings', name: 'student-rankings', component: () => import('@/views/workbench/StudentRankingList.vue') },
         { path: 'rankings/:activityProjectId', name: 'student-ranking-detail', component: () => import('@/views/workbench/StudentRankingDetail.vue') },
         { path: 'appeals', name: 'student-appeals', component: () => import('@/views/NotImplementedView.vue') },
-        { path: 'achievements', name: 'student-achievements', component: () => import('@/views/NotImplementedView.vue') },
+        { path: 'achievements', name: 'student-achievements', component: () => import('@/views/workbench/StudentAchievementList.vue') },
+        { path: 'achievements/:recordId', name: 'student-achievement-detail', component: () => import('@/views/workbench/StudentAchievementDetail.vue') },
       ],
     },
     // Teacher workbench

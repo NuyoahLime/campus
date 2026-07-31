@@ -70,6 +70,11 @@ export interface RankingProjectDetail extends RankingProjectItem {
 }
 
 export interface RankingEntryItem {
+  /**
+   * Preview rows are calculated and have no persisted entry id. Published
+   * current/history version rows always include this field.
+   */
+  rankingEntryId?: string;
   rankPosition: number;
   studentId: string;
   studentDisplayName: string;

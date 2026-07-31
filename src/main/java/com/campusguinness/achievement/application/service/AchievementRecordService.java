@@ -1,104 +1,168 @@
 package com.campusguinness.achievement.application.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.campusguinness.achievement.application.port.AchievementIssuancePort;
+import com.campusguinness.achievement.application.query.model.AchievementRecordDetail;
+import com.campusguinness.achievement.application.query.model.AchievementRecordItem;
+import com.campusguinness.achievement.application.query.model.PublicAchievementVerification;
+import com.campusguinness.achievement.application.query.model.SchoolAdminAchievementDetail;
+import com.campusguinness.achievement.application.query.port.AchievementRecordQueryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.Instant;
-import java.util.*;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Compatibility facade for the original achievement-record endpoints and the
+ * ranking-withdrawal integration.
+ */
 @Service
 @Transactional
 public class AchievementRecordService {
-    private final JdbcTemplate jdbc;
 
-    public AchievementRecordService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final SchoolAdminAchievementApplicationService schoolAdminService;
+    private final StudentAchievementApplicationService studentService;
+    private final PublicAchievementVerificationService publicService;
+    private final AchievementRecordQueryPort records;
+    private final AchievementIssuancePort issuance;
 
-    public record Record(UUID id, UUID activityProjectId, UUID studentId, int rank,
-            String scoreValue, String storageType, String title, String verificationCode,
-            String status, Instant issuedAt, UUID issuedBy, Instant revokedAt, String revocationReason) {}
+    public AchievementRecordService(
+            SchoolAdminAchievementApplicationService schoolAdminService,
+            StudentAchievementApplicationService studentService,
+            PublicAchievementVerificationService publicService,
+            AchievementRecordQueryPort records,
+            AchievementIssuancePort issuance) {
+        this.schoolAdminService = schoolAdminService;
+        this.studentService = studentService;
+        this.publicService = publicService;
+        this.records = records;
+        this.issuance = issuance;
+    }
 
-    public Record issue(UUID activityProjectId, UUID rankingEntryId, UUID issuedBy) {
-        var vRows = jdbc.queryForList(
-                "SELECT version.id, version.version_number, "
-                        + "version.calculation_params ->> 'scoreStorageType' AS score_storage_type "
-                        + "FROM ranking_definitions definition "
-                        + "JOIN ranking_versions version ON version.id = definition.current_version_id "
-                        + "WHERE definition.activity_project_id = ? "
-                        + "AND version.version_status = 'PUBLISHED' "
-                        + "AND version.withdrawn_at IS NULL",
-                activityProjectId);
-        if (vRows.isEmpty()) throw new IllegalStateException("No current published ranking");
-        UUID versionId = (UUID) vRows.getFirst().get("id");
+    public record Record(
+            UUID id,
+            UUID activityProjectId,
+            UUID studentId,
+            int rank,
+            String scoreValue,
+            String storageType,
+            String title,
+            String verificationCode,
+            String status,
+            Instant issuedAt,
+            UUID issuedBy,
+            Instant revokedAt,
+            String revocationReason) {
+    }
 
-        var eRows = jdbc.queryForList(
-                "SELECT student_id, rank_position, score_display_value "
-                        + "FROM ranking_entries WHERE id = ? AND version_id = ?",
-                rankingEntryId, versionId);
-        if (eRows.isEmpty()) throw new IllegalArgumentException("Ranking entry not found in current version");
-
-        var entry = eRows.getFirst();
-        UUID id = UUID.randomUUID();
-        String code = UUID.randomUUID().toString().replace("-", "");
-        Instant now = Instant.now();
-
-        jdbc.update("INSERT INTO achievement_records (id, activity_project_id, ranking_version_id, ranking_entry_id, " +
-                "student_id, rank_snapshot, score_value_snapshot, score_storage_type, record_title, verification_code, " +
-                "status, issued_at, issued_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                id, activityProjectId, versionId, rankingEntryId, entry.get("student_id"),
-                entry.get("rank_position"), entry.get("score_display_value"),
-                vRows.getFirst().get("score_storage_type"),
-                "Achievement Record", code, "ACTIVE", now, issuedBy);
-
-        return new Record(
-                id,
-                activityProjectId,
-                (UUID) entry.get("student_id"),
-                (int) entry.get("rank_position"),
-                (String) entry.get("score_display_value"),
-                (String) vRows.getFirst().get("score_storage_type"),
-                "Achievement Record", code, "ACTIVE", now, issuedBy, null, null);
+    public Record issue(
+            UUID activityProjectId, UUID rankingEntryId, UUID issuedBy) {
+        return fromAdmin(schoolAdminService.issueAsSuperAdmin(
+                issuedBy, activityProjectId, rankingEntryId).record());
     }
 
     @Transactional(readOnly = true)
     public List<Record> listMine(UUID studentId) {
-        return jdbc.queryForList(
-                "SELECT * FROM achievement_records WHERE student_id = ? ORDER BY issued_at DESC", studentId)
-                .stream().map(this::map).toList();
+        return studentService.list(studentId, null, null, 0, 100)
+                .items().stream().map(AchievementRecordService::fromStudentItem)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public Optional<Record> getMine(UUID id, UUID studentId) {
-        var rows = jdbc.queryForList(
-                "SELECT * FROM achievement_records WHERE id = ? AND student_id = ?", id, studentId);
-        return rows.isEmpty() ? Optional.empty() : Optional.of(map(rows.getFirst()));
+        return records.findStudentRecord(studentId, id)
+                .map(AchievementRecordService::fromStudentDetail);
     }
 
     @Transactional(readOnly = true)
     public List<Record> listByProject(UUID activityProjectId) {
-        return jdbc.queryForList(
-                "SELECT * FROM achievement_records WHERE activity_project_id = ? ORDER BY rank ASC", activityProjectId)
-                .stream().map(this::map).toList();
+        return schoolAdminService.listForSuperAdmin(activityProjectId)
+                .stream().map(AchievementRecordService::fromAdmin).toList();
     }
 
     @Transactional(readOnly = true)
     public Optional<Record> verify(String verificationCode) {
-        var rows = jdbc.queryForList(
-                "SELECT * FROM achievement_records WHERE verification_code = ?", verificationCode);
-        return rows.isEmpty() ? Optional.empty() : Optional.of(map(rows.getFirst()));
+        try {
+            return Optional.of(fromPublic(publicService.verify(
+                    verificationCode)));
+        } catch (com.campusguinness.achievement.application.exception
+                .AchievementNotFoundException ignored) {
+            return Optional.empty();
+        }
     }
 
-    public void revokeByRankingVersion(UUID versionId, UUID revokedBy, String reason) {
-        jdbc.update("UPDATE achievement_records SET status = 'REVOKED', revoked_at = now(), " +
-                "revoked_by = ?, revocation_reason = ? WHERE ranking_version_id = ? AND status = 'ACTIVE'",
-                revokedBy, reason, versionId);
+    public void revokeByRankingVersion(
+            UUID versionId, UUID revokedBy, String reason) {
+        issuance.revokeByRankingVersion(versionId, revokedBy, reason);
     }
 
-    private Record map(Map<String, Object> r) {
-        return new Record((UUID)r.get("id"), (UUID)r.get("activity_project_id"), (UUID)r.get("student_id"),
-                (int)r.get("rank_snapshot"), (String)r.get("score_value_snapshot"),
-                (String)r.get("score_storage_type"), (String)r.get("record_title"),
-                (String)r.get("verification_code"), (String)r.get("status"),
-                (Instant)r.get("issued_at"), (UUID)r.get("issued_by"),
-                (Instant)r.get("revoked_at"), (String)r.get("revocation_reason"));
+    private static Record fromAdmin(SchoolAdminAchievementDetail value) {
+        return new Record(
+                value.recordId(),
+                value.activityProjectId(),
+                value.studentId(),
+                value.rankPosition(),
+                value.scoreDisplayValue(),
+                value.scoreStorageType(),
+                value.recordTitle(),
+                value.verificationCode(),
+                value.status().name(),
+                value.issuedAt(),
+                value.issuedBy(),
+                value.revokedAt(),
+                value.revocationReason());
+    }
+
+    private static Record fromStudentItem(AchievementRecordItem value) {
+        return new Record(
+                value.recordId(),
+                null,
+                null,
+                value.rankPosition(),
+                value.scoreDisplayValue(),
+                value.scoreStorageType(),
+                value.recordTitle(),
+                value.verificationCode(),
+                value.status().name(),
+                value.issuedAt(),
+                null,
+                value.revokedAt(),
+                null);
+    }
+
+    private static Record fromStudentDetail(AchievementRecordDetail value) {
+        return new Record(
+                value.recordId(),
+                value.activityProjectId(),
+                null,
+                value.rankPosition(),
+                value.scoreDisplayValue(),
+                value.scoreStorageType(),
+                value.recordTitle(),
+                value.verificationCode(),
+                value.status().name(),
+                value.issuedAt(),
+                null,
+                value.revokedAt(),
+                value.revocationReason());
+    }
+
+    private static Record fromPublic(PublicAchievementVerification value) {
+        return new Record(
+                null,
+                null,
+                null,
+                value.rankPosition(),
+                value.scoreDisplayValue(),
+                value.scoreStorageType(),
+                value.recordTitle(),
+                null,
+                value.status().name(),
+                value.issuedAt(),
+                null,
+                value.revokedAt(),
+                null);
     }
 }

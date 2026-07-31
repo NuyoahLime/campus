@@ -1,6 +1,8 @@
 package com.campusguinness.interfaces.web.achievement;
 
 import com.campusguinness.achievement.application.service.AchievementRecordService;
+import com.campusguinness.achievement.application.query.model.PublicAchievementVerification;
+import com.campusguinness.achievement.application.service.PublicAchievementVerificationService;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,14 +15,20 @@ import java.util.UUID;
 @RequestMapping("/api/v1")
 public class AchievementRecordController {
     private final AchievementRecordService service;
+    private final PublicAchievementVerificationService publicService;
     private final CurrentActor currentActor;
 
-    public AchievementRecordController(AchievementRecordService service, CurrentActor currentActor) {
-        this.service = service; this.currentActor = currentActor;
+    public AchievementRecordController(
+            AchievementRecordService service,
+            PublicAchievementVerificationService publicService,
+            CurrentActor currentActor) {
+        this.service = service;
+        this.publicService = publicService;
+        this.currentActor = currentActor;
     }
 
     @PostMapping("/activity-projects/{activityProjectId}/achievement-records")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<AdminRecord> issue(@PathVariable UUID activityProjectId,
                                               @RequestBody IssueRequest req) {
         var r = service.issue(activityProjectId, req.rankingEntryId(), currentActor.requireUserId());
@@ -30,7 +38,7 @@ public class AchievementRecordController {
     }
 
     @GetMapping("/activity-projects/{activityProjectId}/achievement-records")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public List<AdminRecord> listProject(@PathVariable UUID activityProjectId) {
         return service.listByProject(activityProjectId).stream().map(r -> new AdminRecord(
                 r.id(), r.activityProjectId(), r.studentId(), r.rank(), r.scoreValue(),
@@ -54,13 +62,12 @@ public class AchievementRecordController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/public/achievement-records/{verificationCode}")
-    public ResponseEntity<PublicRecord> verify(@PathVariable String verificationCode) {
-        return service.verify(verificationCode)
-                .map(r -> ResponseEntity.ok(new PublicRecord(
-                        "ACTIVE".equals(r.status()), r.status(), r.title(), r.rank(),
-                        r.scoreValue(), r.issuedAt(), r.revokedAt())))
-                .orElse(ResponseEntity.notFound().build());
+    @GetMapping({
+            "/public/achievement-records/{verificationCode}",
+            "/public/achievement-records/verify/{verificationCode}"})
+    public PublicAchievementVerification verify(
+            @PathVariable String verificationCode) {
+        return publicService.verify(verificationCode);
     }
 
     public record IssueRequest(UUID rankingEntryId) {}
@@ -69,6 +76,4 @@ public class AchievementRecordController {
             String status, Instant issuedAt, Instant revokedAt) {}
     public record StudentRecord(UUID id, String title, int rank, String scoreValue,
             String verificationCode, String status, Instant issuedAt, Instant revokedAt) {}
-    public record PublicRecord(boolean valid, String status, String title, int rank,
-            String scoreValue, Instant issuedAt, Instant revokedAt) {}
 }

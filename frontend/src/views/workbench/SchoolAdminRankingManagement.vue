@@ -309,7 +309,61 @@
           <el-button class="current-retry" type="primary" @click="retryCurrent">重试</el-button>
         </template>
       </el-result>
-      <version-content v-else-if="currentVersion" :version="currentVersion" />
+      <template v-else-if="currentVersion">
+        <el-alert
+          v-if="achievementStatusError"
+          class="achievement-status-error"
+          :title="achievementStatusError"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+        <version-content
+          :version="currentVersion"
+          :achievement-statuses="achievementStatuses"
+          :issuing-entry-id="issuingEntryId"
+          enable-achievements
+          @issue="openIssueConfirmation"
+        />
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="issueVisible"
+      class="achievement-issue-dialog"
+      title="确认签发成就"
+      width="560px"
+    >
+      <el-alert
+        title="成就内容将保存为不可变快照，请确认排名条目。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <el-descriptions v-if="issueEntry && currentVersion" :column="2" border>
+        <el-descriptions-item label="学生">{{ issueEntry.studentDisplayName }}</el-descriptions-item>
+        <el-descriptions-item label="学校">{{ issueEntry.schoolName || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="活动">{{ currentVersion.activityTitle }}</el-descriptions-item>
+        <el-descriptions-item label="项目">{{ currentVersion.projectName }}</el-descriptions-item>
+        <el-descriptions-item label="排名版本">V{{ currentVersion.versionNumber }}</el-descriptions-item>
+        <el-descriptions-item label="名次">第{{ issueEntry.rankPosition }}名</el-descriptions-item>
+        <el-descriptions-item label="成绩">{{ issueEntry.scoreDisplayValue }}</el-descriptions-item>
+        <el-descriptions-item label="成就标题">
+          {{ currentVersion.activityTitle }} · {{ currentVersion.projectName }} · 第{{ issueEntry.rankPosition }}名
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button :disabled="issueSubmitting" @click="issueVisible = false">取消</el-button>
+        <el-button
+          class="confirm-achievement-issue"
+          type="primary"
+          :loading="issueSubmitting"
+          :disabled="issueSubmitting"
+          @click="confirmIssue"
+        >
+          确认签发
+        </el-button>
+      </template>
     </el-dialog>
 
     <el-dialog v-model="historyVisible" class="ranking-history-dialog" title="排名历史" width="920px">
@@ -410,8 +464,20 @@
 
 <script setup lang="ts">
 import { defineComponent, h, onMounted, ref } from 'vue';
-import { ElDescriptions, ElDescriptionsItem, ElMessage, ElTable, ElTableColumn } from 'element-plus';
+import {
+  ElButton,
+  ElDescriptions,
+  ElDescriptionsItem,
+  ElMessage,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+} from 'element-plus';
 import { ApiError } from '@/api/http';
+import {
+  fetchRankingVersionAchievementStatuses,
+  issueAchievementForRankingEntry,
+} from '@/api/school-admin-achievement';
 import {
   fetchCurrentRanking,
   fetchRankingProject,
@@ -434,6 +500,10 @@ import type {
   RankingVersionSummary,
   TiePolicy,
 } from '@/types/school-admin-ranking';
+import type {
+  SchoolAdminAchievementDetail,
+  SchoolAdminAchievementStatus,
+} from '@/types/student-achievement';
 
 const RankingEntryTable = defineComponent({
   name: 'RankingEntryTable',
@@ -446,12 +516,27 @@ const RankingEntryTable = defineComponent({
       type: Boolean,
       default: false,
     },
+    achievementStatuses: {
+      type: Object as () => Record<string, SchoolAdminAchievementStatus>,
+      default: () => ({}),
+    },
+    enableAchievements: {
+      type: Boolean,
+      default: false,
+    },
+    issuingEntryId: {
+      type: String,
+      default: '',
+    },
   },
-  setup(props) {
+  emits: {
+    issue: (entry: RankingEntryItem) => Boolean(entry.rankingEntryId),
+  },
+  setup(props, { emit }) {
     return () => h(ElTable, {
       class: 'ranking-entry-table',
       data: props.entries,
-      rowKey: 'scoreAttemptId',
+      rowKey: props.enableAchievements ? 'rankingEntryId' : 'scoreAttemptId',
     }, {
       default: () => [
         h(ElTableColumn, { prop: 'rankPosition', label: '名次', width: 80 }),
@@ -463,6 +548,37 @@ const RankingEntryTable = defineComponent({
               minWidth: 170,
             }, {
               default: ({ row }: { row: RankingEntryItem }) => formatTime(row.scoreBusinessTime),
+            })]
+          : []),
+        ...(props.enableAchievements
+          ? [h(ElTableColumn, {
+              label: '成就状态',
+              minWidth: 180,
+              fixed: 'right',
+            }, {
+              default: ({ row }: { row: RankingEntryItem }) => {
+                if (!row.rankingEntryId) return h('span', '—');
+                const status = props.achievementStatuses[row.rankingEntryId];
+                if (status?.achievementRecordId) {
+                  return h('div', { class: 'achievement-issued' }, [
+                    h(ElTag, {
+                      type: status.achievementStatus === 'ACTIVE' ? 'success' : 'danger',
+                    }, () => status.achievementStatus === 'ACTIVE' ? '已签发 · 有效' : '已签发 · 已撤销'),
+                    status.verificationCode
+                      ? h('small', { class: 'achievement-code' }, status.verificationCode)
+                      : null,
+                  ]);
+                }
+                return h(ElButton, {
+                  class: 'issue-achievement-button',
+                  link: true,
+                  type: 'primary',
+                  loading: props.issuingEntryId === row.rankingEntryId,
+                  disabled: Boolean(props.issuingEntryId),
+                  'data-ranking-entry-id': row.rankingEntryId,
+                  onClick: () => emit('issue', row),
+                }, () => '签发成就');
+              },
             })]
           : []),
       ],
@@ -477,8 +593,23 @@ const VersionContent = defineComponent({
       type: Object as () => RankingVersionDetail,
       required: true,
     },
+    achievementStatuses: {
+      type: Object as () => Record<string, SchoolAdminAchievementStatus>,
+      default: () => ({}),
+    },
+    enableAchievements: {
+      type: Boolean,
+      default: false,
+    },
+    issuingEntryId: {
+      type: String,
+      default: '',
+    },
   },
-  setup(props) {
+  emits: {
+    issue: (entry: RankingEntryItem) => Boolean(entry.rankingEntryId),
+  },
+  setup(props, { emit }) {
     return () => h('div', { class: 'version-content' }, [
       h(ElDescriptions, { column: 3, border: true }, {
         default: () => [
@@ -497,7 +628,13 @@ const VersionContent = defineComponent({
             shortFingerprint(props.version.sourceFingerprint)),
         ],
       }),
-      h(RankingEntryTable, { entries: props.version.entries }),
+      h(RankingEntryTable, {
+        entries: props.version.entries,
+        achievementStatuses: props.achievementStatuses,
+        enableAchievements: props.enableAchievements,
+        issuingEntryId: props.issuingEntryId,
+        onIssue: (entry: RankingEntryItem) => emit('issue', entry),
+      }),
     ]);
   },
 });
@@ -542,6 +679,12 @@ const currentVersion = ref<RankingVersionDetail | null>(null);
 const currentVisible = ref(false);
 const currentLoading = ref(false);
 const currentError = ref('');
+const achievementStatuses = ref<Record<string, SchoolAdminAchievementStatus>>({});
+const achievementStatusError = ref('');
+const issueVisible = ref(false);
+const issueEntry = ref<RankingEntryItem | null>(null);
+const issueSubmitting = ref(false);
+const issuingEntryId = ref('');
 
 const historyProject = ref<RankingProjectItem | null>(null);
 const versions = ref<RankingVersionSummary[]>([]);
@@ -691,6 +834,7 @@ async function confirmPublish() {
     previewVisible.value = false;
     await loadProjects();
     currentVersion.value = version;
+    await loadAchievementStatuses(version.versionId);
     currentError.value = '';
     currentVisible.value = true;
     ElMessage.success('排名发布成功');
@@ -719,13 +863,69 @@ async function loadCurrent(activityProjectId: string) {
   currentLoading.value = true;
   currentError.value = '';
   currentVersion.value = null;
+  achievementStatuses.value = {};
+  achievementStatusError.value = '';
   try {
-    currentVersion.value = await fetchCurrentRanking(activityProjectId);
+    const version = await fetchCurrentRanking(activityProjectId);
+    currentVersion.value = version;
+    await loadAchievementStatuses(version.versionId);
   } catch (error) {
     currentError.value = errorMessage(error);
   } finally {
     currentLoading.value = false;
   }
+}
+
+async function loadAchievementStatuses(rankingVersionId: string) {
+  achievementStatusError.value = '';
+  try {
+    const statuses = await fetchRankingVersionAchievementStatuses(rankingVersionId);
+    achievementStatuses.value = Object.fromEntries(
+      statuses.map(status => [status.rankingEntryId, status]),
+    );
+  } catch (error) {
+    achievementStatuses.value = {};
+    achievementStatusError.value = `成就签发状态加载失败：${errorMessage(error)}`;
+  }
+}
+
+function openIssueConfirmation(entry: RankingEntryItem) {
+  if (!entry.rankingEntryId || issueSubmitting.value || issuingEntryId.value) return;
+  if (achievementStatuses.value[entry.rankingEntryId]?.achievementRecordId) return;
+  issueEntry.value = entry;
+  issueVisible.value = true;
+}
+
+async function confirmIssue() {
+  const entry = issueEntry.value;
+  const rankingEntryId = entry?.rankingEntryId;
+  if (!rankingEntryId || issueSubmitting.value || issuingEntryId.value) return;
+  issueSubmitting.value = true;
+  issuingEntryId.value = rankingEntryId;
+  try {
+    const issued = await issueAchievementForRankingEntry(rankingEntryId);
+    updateAchievementStatus(issued);
+    issueVisible.value = false;
+    ElMessage.success(issued.created ? '成就签发成功' : '该成就已签发');
+  } catch (error) {
+    ElMessage.error(errorMessage(error));
+  } finally {
+    issueSubmitting.value = false;
+    issuingEntryId.value = '';
+  }
+}
+
+function updateAchievementStatus(issued: SchoolAdminAchievementDetail) {
+  achievementStatuses.value = {
+    ...achievementStatuses.value,
+    [issued.rankingEntryId]: {
+      rankingEntryId: issued.rankingEntryId,
+      achievementRecordId: issued.recordId,
+      achievementStatus: issued.status,
+      verificationCode: issued.verificationCode,
+      issuedAt: issued.issuedAt,
+    },
+  };
 }
 
 async function retryCurrent() {
@@ -903,5 +1103,27 @@ function shortFingerprint(value: string): string {
 
 .ranking-entry-table {
   margin-top: 16px;
+}
+
+.achievement-status-error {
+  margin-bottom: 12px;
+}
+
+.achievement-issue-dialog :deep(.el-descriptions) {
+  margin-top: 16px;
+}
+
+.achievement-issued {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+}
+
+.achievement-code {
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--el-text-color-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  text-overflow: ellipsis;
 }
 </style>
