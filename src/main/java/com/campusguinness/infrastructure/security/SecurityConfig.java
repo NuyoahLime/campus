@@ -9,9 +9,13 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -36,14 +40,29 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository repo) throws Exception {
+    public CsrfTokenRepository csrfTokenRepository() {
+        var repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repo.setCookieCustomizer(cookie -> cookie.sameSite("Lax"));
+        return repo;
+    }
+
+    @Bean
+    public SessionAuthenticationStrategy sessionAuthenticationStrategy(
+            CsrfTokenRepository csrfTokenRepository) {
+        // Session ID rotation is performed explicitly in AuthController so that
+        // the custom programmatic login flow has an obvious and testable order.
+        // This strategy is responsible only for clearing the pre-login CSRF token.
+        return new CompositeSessionAuthenticationStrategy(List.of(
+                new CsrfAuthenticationStrategy(csrfTokenRepository)));
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+            SecurityContextRepository repo,
+            CsrfTokenRepository csrfTokenRepository) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> {
-                var csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
-                csrfRepo.setCookieCustomizer(cookie -> cookie.sameSite("Lax"));
-                csrf.csrfTokenRepository(csrfRepo);
-            })
+            .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository))
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(new JsonAuthenticationEntryPoint())
                 .accessDeniedHandler(new JsonAccessDeniedHandler()))

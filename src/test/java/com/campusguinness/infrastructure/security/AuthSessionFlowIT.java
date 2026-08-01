@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.test.context.ActiveProfiles;
@@ -16,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -112,5 +114,22 @@ class AuthSessionFlowIT {
         Assertions.assertNotNull(session);
         Assertions.assertNotNull(session.getAttribute("SPRING_SECURITY_CONTEXT"),
                 "SPRING_SECURITY_CONTEXT must be saved to session by SecurityContextRepository");
+    }
+
+    // ── Phase 2: Session Fixation ──
+
+    @Test void failedLoginDoesNotWriteSecurityContext() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"wrong\"}"))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(session.getAttribute("SPRING_SECURITY_CONTEXT"))
+                .as("Failed authentication must not write SPRING_SECURITY_CONTEXT to session")
+                .isNull();
     }
 }
