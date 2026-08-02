@@ -23,13 +23,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RankingDefinitionControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean RankingDefinitionApplicationService service;
+    @MockitoBean com.campusguinness.infrastructure.security.CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Test void createReturns201() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
         when(service.create(any(), anyString(), any(), any(), any())).thenReturn(new RankingDefinitionResult(id, true));
         mvc.perform(post("/api/v1/ranking-definitions").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID(),UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID()))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.enabled").value(true));
     }
     @Test void enableReturns200() throws Exception {

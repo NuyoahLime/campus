@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/campus_guinness
-    username: postgres
-    password: postgres
+    username: campus
+    password: campus
 
 logging:
   level:

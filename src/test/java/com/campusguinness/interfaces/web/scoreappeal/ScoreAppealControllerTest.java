@@ -24,21 +24,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ScoreAppealControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService service;
-    @MockitoBean CurrentActor currentActor;
+    @MockitoBean com.campusguinness.infrastructure.security.CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
         when(service.submit(any(), any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/score-appeals").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
+                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED")).andExpect(jsonPath("$.id").exists());
     }
     @Test void beginProcessingReturns200() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
         when(service.beginProcessing(eq(id), any())).thenReturn(new ScoreAppealResult(id, "PROCESSING"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
     }
     @Test void rejectReturns200() throws Exception {
@@ -52,27 +55,32 @@ class ScoreAppealControllerTest {
     }
     @Test void withdrawReturns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.withdraw(id)).thenReturn(new ScoreAppealResult(id, "WITHDRAWN"));
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
+        when(service.withdraw(eq(id), any())).thenReturn(new ScoreAppealResult(id, "WITHDRAWN"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/withdraw"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
     }
     @Test void notFoundReturns404() throws Exception {
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
         when(service.beginProcessing(any(), any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/score-appeals/" + UUID.randomUUID() + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isNotFound());
     }
     @Test void stateConflictReturns409() throws Exception {
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
         when(service.beginProcessing(any(), any())).thenThrow(new InvalidAppealStateTransitionException(AppealStatus.RESOLVED, "begin processing"));
         mvc.perform(post("/api/v1/score-appeals/" + UUID.randomUUID() + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isConflict());
     }
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
+        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
         when(service.submit(any(), any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/score-appeals").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
+                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
                 .andExpect(jsonPath("$.handlerId").doesNotExist()).andExpect(jsonPath("$.studentId").doesNotExist());
     }
 }

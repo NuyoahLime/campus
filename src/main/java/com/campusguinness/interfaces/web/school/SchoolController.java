@@ -7,6 +7,7 @@ import com.campusguinness.school.application.service.SchoolApplicationService;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -41,12 +42,14 @@ public class SchoolController {
     }
 
     @PostMapping("/{id}/activate")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<SchoolResponse> activate(@PathVariable UUID id) {
         SchoolResult result = service.activate(id);
         return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));
     }
 
     @PostMapping("/{id}/disable")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<SchoolResponse> disable(@PathVariable UUID id, @Valid @RequestBody DisableSchoolRequest req) {
         SchoolResult result = service.disable(id, req.reason());
         return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));

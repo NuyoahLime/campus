@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SchoolRegistrationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean SchoolRegistrationApplicationService service;
+    @MockitoBean com.campusguinness.infrastructure.security.CurrentActor currentActor;
     @Autowired ObjectMapper mapper;
 
     @Nested class Submit {
@@ -39,7 +40,7 @@ class SchoolRegistrationControllerTest {
             UUID id = UUID.randomUUID(), sid = UUID.randomUUID();
             when(service.approve(eq(id), any(), any(), eq(sid))).thenReturn(new SchoolRegistrationResult(id, "t", "APPROVED", sid));
             mvc.perform(post("/api/v1/school-registrations/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest(UUID.randomUUID(), "ok", sid))))
+                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok", sid))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
         }
     }
@@ -48,7 +49,7 @@ class SchoolRegistrationControllerTest {
             UUID id = UUID.randomUUID();
             when(service.reject(eq(id), any(), any())).thenReturn(new SchoolRegistrationResult(id, "t", "REJECTED", null));
             mvc.perform(post("/api/v1/school-registrations/" + id + "/reject").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new RejectSchoolRegistrationRequest(UUID.randomUUID(), "reason"))))
+                    .content(mapper.writeValueAsString(new RejectSchoolRegistrationRequest("reason"))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
         }
     }
@@ -64,7 +65,7 @@ class SchoolRegistrationControllerTest {
         @Test void notFound() throws Exception {
             when(service.approve(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
             mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest(UUID.randomUUID(), "ok", UUID.randomUUID()))))
+                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok", UUID.randomUUID()))))
                     .andExpect(status().isNotFound());
         }
     }
