@@ -5,6 +5,7 @@ import com.campusguinness.identity.application.port.PasswordHasher;
 import com.campusguinness.identity.application.port.PasswordPolicy;
 import com.campusguinness.identity.application.port.UserAccountProvisioningPort;
 import com.campusguinness.identity.application.port.UserRepository;
+import com.campusguinness.identity.application.port.UserSessionRevocationPort;
 import com.campusguinness.identity.application.result.UserResult;
 import com.campusguinness.identity.internal.domain.*;
 
@@ -19,11 +20,14 @@ public class UserApplicationService {
     private final UserRepository repo;
     private final UserAccountProvisioningPort provisioning;
     private final PasswordHasher hasher;
+    private final UserSessionRevocationPort sessionRevocation;
 
-    public UserApplicationService(UserRepository repo, UserAccountProvisioningPort provisioning, PasswordHasher hasher) {
+    public UserApplicationService(UserRepository repo, UserAccountProvisioningPort provisioning,
+            PasswordHasher hasher, UserSessionRevocationPort sessionRevocation) {
         this.repo = repo;
         this.provisioning = provisioning;
         this.hasher = hasher;
+        this.sessionRevocation = sessionRevocation;
     }
 
     /**
@@ -47,7 +51,21 @@ public class UserApplicationService {
     }
 
     public UserResult activate(UUID id) { var u=find(id); u.activate(); repo.save(u); return result(u); }
-    public UserResult disable(UUID id) { var u=find(id); u.disable(); repo.save(u); return result(u); }
+
+    public UserResult disable(UUID id) {
+        var u = find(id);
+        u.disable();
+        repo.save(u);
+        // Revoke sessions after the user state update.
+        // IMPORTANT: Session deletion uses Spring Session's REQUIRES_NEW
+        // transactions, independent of this method's user-state transaction.
+        // If revocation throws, the user-state transaction rolls back BUT
+        // already-deleted sessions (in their own committed REQUIRES_NEW txns)
+        // remain deleted. This does not constitute privilege escalation.
+        sessionRevocation.revokeAllSessions(u.username());
+        return result(u);
+    }
+
     public UserResult reEnable(UUID id) { var u=find(id); u.reEnable(); repo.save(u); return result(u); }
 
     private User find(UUID id) { return repo.findById(new UserId(id)).orElseThrow(()->new IllegalArgumentException("User not found: "+id)); }

@@ -5,6 +5,7 @@ import com.campusguinness.identity.application.exception.UsernameAlreadyExistsEx
 import com.campusguinness.identity.application.port.PasswordHasher;
 import com.campusguinness.identity.application.port.UserAccountProvisioningPort;
 import com.campusguinness.identity.application.port.UserRepository;
+import com.campusguinness.identity.application.port.UserSessionRevocationPort;
 import com.campusguinness.identity.internal.domain.*;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -26,10 +27,11 @@ class UserApplicationServiceTest {
     @Mock UserRepository repo;
     @Mock UserAccountProvisioningPort provisioning;
     @Mock PasswordHasher hasher;
+    @Mock UserSessionRevocationPort sessionRevocation;
     UserApplicationService svc;
 
     @BeforeEach void setUp() {
-        svc = new UserApplicationService(repo, provisioning, hasher);
+        svc = new UserApplicationService(repo, provisioning, hasher, sessionRevocation);
     }
 
     private User user() { return User.create(new User.Builder().id(new UserId(UUID.randomUUID())).username("u")); }
@@ -130,6 +132,29 @@ class UserApplicationServiceTest {
     }
 
     @Nested class Activate { @Test void success() { var u=user(); when(repo.findById(any())).thenReturn(Optional.of(u)); assertThat(svc.activate(u.id().value()).status()).isEqualTo("NORMAL"); verify(repo).save(any()); } @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.activate(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); } }
-    @Nested class Disable { @Test void success() { var u=user(); u.activate(); when(repo.findById(any())).thenReturn(Optional.of(u)); assertThat(svc.disable(u.id().value()).status()).isEqualTo("DISABLED"); verify(repo).save(any()); } }
-    @Nested class ReEnable { @Test void success() { var u=user(); u.activate(); u.disable(); when(repo.findById(any())).thenReturn(Optional.of(u)); assertThat(svc.reEnable(u.id().value()).status()).isEqualTo("NORMAL"); verify(repo).save(any()); } }
+    @Nested class Disable {
+        @Test void success() {
+            var u=user(); u.activate(); when(repo.findById(any())).thenReturn(Optional.of(u));
+            assertThat(svc.disable(u.id().value()).status()).isEqualTo("DISABLED");
+            verify(repo).save(any());
+            verify(sessionRevocation).revokeAllSessions(u.username());
+        }
+        @Test void revokesSessionsBeforeReturning() {
+            var u=user(); u.activate(); when(repo.findById(any())).thenReturn(Optional.of(u));
+            doThrow(new RuntimeException("session error")).when(sessionRevocation).revokeAllSessions(any());
+            // Session revocation failure must not silently hide the disable result
+            assertThatThrownBy(() -> svc.disable(u.id().value()))
+                    .isInstanceOf(RuntimeException.class);
+            // The user must still have been saved
+            verify(repo).save(any());
+        }
+    }
+    @Nested class ReEnable {
+        @Test void success() {
+            var u=user(); u.activate(); u.disable(); when(repo.findById(any())).thenReturn(Optional.of(u));
+            assertThat(svc.reEnable(u.id().value()).status()).isEqualTo("NORMAL");
+            verify(repo).save(any());
+            verifyNoInteractions(sessionRevocation);
+        }
+    }
 }
