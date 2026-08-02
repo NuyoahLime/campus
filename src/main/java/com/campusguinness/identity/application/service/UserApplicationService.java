@@ -8,6 +8,7 @@ import com.campusguinness.identity.application.port.UserRepository;
 import com.campusguinness.identity.application.port.UserSessionRevocationPort;
 import com.campusguinness.identity.application.result.UserResult;
 import com.campusguinness.identity.internal.domain.*;
+import com.campusguinness.infrastructure.security.LoginNameNormalizer;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +22,16 @@ public class UserApplicationService {
     private final UserAccountProvisioningPort provisioning;
     private final PasswordHasher hasher;
     private final UserSessionRevocationPort sessionRevocation;
+    private final LoginNameNormalizer normalizer;
 
     public UserApplicationService(UserRepository repo, UserAccountProvisioningPort provisioning,
-            PasswordHasher hasher, UserSessionRevocationPort sessionRevocation) {
+            PasswordHasher hasher, UserSessionRevocationPort sessionRevocation,
+            LoginNameNormalizer normalizer) {
         this.repo = repo;
         this.provisioning = provisioning;
         this.hasher = hasher;
         this.sessionRevocation = sessionRevocation;
+        this.normalizer = normalizer;
     }
 
     /**
@@ -35,8 +39,7 @@ public class UserApplicationService {
      * The user is created in PENDING_ACTIVATION state with platformRole=null.
      */
     public UserResult create(String username, String rawPassword) {
-        String normalized = username != null ? username.trim() : "";
-        if (normalized.isEmpty()) throw new IllegalArgumentException("username must not be blank");
+        String normalized = normalizer.normalize(username);
         PasswordPolicy.validate(rawPassword);
         if (repo.existsByUsername(normalized)) throw new UsernameAlreadyExistsException(normalized);
 

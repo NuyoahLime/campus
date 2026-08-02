@@ -20,6 +20,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,10 +29,12 @@ class UserApplicationServiceTest {
     @Mock UserAccountProvisioningPort provisioning;
     @Mock PasswordHasher hasher;
     @Mock UserSessionRevocationPort sessionRevocation;
+    @Mock com.campusguinness.infrastructure.security.LoginNameNormalizer normalizer;
     UserApplicationService svc;
 
     @BeforeEach void setUp() {
-        svc = new UserApplicationService(repo, provisioning, hasher, sessionRevocation);
+        svc = new UserApplicationService(repo, provisioning, hasher, sessionRevocation, normalizer);
+        lenient().when(normalizer.normalize(anyString())).thenAnswer(inv -> ((String) inv.getArgument(0)).trim());
     }
 
     private User user() { return User.create(new User.Builder().id(new UserId(UUID.randomUUID())).username("u")); }
