@@ -1,155 +1,189 @@
-# Business Authorization Matrix
+# Business Authorization Matrix (v2)
 
-> Phase 1 Audit — read-only inventory. No code changes in this commit.
+> Phase 1 Audit — read-only inventory. No code changes. 
+> v2: corrected counts, explicit CRITICAL list, reconciled school scope, fixed registration policy.
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
 | Controllers | 40 |
-| Endpoints | ~145 |
-| Protected by `authenticated()` only | ~55 |
-| Write endpoints missing role check | 14 |
-| Trust request-body `actorId`/`reviewerId`/`handlerId`/`createdBy` | **6** |
+| HTTP Endpoints | 155 |
+| `permitAll()` (SecurityConfig) | 11 |
+| `authenticated()` only (catch-all `/api/**`) | 51 |
+| — of which are WRITE (POST/PUT/PATCH/DELETE) | 14 |
+| Endpoints with `@PreAuthorize` (class or method) | 73 |
+| Request-body `reviewerId`/`handlerId`/`createdBy` fields | 6 |
+| Endpoints also protected by SecurityConfig rule | 4 (`/api/v1/users/**`) |
 
 ---
 
-## CRITICAL — Must Fix Before Public Registration
+## Authenticated-only Write Endpoints (14)
 
-### 1. Request-body identity forgery (6 endpoints)
+These 14 endpoints currently have NO `@PreAuthorize` and are only protected by `SecurityConfig`'s `.requestMatchers("/api/**").authenticated()`.
 
-**Any authenticated user** can supply arbitrary `reviewerId`/`handlerId`/`createdBy`:
+### Platform-level (require SUPER_ADMIN)
 
-| # | Method | Path | Field |
-|---|--------|------|-------|
-| 1 | POST | `/api/v1/school-registrations/{id}/approve` | `reviewerId` |
-| 2 | POST | `/api/v1/school-registrations/{id}/reject` | `reviewerId` |
-| 3 | POST | `/api/v1/l3-authorizations/{id}/approve` | `reviewerId` |
-| 4 | POST | `/api/v1/ranking-definitions` | `createdBy` |
-| 5 | POST | `/api/v1/feedbacks/{id}/begin-processing` | `handlerId` (has role check but no identity verification) |
-| 6 | POST | `/api/v1/score-appeals/{id}/begin-processing` | `handlerId` |
+| # | Method | Path | Controller | Phase 2 fix |
+|---|--------|------|-----------|-------------|
+| 1 | POST | `/api/v1/schools/{id}/activate` | SchoolController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| 2 | POST | `/api/v1/schools/{id}/disable` | SchoolController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| 3 | POST | `/api/v1/ranking-definitions` | RankingDefinitionController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| 4 | POST | `/api/v1/ranking-definitions/{id}/enable` | RankingDefinitionController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| 5 | POST | `/api/v1/ranking-definitions/{id}/disable` | RankingDefinitionController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| 6 | POST | `/api/v1/l3-authorizations` | L3AuthorizationController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| 7 | POST | `/api/v1/l3-authorizations/{id}/approve` | L3AuthorizationController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` + remove `reviewerId` |
+| 8 | POST | `/api/v1/l3-authorizations/{id}/withdraw` | L3AuthorizationController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
 
-**Fix**: Remove these fields from request DTOs. Source identity from `currentActor.requireUserId()`.
+### Review endpoints (request-body identity forgery risk)
 
-### 2. No role check on critical platform endpoints
+| # | Method | Path | Controller | Phase 2 fix |
+|---|--------|------|-----------|-------------|
+| 9 | POST | `/api/v1/school-registrations/{id}/approve` | SchoolRegistrationController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` + remove `reviewerId` |
+| 10 | POST | `/api/v1/school-registrations/{id}/reject` | SchoolRegistrationController | `@PreAuthorize("hasRole('SUPER_ADMIN')")` + remove `reviewerId` |
 
-| Method | Path | Current Auth | Target |
-|--------|------|-------------|--------|
-| POST | `/api/v1/schools/{id}/activate` | `authenticated()` | `SUPER_ADMIN` |
-| POST | `/api/v1/schools/{id}/disable` | `authenticated()` | `SUPER_ADMIN` |
-| POST | `/api/v1/ranking-definitions/{id}/enable` | `authenticated()` | `SUPER_ADMIN` |
-| POST | `/api/v1/ranking-definitions/{id}/disable` | `authenticated()` | `SUPER_ADMIN` |
-| POST | `/api/v1/l3-authorizations` | `authenticated()` | `SUPER_ADMIN` |
-| POST | `/api/v1/l3-authorizations/{id}/withdraw` | `authenticated()` | `SUPER_ADMIN` |
-| POST | `/api/v1/activity-results/{id}/publish` | `authenticated()` | `SCHOOL_ADMIN` |
+### School-admin level
 
----
+| # | Method | Path | Controller | Phase 2 fix |
+|---|--------|------|-----------|-------------|
+| 11 | POST | `/api/v1/activity-results/{id}/publish` | ActivityResultController | `@PreAuthorize("hasRole('SCHOOL_ADMIN')")` |
 
-## HIGH — Missing Role Constraints
+### Ownership-tracked (current: authenticated; future: owner+role)
 
-| Method | Path | Current Auth | Target |
-|--------|------|-------------|--------|
-| POST | `/api/v1/school-registrations/{id}/withdraw` | `authenticated()` | Owner or SUPER_ADMIN |
-| POST | `/api/v1/school-registrations` | `authenticated()` | Owner |
-| GET | `/api/v1/school-registrations` | `authenticated()` | Owner or SUPER_ADMIN |
+| # | Method | Path | Controller | Phase 2 fix |
+|---|--------|------|-----------|-------------|
+| 12 | POST | `/api/v1/school-registrations` | SchoolRegistrationController | `authenticated()` — ownership not recorded (no `applicant_user_id` column) |
+| 13 | POST | `/api/v1/school-registrations/{id}/withdraw` | SchoolRegistrationController | **Temp**: `SUPER_ADMIN` — withdrawn_by is string, not FK |
 
----
+### Student/Teacher self-service (authenticated OK)
 
-## MEDIUM — School Scope Missing
+| # | Method | Path | Controller | Phase 2 fix |
+|---|--------|------|-----------|-------------|
+| 14 | POST | `/api/v1/feedbacks/{id}/begin-processing` | FeedbackController | Already `hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')` but takes `handlerId` from body |
 
-Controllers with `@PreAuthorize("hasRole('SCHOOL_ADMIN')")` but no per-school scope check:
-
-| Controller | Risk |
-|-----------|------|
-| `SchoolAdminActivityController` | School A admin can potentially access school B data |
-| `SchoolAdminScoreReviewController` | Same — needs `@schoolAccess.canManage(#schoolId)` |
-| `SchoolAdminScoreEntryController` | Same |
-| `SchoolAdminRankingController` | Same |
-| `SchoolAdminAccountController` | Uses `actorSchoolId()` correctly — ✅ |
+Note: #14 already has a role check but still accepts `handlerId` from the request body — the field must be removed and sourced from `CurrentActor`.
 
 ---
 
-## LOW — Authenticated Only (Read)
+## Request-Body Identity Fields (6)
 
-These can stay `authenticated()`:
+These DTOs allow the caller to specify who performed the action:
 
-| Method | Path |
-|--------|------|
-| GET | `/api/v1/auth/me` |
-| GET | `/api/v1/public/**` |
-| Various GET | Student/Teacher own-data endpoints (with service-layer ownership check) |
+| # | Endpoint | Field | Controller |
+|---|----------|-------|-----------|
+| 1 | `POST /api/v1/school-registrations/{id}/approve` | `reviewerId` | SchoolRegistrationController |
+| 2 | `POST /api/v1/school-registrations/{id}/reject` | `reviewerId` | SchoolRegistrationController |
+| 3 | `POST /api/v1/l3-authorizations/{id}/approve` | `reviewerId` | L3AuthorizationController |
+| 4 | `POST /api/v1/ranking-definitions` | `createdBy` | RankingDefinitionController |
+| 5 | `POST /api/v1/feedbacks/{id}/begin-processing` | `handlerId` | FeedbackController |
+| 6 | `POST /api/v1/score-appeals/{id}/begin-processing` | `handlerId` | ScoreAppealController |
+
+**Fix**: Remove these fields from DTOs. Source from `currentActor.requireUserId()`.
 
 ---
 
-## Already Protected Correctly
+## School Scope Analysis
 
-| Controller | Protection |
+For every controller with `hasRole('SCHOOL_ADMIN')`, check three layers:
+
+| Controller | Role OK? | Actor from SecurityContext? | School Scope? |
+|-----------|----------|---------------------------|---------------|
+| SchoolAdminActivityController | YES (`@PreAuthorize`) | Partial — `createdBy` from CurrentActor but schoolId from request | NO — no cross-school check |
+| SchoolAdminParticipantController | YES (`@PreAuthorize`) | YES — studentId only | NO — no cross-school check |
+| SchoolAdminScoreReviewController | YES (`@PreAuthorize`) | YES — `currentActor.requireUserId()` | NO |
+| SchoolAdminScoreEntryController | YES (`@PreAuthorize`) | YES — `CurrentActor` | NO |
+| SchoolAdminRankingController | YES (`@PreAuthorize`) | YES | NO |
+| SchoolAdminAccountController | YES (`@PreAuthorize`) | YES — `actorSchoolId()` | YES ✅ |
+| SchoolAdminAchievementController | YES (`@PreAuthorize`) | YES | NO |
+| SchoolAdminTeacherController | YES (`@PreAuthorize`) | YES — queries by school | Partial |
+| SchoolAdminScoreEntryOptionController | YES (`@PreAuthorize`) | YES | NO |
+
+**School scope gaps: 8 controllers** (Phase 3).
+
+---
+
+## School Registration Special Case
+
+The `school_registrations` table lacks an `applicant_user_id` column. Current fields:
+
+- `contact_name`, `contact_phone`, `contact_email` — not authenticated
+- `withdrawn_by VARCHAR(100)` — string, not FK
+- `reviewed_by UUID` — set during review
+
+Therefore ownership cannot be verified by the current schema.
+
+### Phase 2 temporary policy
+
+| Endpoint | Phase 2 protection | Blocked by |
+|----------|--------------------|------------|
+| `POST /school-registrations` | `authenticated()` | `applicant_user_id` missing |
+| `POST /school-registrations/{id}/approve` | `hasRole('SUPER_ADMIN')` | — |
+| `POST /school-registrations/{id}/reject` | `hasRole('SUPER_ADMIN')` | — |
+| `POST /school-registrations/{id}/withdraw` | **Temporarily `hasRole('SUPER_ADMIN')`** | `applicant_user_id` missing |
+
+Future: add `school_registrations.applicant_user_id UUID` → then allow applicant self-withdraw.
+
+---
+
+## Already Protected (reference)
+
+| Controller | Mechanism |
 |-----------|-----------|
-| `UserController` | `@PreAuthorize("hasRole('SUPER_ADMIN')")` class-level |
-| `AdminActivityReviewController` | `@PreAuthorize("hasRole('SUPER_ADMIN')")` class-level |
-| `AdminApplicationReviewController` | `@PreAuthorize("hasRole('SUPER_ADMIN')")` class-level |
-| `AdminSchoolAccountController` | `@PreAuthorize("hasRole('SUPER_ADMIN')")` method-level |
-| `SchoolAdminScoreReviewController` | `@PreAuthorize("hasRole('SCHOOL_ADMIN')")` + `currentActor.requireUserId()` ✅ |
-| `ChallengeProjectController` (write) | `@PreAuthorize("hasRole('SUPER_ADMIN')")` method-level |
-| `MediaController` (review/approve/publish) | `@PreAuthorize` method-level |
-| `FeedbackController` (process/resolve/close) | `@PreAuthorize` method-level |
+| UserController | Class `@PreAuthorize("hasRole('SUPER_ADMIN')")` + SecurityConfig |
+| AdminActivityReviewController | Class `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| AdminApplicationReviewController | Class `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| AdminSchoolAccountController | Method `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| StudentScoreController | Class `@PreAuthorize("hasRole('STUDENT')")` |
+| StudentParticipantController | Class `@PreAuthorize("hasRole('STUDENT')")` |
+| StudentRankingController | Class `@PreAuthorize("hasRole('STUDENT')")` |
+| StudentAchievementController | Class `@PreAuthorize("hasRole('STUDENT')")` |
+| TeacherParticipantController | Class `@PreAuthorize("hasRole('TEACHER')")` |
+| TeacherScoreEntryController | Class `@PreAuthorize("hasRole('TEACHER')")` + CurrentActor |
+| TeacherResponsibleProjectController | Class `@PreAuthorize("hasRole('TEACHER')")` |
+| ActivityApplicationController | Method `@PreAuthorize("hasRole('TEACHER')")` |
+| ChallengeProjectController (write) | Method `@PreAuthorize("hasRole('SUPER_ADMIN')")` |
+| MediaController (review/approve/publish) | Method `@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")` |
+| FeedbackController (process/resolve/close) | Method `@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")` |
+| OperationsDashboardController | Method `@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'SCHOOL_ADMIN')")` |
+| SchoolAdminScoreReviewController | Class `@PreAuthorize("hasRole('SCHOOL_ADMIN')")` + `currentActor.requireUserId()` ✅ |
+| RankingController | Method-level: `hasRole('SUPER_ADMIN')` / `hasRole('STUDENT')` |
+| AchievementRecordController | Method-level: `hasRole('SUPER_ADMIN')` / `hasRole('STUDENT')` |
+| ScoreAttemptController | Method-level: `hasRole('STUDENT')` / `hasRole('TEACHER')` |
 
 ---
 
-## Fix Plan
+## Phase 2 Implementation Scope
 
-### Phase 2 — Platform Admin Endpoint Closure
-Fix all CRITICAL and HIGH items by adding `@PreAuthorize` and removing request-body actor params.
+```text
+PHASE-2-PLATFORM-ADMIN-ENDPOINT-CLOSURE
 
-### Phase 3 — School Scope Authorization
-Add `@schoolAccess.canManage(#schoolId)` to all SCHOOL_ADMIN endpoints.
+IN SCOPE:
+1. School activate/disable → @PreAuthorize("hasRole('SUPER_ADMIN')")
+2. Ranking definition create/enable/disable → @PreAuthorize("hasRole('SUPER_ADMIN')")
+3. L3 authorization create/approve/withdraw → @PreAuthorize("hasRole('SUPER_ADMIN')")
+4. School registration approve/reject → @PreAuthorize("hasRole('SUPER_ADMIN')")
+5. School registration withdraw → TEMPORARILY @PreAuthorize("hasRole('SUPER_ADMIN')")
+6. Activity result publish → @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+7. Remove reviewerId/handlerId/createdBy from all 6 DTOs
+8. Resolve actors exclusively from CurrentActor
+9. Add integration tests for all protected endpoints
 
-### Phase 4 — Role Matrix Integration Tests
-Tests that prove every endpoint returns correct 401/403/success.
+OUT OF SCOPE:
+1. SCHOOL_ADMIN cross-school isolation (Phase 3)
+2. applicant_user_id database migration (needed before owner-based policies)
+3. public self-registration
+4. identity application workflow
+5. SCHOOL_ADMIN role matrix tests (Phase 4)
+```
 
-### Phase 5 — Final Audit
-Re-scan all controllers to verify zero gaps.
-### Complete Endpoint Inventory
+---
 
-| # | Controller | Endpoints | Class @PreAuthorize | Issues |
-|---|-----------|-----------|---------------------|--------|
-| 1 | AccountActivationController | 1 | None | permitAll ✓ |
-| 2 | UserController | 4 | SUPER_ADMIN | ✓ |
-| 3 | AdminSchoolAccountController | 2 | None (method) | SUPER_ADMIN method-level ✓ |
-| 4 | SchoolAdminAccountController | 2 | SCHOOL_ADMIN | ✓ |
-| 5 | ActivityController | 1 | None | authenticated GET |
-| 6 | PublicActivityController | 2 | None | permitAll ✓ |
-| 7 | PublicChallengeProjectController | 2 | None | permitAll ✓ |
-| 8 | AdminActivityReviewController | 6 | SUPER_ADMIN | ✓ |
-| 9 | SchoolAdminActivityController | 16 | SCHOOL_ADMIN | school scope missing |
-| 10 | SchoolAdminTeacherController | 1 | SCHOOL_ADMIN | ✓ |
-| 11 | SchoolAdminParticipantController | 6 | SCHOOL_ADMIN | school scope missing |
-| 12 | TeacherParticipantController | 1 | TEACHER | ✓ |
-| 13 | StudentParticipantController | 4 | STUDENT | ✓ |
-| 14 | ActivityApplicationController | 7 | None (method) | TEACHER method-level ✓ |
-| 15 | TeacherApplicationSchoolController | 2 | TEACHER | ✓ |
-| 16 | AdminApplicationReviewController | 6 | SUPER_ADMIN | ✓ |
-| 17 | ChallengeProjectController | 4 | None (method) | SUPER_ADMIN on write ✓ |
-| 18 | SchoolController | 4 | None | **CRITICAL**: activate/disable no role |
-| 19 | SchoolRegistrationController | 4 | None | **CRITICAL**: reviewerId from body |
-| 20 | MediaController | 6 | None (method) | hasAnyRole on review ✓ |
-| 21 | ActivityResultController | 1 | None | **CRITICAL**: publish no role |
-| 22 | FeedbackController | 7 | None (method) | **CRITICAL**: handlerId from body |
-| 23 | ScoreAttemptController | 5 | None (method) | STUDENT/TEACHER method-level ✓ |
-| 24 | ScoreAppealController | 6 | None | **CRITICAL**: handlerId from body |
-| 25 | NotificationController | 4 | None | authenticated ✓ |
-| 26 | StudentScoreController | 2 | STUDENT | ✓ |
-| 27 | SchoolAdminScoreEntryController | 4 | SCHOOL_ADMIN | uses CurrentActor ✓ |
-| 28 | SchoolAdminScoreReviewController | 4 | SCHOOL_ADMIN | uses CurrentActor ✓ |
-| 29 | SchoolAdminScoreEntryOptionController | 2 | SCHOOL_ADMIN | ✓ |
-| 30 | TeacherScoreEntryController | 5 | TEACHER | uses CurrentActor ✓ |
-| 31 | TeacherResponsibleProjectController | 3 | TEACHER | ✓ |
-| 32 | L3AuthorizationController | 3 | None | **CRITICAL**: reviewerId from body |
-| 33 | RankingDefinitionController | 3 | None | **CRITICAL**: createdBy from body |
-| 34 | RankingController | 8 | None (method) | SUPER_ADMIN/STUDENT on methods ✓ |
-| 35 | SchoolAdminRankingController | 8 | SCHOOL_ADMIN | ✓ |
-| 36 | StudentRankingController | 3 | STUDENT | ✓ |
-| 37 | SchoolAdminAchievementController | 4 | SCHOOL_ADMIN | ✓ |
-| 38 | StudentAchievementController | 2 | STUDENT | ✓ |
-| 39 | AchievementRecordController | 6 | None (method) | SUPER_ADMIN/STUDENT on methods ✓ |
-| 40 | OperationsDashboardController | 1 | None (method) | hasAnyRole ✓ |
+## Fix Plan Summary
+
+| Phase | Content |
+|-------|---------|
+| Phase 1 ✅ | Authorization inventory (this doc) |
+| Phase 2 | Close platform admin endpoints + remove body actor params |
+| Phase 3 | School-scope authorization (`@schoolAccess.canManage(#schoolId)`) |
+| Phase 4 | Role matrix integration tests |
+| Phase 5 | Final authorization audit |
