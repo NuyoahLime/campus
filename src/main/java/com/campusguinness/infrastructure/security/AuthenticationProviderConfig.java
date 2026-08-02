@@ -21,6 +21,8 @@ public class AuthenticationProviderConfig {
             PasswordEncoder passwordEncoder) {
         var provider = new DaoAuthenticationProvider(passwordEncoder);
         provider.setUserDetailsService(userDetailsService);
+        // Unknown usernames must be exposed as generic bad credentials.
+        provider.setHideUserNotFoundExceptions(true);
         return provider;
     }
 

@@ -1,21 +1,23 @@
 package com.campusguinness.infrastructure.security;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tracks login failures and enforces temporary lockout.
- * <p>
- * Rules: 5 consecutive failures → locked for 10 minutes.<br>
- * Success resets the counter. Uses atomic database updates.
+ * Tracks failed credential attempts and enforces temporary login lockout.
+ *
+ * <p>Rules:</p>
+ * <ul>
+ *     <li>Five consecutive bad-credential attempts lock the account.</li>
+ *     <li>The temporary lock lasts ten minutes.</li>
+ *     <li>Attempts during an active lock do not extend the lock.</li>
+ *     <li>After lock expiry, a new failure window starts from one.</li>
+ *     <li>Only NORMAL accounts participate in temporary lockout.</li>
+ * </ul>
  */
 @Service
 public class LoginAttemptService {
-
-    private static final Logger log = LoggerFactory.getLogger(LoginAttemptService.class);
 
     static final int MAX_FAILURES = 5;
     static final long LOCK_DURATION_MINUTES = 10;
@@ -29,34 +31,70 @@ public class LoginAttemptService {
     }
 
     /**
-     * Record a successful login — reset failure counter and clear lock.
+     * Reset temporary lockout state after credentials are verified.
+     * <p>
+     * The update must affect exactly one NORMAL account. Otherwise,
+     * authentication must stop before a SecurityContext is persisted.
      */
     @Transactional
     public void recordSuccess(String rawUsername) {
         String username = normalizer.normalize(rawUsername);
-        int updated = jdbc.update(
-                "UPDATE users SET login_failures = 0, locked_until = NULL WHERE username = ?",
+
+        int updated = jdbc.update("""
+                UPDATE users
+                SET login_failures = 0,
+                    locked_until = NULL,
+                    updated_at = now()
+                WHERE username = ?
+                  AND account_status = 'NORMAL'
+                """,
                 username);
-        if (updated > 0) {
-            log.debug("Login success: reset lockout for {}", username);
+
+        if (updated != 1) {
+            throw new AuthenticationStateUnavailableException(
+                    "Authentication state could not be reset.");
         }
     }
 
     /**
-     * Record a failed login attempt for a known user.
-     * For non-existent usernames, normalize but the UPDATE affects 0 rows.
+     * Record one bad-credential attempt.
+     * <p>
+     * Unknown usernames and non-NORMAL accounts update zero rows.
+     * An account already under an active temporary lock is left unchanged.
      */
     @Transactional
     public void recordFailure(String rawUsername) {
         String username = normalizer.normalize(rawUsername);
-        int updated = jdbc.update(
-                "UPDATE users SET login_failures = login_failures + 1, locked_until = CASE "
-                        + "WHEN login_failures + 1 >= ? THEN now() + (? * INTERVAL '1 minute') "
-                        + "ELSE locked_until END "
-                        + "WHERE username = ?",
+
+        jdbc.update("""
+                UPDATE users
+                SET login_failures = CASE
+                        WHEN locked_until IS NOT NULL
+                             AND locked_until <= now()
+                        THEN 1
+                        ELSE login_failures + 1
+                    END,
+
+                    locked_until = CASE
+                        WHEN locked_until IS NOT NULL
+                             AND locked_until <= now()
+                        THEN NULL
+
+                        WHEN login_failures + 1 >= ?
+                        THEN now() + (? * INTERVAL '1 minute')
+
+                        ELSE NULL
+                    END,
+
+                    updated_at = now()
+
+                WHERE username = ?
+                  AND account_status = 'NORMAL'
+                  AND (
+                      locked_until IS NULL
+                      OR locked_until <= now()
+                  )
+                """,
                 MAX_FAILURES, LOCK_DURATION_MINUTES, username);
-        if (updated > 0) {
-            log.debug("Login failure recorded for {}", username);
-        }
     }
 }

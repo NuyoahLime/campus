@@ -25,6 +25,6 @@ class AuthIdentityIntegrationIT {
     }
 
     private com.campusguinness.identity.application.query.AuthenticationAccount account(String pr, java.util.List<com.campusguinness.identity.application.query.AuthenticationAccount.SchoolMembershipRecord> m) {
-        return new com.campusguinness.identity.application.query.AuthenticationAccount(userId, "t", "h", "NORMAL", pr, m);
+        return new com.campusguinness.identity.application.query.AuthenticationAccount(userId, "t", "h", "NORMAL", pr, m, 0, null);
     }
 }

@@ -7,9 +7,13 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -48,16 +52,17 @@ public class AuthController {
             Authentication auth = authManager.authenticate(token);
             CampusGuinnessUserDetails user = (CampusGuinnessUserDetails) auth.getPrincipal();
 
+            // Credentials verified — reset lockout BEFORE creating any authenticated session.
+            loginAttemptService.recordSuccess(user.getUsername());
+
             var identityResult = checkIdentity(user.getResolvedIdentity(), "/api/v1/auth/login");
             if (identityResult != null) return identityResult;
 
-            // Session fixation defense: ensure a session exists and rotate its ID.
-            // request.changeSessionId() delegates to Spring Session JDBC which
-            // generates a new SESSION_ID. The old SESSION_ID is no longer resolvable.
+            // Session fixation defense.
             request.getSession(true);
             request.changeSessionId();
 
-            // Invalidate pre-login CSRF token
+            // Clear the pre-login CSRF token.
             sessionAuthenticationStrategy.onAuthentication(auth, request, response);
 
             SecurityContext ctx = SecurityContextHolder.createEmptyContext();
@@ -65,24 +70,43 @@ public class AuthController {
             SecurityContextHolder.setContext(ctx);
             contextRepo.saveContext(ctx, request, response);
 
-            loginAttemptService.recordSuccess(req.username());
-
             return ResponseEntity.ok(AuthContextResponse.from(user));
+
         } catch (SessionAuthenticationException e) {
-            SecurityContextHolder.clearContext();
-            HttpSession session = request.getSession(false);
-            if (session != null) {
-                try { session.invalidate(); } catch (Exception ignored) {}
-            }
+            clearAuthenticationState(request);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiErrorResponse.of("AUTHENTICATION_FAILED",
                             "Authentication could not be completed.", request.getRequestURI()));
+
+        } catch (BadCredentialsException e) {
+            SecurityContextHolder.clearContext();
+            try {
+                loginAttemptService.recordFailure(req.username());
+            } catch (DataAccessException | AuthenticationStateUnavailableException stateFailure) {
+                log.error("Failed to persist authentication failure state", stateFailure);
+                clearAuthenticationState(request);
+                return authenticationStateUnavailable(request);
+            }
+            return authenticationFailed(request);
+
+        } catch (AccountStatusException e) {
+            // LockedException, DisabledException, etc. — not bad-password events.
+            SecurityContextHolder.clearContext();
+            return authenticationFailed(request);
+
+        } catch (AuthenticationServiceException e) {
+            log.error("Authentication infrastructure failure", e);
+            clearAuthenticationState(request);
+            return authenticationStateUnavailable(request);
+
+        } catch (AuthenticationStateUnavailableException | DataAccessException e) {
+            log.error("Authentication state update failed", e);
+            clearAuthenticationState(request);
+            return authenticationStateUnavailable(request);
+
         } catch (AuthenticationException e) {
             SecurityContextHolder.clearContext();
-            loginAttemptService.recordFailure(req.username());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiErrorResponse.of("AUTHENTICATION_FAILED",
-                            "The username or password is invalid.", request.getRequestURI()));
+            return authenticationFailed(request);
         }
     }
 
@@ -94,7 +118,6 @@ public class AuthController {
                     .body(ApiErrorResponse.of("AUTHENTICATION_REQUIRED",
                             "Authentication is required.", "/api/v1/auth/me"));
         }
-        // Verify identity still valid
         var identityResult = checkIdentity(user.getResolvedIdentity(), "/api/v1/auth/me");
         if (identityResult != null) {
             try { var s = request.getSession(false); if (s != null) s.invalidate(); } catch (Exception ignored) {}
@@ -102,6 +125,8 @@ public class AuthController {
         }
         return ResponseEntity.ok(AuthContextResponse.from(user));
     }
+
+    // ── helpers ──
 
     private ResponseEntity<?> checkIdentity(
             PrimaryIdentityResolver.ResolvedIdentity identity, String path) {
@@ -114,5 +139,25 @@ public class AuthController {
         SecurityContextHolder.clearContext();
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiErrorResponse.of(code, "Account identity error.", path));
+    }
+
+    private ResponseEntity<ApiErrorResponse> authenticationFailed(HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiErrorResponse.of("AUTHENTICATION_FAILED",
+                        "The username or password is invalid.", request.getRequestURI()));
+    }
+
+    private ResponseEntity<ApiErrorResponse> authenticationStateUnavailable(HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiErrorResponse.of("AUTHENTICATION_STATE_UNAVAILABLE",
+                        "Authentication could not be completed.", request.getRequestURI()));
+    }
+
+    private void clearAuthenticationState(HttpServletRequest request) {
+        SecurityContextHolder.clearContext();
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            try { session.invalidate(); } catch (IllegalStateException ignored) {}
+        }
     }
 }

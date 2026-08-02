@@ -94,8 +94,7 @@ public final class CampusGuinnessUserDetails implements UserDetails {
     @Override
     public boolean isAccountNonLocked() {
         if ("LOCKED".equals(accountStatus)) return false;
-        if (lockedUntil != null && !Instant.now().isAfter(lockedUntil)) return false;
-        return true;
+        return lockedUntil == null || !lockedUntil.isAfter(Instant.now());
     }
 
     @Override

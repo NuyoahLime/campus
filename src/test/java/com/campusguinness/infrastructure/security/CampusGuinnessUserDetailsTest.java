@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
@@ -69,5 +70,17 @@ class CampusGuinnessUserDetailsTest {
     @Test void toStringExcludesPasswordHash() {
         var ud = new CampusGuinnessUserDetails(USER_ID, "u", "secret", "NORMAL", null, Set.of(), java.util.List.of(), null);
         assertThat(ud.toString()).doesNotContain("secret");
+    }
+
+    @Test void futureTemporaryLockIsLocked() {
+        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "NORMAL",
+                Instant.now().plusSeconds(60), Set.of(), java.util.List.of(), null);
+        assertThat(ud.isAccountNonLocked()).isFalse();
+    }
+
+    @Test void expiredTemporaryLockIsUnlocked() {
+        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "NORMAL",
+                Instant.now().minusSeconds(60), Set.of(), java.util.List.of(), null);
+        assertThat(ud.isAccountNonLocked()).isTrue();
     }
 }
