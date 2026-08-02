@@ -93,6 +93,22 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of("CONFLICT", ex.getMessage(), req.getRequestURI()));
     }
 
+    @ExceptionHandler(com.campusguinness.identity.application.exception.InvalidPasswordException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidPassword(
+            com.campusguinness.identity.application.exception.InvalidPasswordException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorResponse.of(ex.getMessage(), "Invalid password", req.getRequestURI()));
+    }
+
+    @ExceptionHandler(com.campusguinness.identity.application.exception.UsernameAlreadyExistsException.class)
+    public ResponseEntity<ApiErrorResponse> handleUsernameAlreadyExists(
+            com.campusguinness.identity.application.exception.UsernameAlreadyExistsException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of("USERNAME_ALREADY_EXISTS", "Username already exists", req.getRequestURI()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
         var details = ex.getBindingResult().getFieldErrors().stream()
@@ -125,7 +141,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(com.campusguinness.infrastructure.security.AccountProvisioningService.DuplicateUsernameException.class)
     public ResponseEntity<ApiErrorResponse> handleDuplicateUsername(
-            com.campusguinness.infrastructure.security.AccountProvisioningService.DuplicateUsernameException ex, HttpServletRequest req) {
+            com.campusguinness.infrastructure.security.AccountProvisioningService.DuplicateUsernameException ex,
+            HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiErrorResponse.of("USERNAME_ALREADY_EXISTS", "Username already exists", req.getRequestURI()));
     }
