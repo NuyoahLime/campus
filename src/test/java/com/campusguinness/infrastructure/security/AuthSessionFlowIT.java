@@ -102,7 +102,7 @@ class AuthSessionFlowIT {
     @Test void contextRepoDirectSaveVerifiesCorrectBehavior() {
         var request = new MockHttpServletRequest();
         var response = new MockHttpServletResponse();
-        var user = new CampusGuinnessUserDetails(userId, username, encoder.encode(rawPassword), "NORMAL", java.util.Set.of(), java.util.List.of(), null);
+        var user = new CampusGuinnessUserDetails(userId, username, encoder.encode(rawPassword), "NORMAL", null, java.util.Set.of(), java.util.List.of(), null);
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user, null);
         var ctx = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
         ctx.setAuthentication(auth);

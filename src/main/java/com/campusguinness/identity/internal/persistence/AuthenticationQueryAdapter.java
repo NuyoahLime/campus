@@ -42,7 +42,9 @@ class AuthenticationQueryAdapter implements AuthenticationAccountQuery {
                             e.getPasswordHash(),
                             e.getAccountStatus(),
                             e.getPlatformRole(),
-                            memberships
+                            memberships,
+                            e.getLoginFailures(),
+                            e.getLockedUntil()
                     );
                 });
     }

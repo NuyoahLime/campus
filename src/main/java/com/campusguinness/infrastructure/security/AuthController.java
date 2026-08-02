@@ -28,13 +28,16 @@ public class AuthController {
     private final AuthenticationManager authManager;
     private final SecurityContextRepository contextRepo;
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
+    private final LoginAttemptService loginAttemptService;
 
     public AuthController(AuthenticationManager authManager,
             SecurityContextRepository contextRepo,
-            SessionAuthenticationStrategy sessionAuthenticationStrategy) {
+            SessionAuthenticationStrategy sessionAuthenticationStrategy,
+            LoginAttemptService loginAttemptService) {
         this.authManager = authManager;
         this.contextRepo = contextRepo;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
+        this.loginAttemptService = loginAttemptService;
     }
 
     @PostMapping("/login")
@@ -62,6 +65,8 @@ public class AuthController {
             SecurityContextHolder.setContext(ctx);
             contextRepo.saveContext(ctx, request, response);
 
+            loginAttemptService.recordSuccess(req.username());
+
             return ResponseEntity.ok(AuthContextResponse.from(user));
         } catch (SessionAuthenticationException e) {
             SecurityContextHolder.clearContext();
@@ -74,6 +79,7 @@ public class AuthController {
                             "Authentication could not be completed.", request.getRequestURI()));
         } catch (AuthenticationException e) {
             SecurityContextHolder.clearContext();
+            loginAttemptService.recordFailure(req.username());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiErrorResponse.of("AUTHENTICATION_FAILED",
                             "The username or password is invalid.", request.getRequestURI()));

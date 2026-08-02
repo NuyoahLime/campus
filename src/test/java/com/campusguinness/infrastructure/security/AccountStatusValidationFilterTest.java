@@ -47,7 +47,7 @@ class AccountStatusValidationFilterTest {
     }
 
     private void setAuthenticatedPrincipal() {
-        var user = new CampusGuinnessUserDetails(USER_ID, USERNAME, "hash", "NORMAL",
+        var user = new CampusGuinnessUserDetails(USER_ID, USERNAME, "hash", "NORMAL", null,
                 Set.of(new SimpleGrantedAuthority("ROLE_STUDENT")),
                 java.util.List.of(),
                 new PrimaryIdentityResolver.ResolvedIdentity(USER_ID, "STUDENT", null, "NORMAL"));

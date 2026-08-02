@@ -61,6 +61,6 @@ class PrimaryIdentityResolverTest {
     }
 
     private AuthenticationAccount account(String platformRole, List<SchoolMembershipRecord> memberships) {
-        return new AuthenticationAccount(userId, "test", "hash", "NORMAL", platformRole, memberships);
+        return new AuthenticationAccount(userId, "test", "hash", "NORMAL", platformRole, memberships, 0, null);
     }
 }

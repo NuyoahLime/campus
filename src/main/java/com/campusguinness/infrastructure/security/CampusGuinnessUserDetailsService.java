@@ -63,6 +63,7 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
                 account.loginName(),
                 account.passwordHash(),
                 account.accountStatus(),
+                account.lockedUntil(),
                 authorities,
                 account.memberships(),
                 identity

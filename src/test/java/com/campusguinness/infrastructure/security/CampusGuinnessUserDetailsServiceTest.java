@@ -32,7 +32,7 @@ class CampusGuinnessUserDetailsServiceTest {
     }
 
     private AuthenticationAccount account(String status, String platformRole) {
-        return new AuthenticationAccount(USER_ID, "testuser", "$2a$12$hash", status, platformRole, java.util.List.of());
+        return new AuthenticationAccount(USER_ID, "testuser", "$2a$12$hash", status, platformRole, java.util.List.of(), 0, null);
     }
 
     @Nested class LoadUser {

@@ -98,6 +98,8 @@ class SchoolAdminActivityControllerIT extends PostgreSqlIntegrationTestSupport {
         var identity = new ResolvedIdentity(uid, role, sid, "NORMAL");
         var details = new CampusGuinnessUserDetails(
                 uid, "test-" + uid, "hash", "NORMAL",
+                
+                null,
                 Set.of(new SimpleGrantedAuthority("ROLE_" + role)),
                 memberships, identity);
         var auth = new UsernamePasswordAuthenticationToken(details, details.getPassword(), details.getAuthorities());

@@ -1,5 +1,6 @@
 package com.campusguinness.identity.application.query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,7 +17,9 @@ public record AuthenticationAccount(
         String passwordHash,
         String accountStatus,
         String platformRole,
-        List<SchoolMembershipRecord> memberships
+        List<SchoolMembershipRecord> memberships,
+        int loginFailures,
+        Instant lockedUntil
 ) {
     public record SchoolMembershipRecord(UUID schoolId, String roleInSchool) implements java.io.Serializable {
         @java.io.Serial

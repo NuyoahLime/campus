@@ -20,7 +20,7 @@ class CampusGuinnessUserDetailsSerializationTest {
         UUID schoolId = UUID.randomUUID();
 
         var identity = new ResolvedIdentity(userId, "SCHOOL_ADMIN", schoolId, "NORMAL");
-        var original = new CampusGuinnessUserDetails(userId, "school-admin", "hash", "NORMAL",
+        var original = new CampusGuinnessUserDetails(userId, "school-admin", "hash", "NORMAL", null,
                 Set.of(new SimpleGrantedAuthority("ROLE_SCHOOL_ADMIN")),
                 List.of(new SchoolMembershipRecord(schoolId, "SCHOOL_ADMIN")), identity);
 

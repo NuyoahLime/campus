@@ -137,6 +137,7 @@ public abstract class ScoreReviewIntegrationTestSupport extends PostgreSqlIntegr
         var identity = new ResolvedIdentity(userId, role, membershipSchool, "NORMAL");
         var details = new CampusGuinnessUserDetails(
                 userId, "test-" + userId, "hash", "NORMAL",
+                null,
                 Set.of(new SimpleGrantedAuthority("ROLE_" + role)), memberships, identity);
         var authentication = new UsernamePasswordAuthenticationToken(
                 details, details.getPassword(), details.getAuthorities());

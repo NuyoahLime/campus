@@ -462,6 +462,8 @@ public abstract class RankingIntegrationTestSupport
                 "test-" + userId,
                 "hash",
                 "NORMAL",
+                
+                null,
                 Set.of(new SimpleGrantedAuthority("ROLE_" + role)),
                 memberships,
                 identity);

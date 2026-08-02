@@ -7,6 +7,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +30,7 @@ public final class CampusGuinnessUserDetails implements UserDetails {
     private final String loginName;
     private final String passwordHash;
     private final String accountStatus;
+    private final Instant lockedUntil;
     private final Set<GrantedAuthority> authorities;
     private final List<SchoolMembershipRecord> schoolMemberships;
     private final ResolvedIdentity resolvedIdentity;
@@ -38,6 +40,7 @@ public final class CampusGuinnessUserDetails implements UserDetails {
             String loginName,
             String passwordHash,
             String accountStatus,
+            Instant lockedUntil,
             Set<GrantedAuthority> authorities,
             List<SchoolMembershipRecord> schoolMemberships,
             ResolvedIdentity resolvedIdentity) {
@@ -45,6 +48,7 @@ public final class CampusGuinnessUserDetails implements UserDetails {
         this.loginName = loginName;
         this.passwordHash = passwordHash;
         this.accountStatus = accountStatus;
+        this.lockedUntil = lockedUntil;
         this.authorities = Collections.unmodifiableSet(authorities);
         this.schoolMemberships = List.copyOf(schoolMemberships);
         this.resolvedIdentity = resolvedIdentity;
@@ -86,9 +90,12 @@ public final class CampusGuinnessUserDetails implements UserDetails {
                 || "LOCKED".equals(accountStatus); // LOCKED is still enabled but not non-locked
     }
 
+    /** Returns true unless account is LOCKED or locked_until is in the future. */
     @Override
     public boolean isAccountNonLocked() {
-        return !"LOCKED".equals(accountStatus);
+        if ("LOCKED".equals(accountStatus)) return false;
+        if (lockedUntil != null && !Instant.now().isAfter(lockedUntil)) return false;
+        return true;
     }
 
     @Override
