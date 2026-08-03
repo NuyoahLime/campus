@@ -7,4 +7,5 @@ public interface FeedbackJpaRepository extends JpaRepository<FeedbackEntity, UUI
     List<FeedbackEntity> findBySchoolId(UUID schoolId);
     List<FeedbackEntity> findBySubmitterId(UUID submitterId);
     Optional<FeedbackEntity> findByIdAndSubmitterId(UUID id, UUID submitterId);
+    Optional<FeedbackEntity> findByIdAndSchoolId(UUID id, UUID schoolId);
 }
