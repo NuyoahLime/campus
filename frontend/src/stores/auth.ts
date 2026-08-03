@@ -65,6 +65,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** Clear local auth state without calling the server (e.g. on 401). */
+  function clearLocalSession(): void {
+    user.value = null;
+    initialized.value = true;
+  }
+
   return {
     user,
     initialized,
@@ -78,5 +84,6 @@ export const useAuthStore = defineStore('auth', () => {
     restoreSession,
     login,
     logout,
+    clearLocalSession,
   };
 });

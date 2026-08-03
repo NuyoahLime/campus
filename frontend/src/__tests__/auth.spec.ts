@@ -169,4 +169,46 @@ describe('useAuthStore', () => {
     expect(store.authenticated).toBe(true);
     expect(store.initialized).toBe(true);
   });
+
+  // ── clearLocalSession ──
+
+  it('clearLocalSession removes user without HTTP call', async () => {
+    mockMeResponse(['STUDENT']);
+    const store = useAuthStore();
+    await store.restoreSession();
+    expect(store.authenticated).toBe(true);
+
+    store.clearLocalSession();
+    expect(store.authenticated).toBe(false);
+    expect(store.initialized).toBe(true);
+    expect(store.user).toBeNull();
+    // logout API must NOT be called
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('clearLocalSession works even when no user is set', () => {
+    const store = useAuthStore();
+    store.clearLocalSession();
+    expect(store.authenticated).toBe(false);
+    expect(store.initialized).toBe(true);
+  });
+
+  it('failed login does not clear existing user (store preserves identity)', async () => {
+    // Set an existing user first
+    mockMeResponse(['STUDENT']);
+    const store = useAuthStore();
+    await store.restoreSession();
+    expect(store.authenticated).toBe(true);
+
+    // Simulate a failed login attempt — the store.login throws,
+    // but the existing user must remain
+    mockPost.mockRejectedValue(new MockApiError(401, 'unauthorized'));
+    try { await store.login('bad', 'wrong'); } catch {}
+
+    // The existing session is preserved because login rejects before setting user
+    // (store.login only sets user on success — the catch in http.ts also skips
+    // clearing because /v1/auth/login is an auth attempt)
+    expect(store.authenticated).toBe(true);
+    expect(store.user?.roles).toContain('STUDENT');
+  });
 });

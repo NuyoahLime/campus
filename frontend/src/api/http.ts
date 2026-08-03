@@ -37,7 +37,14 @@ http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
 // Response interceptor: normalize errors and handle 401
 http.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Clear CSRF cache after every write request — Spring Security rotates the token
+    const method = (response.config.method || 'get').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      import('./csrf').then(({ clearCsrfToken }) => clearCsrfToken());
+    }
+    return response;
+  },
   (error: AxiosError<{ message?: string; code?: string }>) => {
     if (!error.response) {
       throw new ApiError(0, '网络连接失败，请检查网络后重试');
@@ -46,17 +53,44 @@ http.interceptors.response.use(
     const serverMessage = error.response.data?.message;
     const message = serverMessage || getDefaultMessage(status);
 
-    // On 401, clear auth state to force re-login
-    if (status === 401) {
+    // On 401, only clear local session for non-auth-attempt requests.
+    // Auth-attempt endpoints (login / activate / register) returning 401
+    // must NOT clear an existing session — failed auth is not a session loss.
+    if (status === 401 && !isAuthenticationAttempt(error.config?.url)) {
       import('@/stores/auth').then(({ useAuthStore }) => {
-        const store = useAuthStore();
-        store.logout().catch(() => {});
+        useAuthStore().clearLocalSession();
       });
+    }
+
+    // Also clear CSRF cache after failed write requests
+    if (error.config) {
+      const method = (error.config.method || 'get').toLowerCase();
+      if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        import('./csrf').then(({ clearCsrfToken }) => clearCsrfToken());
+      }
     }
 
     throw new ApiError(status, message, error.response.data?.code);
   },
 );
+
+/**
+ * Returns true when the URL is an explicit authentication attempt
+ * (login, activate, register). These endpoints returning 401 must NOT
+ * clear an existing session — they represent a failed auth attempt,
+ * not a loss of already-authenticated identity.
+ *
+ * /auth/me is intentionally excluded: a 401 from /auth/me means the
+ * current session is genuinely invalid and local state should be cleared.
+ */
+function isAuthenticationAttempt(url?: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes('/v1/auth/login') ||
+    url.includes('/v1/auth/activate') ||
+    url.includes('/v1/auth/register')
+  );
+}
 
 function getDefaultMessage(status: number): string {
   switch (status) {
