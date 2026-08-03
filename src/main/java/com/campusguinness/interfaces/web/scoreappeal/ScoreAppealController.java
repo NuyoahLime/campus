@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.scoreappeal;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.CurrentActorContextImpl;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -19,10 +20,13 @@ public class ScoreAppealController {
 
     private final ScoreAppealApplicationService service;
     private final CurrentActor currentActor;
+    private final CurrentActorContextImpl actorContext;
 
-    public ScoreAppealController(ScoreAppealApplicationService service, CurrentActor currentActor) {
+    public ScoreAppealController(ScoreAppealApplicationService service, CurrentActor currentActor,
+            CurrentActorContextImpl actorContext) {
         this.service = service;
         this.currentActor = currentActor;
+        this.actorContext = actorContext;
     }
 
     @GetMapping("/mine")
@@ -48,14 +52,16 @@ public class ScoreAppealController {
     @PostMapping("/{id}/begin-processing")
     @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id) {
-        ScoreAppealResult r = service.beginProcessing(id, currentActor.requireUserId());
+        var actor = actorContext.require();
+        ScoreAppealResult r = service.beginProcessing(id, currentActor.requireUserId(), actor);
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ScoreAppealResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectScoreAppealRequest req) {
-        ScoreAppealResult r = service.reject(id, req.resolution());
+        var actor = actorContext.require();
+        ScoreAppealResult r = service.reject(id, currentActor.requireUserId(), req.resolution(), actor);
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));
     }
 

@@ -3,6 +3,7 @@ package com.campusguinness.appeal.application.service;
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.ActorContext;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 
 import org.springframework.stereotype.Service;
@@ -36,8 +37,22 @@ public class ScoreAppealApplicationService {
         var a = find(id); a.beginProcessing(handlerId); repo.save(a); return result(a);
     }
 
+    public ScoreAppealResult beginProcessing(UUID id, UUID handlerId, ActorContext actor) {
+        var a = findManageable(id, actor); a.beginProcessing(handlerId); repo.save(a); return result(a);
+    }
+
     public ScoreAppealResult reject(UUID id, String resolution) {
         var a = find(id); a.reject(resolution); repo.save(a); return result(a);
+    }
+
+    public ScoreAppealResult reject(UUID id, UUID handlerId, String resolution, ActorContext actor) {
+        var a = findManageable(id, actor); a.reject(resolution); repo.save(a); return result(a);
+    }
+
+    private ScoreAppeal findManageable(UUID id, ActorContext actor) {
+        if (actor.isSuperAdmin()) return find(id);
+        return repo.findByIdAndSchoolId(id, actor.requireSchoolId())
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found"));
     }
 
     public ScoreAppealResult withdraw(UUID id, UUID currentStudentId) {

@@ -36,4 +36,10 @@ class ScoreAppealRepositoryAdapter implements ScoreAppealRepository {
         return jpa.findByIdAndStudentId(id, studentId)
                 .map(ScoreAppealPersistenceMapper::toDomain);
     }
+
+    @Override @Transactional(readOnly = true)
+    public Optional<ScoreAppeal> findByIdAndSchoolId(UUID id, UUID schoolId) {
+        return jpa.findByIdAndSchoolId(id, schoolId)
+                .map(ScoreAppealPersistenceMapper::toDomain);
+    }
 }

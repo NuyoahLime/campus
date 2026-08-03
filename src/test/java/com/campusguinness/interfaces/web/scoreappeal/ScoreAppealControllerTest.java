@@ -3,7 +3,9 @@ package com.campusguinness.interfaces.web.scoreappeal;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.ActorContext;
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.infrastructure.security.CurrentActorContextImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,12 +26,14 @@ class ScoreAppealControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService service;
     @MockitoBean CurrentActor currentActor;
+    @MockitoBean CurrentActorContextImpl actorContext;
     @Autowired ObjectMapper mapper;
 
     private static final UUID ACTOR_ID = UUID.randomUUID();
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
         when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
         when(service.submit(any(), eq(ACTOR_ID), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/score-appeals").contentType(MediaType.APPLICATION_JSON)
@@ -39,15 +43,18 @@ class ScoreAppealControllerTest {
 
     @Test void beginProcessingReturns200() throws Exception {
         UUID id = UUID.randomUUID();
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
         when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
-        when(service.beginProcessing(eq(id), eq(ACTOR_ID))).thenReturn(new ScoreAppealResult(id, "PROCESSING"));
+        when(service.beginProcessing(eq(id), any(), any())).thenReturn(new ScoreAppealResult(id, "PROCESSING"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/begin-processing"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
     }
 
     @Test void rejectReturns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.reject(eq(id), anyString())).thenReturn(new ScoreAppealResult(id, "REJECTED"));
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
+        when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
+        when(service.reject(eq(id), any(), anyString(), any())).thenReturn(new ScoreAppealResult(id, "REJECTED"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/reject").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new RejectScoreAppealRequest("reason"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
@@ -55,6 +62,7 @@ class ScoreAppealControllerTest {
 
     @Test void withdrawReturns200() throws Exception {
         UUID id = UUID.randomUUID();
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
         when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
         when(service.withdraw(id, ACTOR_ID)).thenReturn(new ScoreAppealResult(id, "WITHDRAWN"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/withdraw"))
@@ -62,21 +70,24 @@ class ScoreAppealControllerTest {
     }
 
     @Test void notFoundReturns404() throws Exception {
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
         when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
-        when(service.beginProcessing(any(), any())).thenThrow(new IllegalArgumentException("not found"));
+        when(service.beginProcessing(any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/score-appeals/" + UUID.randomUUID() + "/begin-processing"))
                 .andExpect(status().isNotFound());
     }
 
     @Test void stateConflictReturns409() throws Exception {
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
         when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
-        when(service.beginProcessing(any(), any())).thenThrow(new InvalidAppealStateTransitionException(AppealStatus.RESOLVED, "begin processing"));
+        when(service.beginProcessing(any(), any(), any())).thenThrow(new InvalidAppealStateTransitionException(AppealStatus.RESOLVED, "begin processing"));
         mvc.perform(post("/api/v1/score-appeals/" + UUID.randomUUID() + "/begin-processing"))
                 .andExpect(status().isConflict());
     }
 
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
+        when(actorContext.require()).thenReturn(new ActorContext(UUID.randomUUID(), "SCHOOL_ADMIN", UUID.randomUUID()));
         when(currentActor.requireUserId()).thenReturn(ACTOR_ID);
         when(service.withdraw(id, ACTOR_ID)).thenReturn(new ScoreAppealResult(id, "WITHDRAWN"));
         mvc.perform(post("/api/v1/score-appeals/" + id + "/withdraw"))
