@@ -41,7 +41,7 @@ class ScoreAppealAuthorizationIT {
         superAdminName = prefix + "sa"; teacherName = prefix + "tch";
 
         schoolId = UUID.randomUUID();
-        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,now(),now(),0)", schoolId,prefix+"sch","USCC","S"+prefix,"SCH","MIDDLE_SCHOOL","GZ","r","c","1","t@t.cn","NORMAL");
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,now(),now(),0)", schoolId,prefix+"sch","USCC",UUID.randomUUID().toString(),"SCH","MIDDLE_SCHOOL","GZ","r","c","1","t@t.cn","NORMAL");
 
         superAdminId = UUID.randomUUID();
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status,platform_role) VALUES (?,?,?,?,?)", superAdminId, superAdminName, encoder.encode(RAW_PW), "NORMAL", "SUPER_ADMIN");
@@ -67,7 +67,7 @@ class ScoreAppealAuthorizationIT {
 
         // School B — cross-school isolation testing
         schoolBId = UUID.randomUUID();
-        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,now(),now(),0)", schoolBId,prefix+"schB","USCC","SB"+prefix,"SCH-B","MIDDLE_SCHOOL","GZ","r","c","1","t@t.cn","NORMAL");
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,now(),now(),0)", schoolBId,prefix+"schB","USCC","SB"+UUID.randomUUID().toString().substring(0,8),"SCH-B","MIDDLE_SCHOOL","GZ","r","c","1","t@t.cn","NORMAL");
         adminBName = prefix + "adB";
         adminBId = UUID.randomUUID();
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)", adminBId, adminBName, encoder.encode(RAW_PW), "NORMAL");
