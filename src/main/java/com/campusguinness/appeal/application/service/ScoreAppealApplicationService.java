@@ -48,13 +48,6 @@ public class ScoreAppealApplicationService {
         return result(a);
     }
 
-    public ScoreAppealResult resolve(UUID id, ActorContext actor, String resolution) {
-        var a = findManageable(id, actor);
-        a.resolve(resolution);
-        repo.save(a);
-        return result(a);
-    }
-
     public ScoreAppealResult withdraw(UUID id, UUID currentStudentId) {
         var a = repo.findByIdAndStudentId(id, currentStudentId)
                 .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found"));

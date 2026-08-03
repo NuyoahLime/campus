@@ -49,6 +49,8 @@ class ScoreAppealControllerTest {
         mvc.perform(post("/api/v1/score-appeals/" + id + "/begin-processing"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
         verify(service).beginProcessing(id, SCHOOL_ADMIN);
+        verify(actorContext).require();
+        verifyNoInteractions(currentActor);
     }
 
     @Test void rejectReturns200() throws Exception {
@@ -58,6 +60,8 @@ class ScoreAppealControllerTest {
         mvc.perform(post("/api/v1/score-appeals/" + id + "/reject").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new RejectScoreAppealRequest("reason"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+        verify(service).reject(id, SCHOOL_ADMIN, "reason");
+        verify(actorContext).require();
     }
 
     @Test void withdrawReturns200() throws Exception {

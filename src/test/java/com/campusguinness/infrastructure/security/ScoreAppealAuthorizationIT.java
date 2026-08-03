@@ -29,9 +29,9 @@ class ScoreAppealAuthorizationIT {
     @Autowired PasswordEncoder encoder;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    private UUID studentId, student2Id, schoolAdminId, superAdminId, teacherId, schoolId;
-    private String studentName, student2Name, schoolAdminName, superAdminName, teacherName;
-    private UUID scoreAttemptId, scoreAttempt2Id;
+    private UUID studentId, student2Id, schoolAdminId, superAdminId, teacherId, schoolId, schoolBId, adminBId;
+    private String studentName, student2Name, schoolAdminName, superAdminName, teacherName, adminBName;
+    private UUID scoreAttemptId, scoreAttempt2Id, appealBId;
     private static final String RAW_PW = "testPass123";
 
     @BeforeEach
@@ -64,6 +64,17 @@ class ScoreAppealAuthorizationIT {
         jdbc.update("INSERT INTO score_attempts(id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,score_value,is_current_effective,score_status,entered_by,version) VALUES (?,?,?,?,?,?,?,?,?,?,?)", scoreAttemptId, schoolId, activityProjectId, studentId, 1, "INTEGER", 100, true, "APPROVED", teacherId, 1);
         scoreAttempt2Id = UUID.randomUUID();
         jdbc.update("INSERT INTO score_attempts(id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,score_value,is_current_effective,score_status,entered_by,version) VALUES (?,?,?,?,?,?,?,?,?,?,?)", scoreAttempt2Id, schoolId, activityProjectId, student2Id, 1, "INTEGER", 100, true, "APPROVED", teacherId, 1);
+
+        // School B — cross-school isolation testing
+        schoolBId = UUID.randomUUID();
+        jdbc.update("INSERT INTO schools(id,name,unified_code_type,unified_code,internal_code,school_type,region,address,contact_name,contact_phone,contact_email,school_status,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,now(),now(),0)", schoolBId,prefix+"schB","USCC","SB"+prefix,"SCH-B","MIDDLE_SCHOOL","GZ","r","c","1","t@t.cn","NORMAL");
+        adminBName = prefix + "adB";
+        adminBId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)", adminBId, adminBName, encoder.encode(RAW_PW), "NORMAL");
+        jdbc.update("INSERT INTO school_memberships(id,user_id,school_id,role_in_school,status,started_at,created_at,version) VALUES (?,?,?,?,?,now(),now(),1)", UUID.randomUUID(), adminBId, schoolBId, "SCHOOL_ADMIN", "ACTIVE");
+
+        // Create an appeal in School A for cross-school testing (submitted by student)
+        // Will be created on-demand in cross-school tests
     }
 
     @AfterEach
@@ -178,5 +189,25 @@ class ScoreAppealAuthorizationIT {
         UUID appealId = submitAppeal(student2Name, scoreAttempt2Id);
         var r = login(studentName);
         mvc.perform(post("/api/v1/score-appeals/" + appealId + "/withdraw").with(csrf()).cookie(sCookie(r))).andExpect(status().isNotFound());
+    }
+
+    // ── cross-school isolation ──
+
+    @Test void adminABeginAppealAReturns200() throws Exception {
+        UUID appealId = submitAppeal(studentName, scoreAttemptId);
+        var r = login(schoolAdminName);
+        mvc.perform(post("/api/v1/score-appeals/" + appealId + "/begin-processing").with(csrf()).cookie(sCookie(r))).andExpect(status().isOk());
+    }
+
+    @Test void adminABeginAppealBReturns404() throws Exception {
+        UUID appealId = submitAppeal(studentName, scoreAttemptId);
+        var r = login(adminBName); // Admin B trying to process School A's appeal
+        mvc.perform(post("/api/v1/score-appeals/" + appealId + "/begin-processing").with(csrf()).cookie(sCookie(r))).andExpect(status().isNotFound());
+    }
+
+    @Test void superAdminBeginAppealAReturns200() throws Exception {
+        UUID appealId = submitAppeal(studentName, scoreAttemptId);
+        var r = login(superAdminName);
+        mvc.perform(post("/api/v1/score-appeals/" + appealId + "/begin-processing").with(csrf()).cookie(sCookie(r))).andExpect(status().isOk());
     }
 }
