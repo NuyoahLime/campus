@@ -39,15 +39,15 @@ public class ScoreAppealController {
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ScoreAppealResponse> submit(@Valid @RequestBody SubmitScoreAppealRequest req) {
-        ScoreAppealResult r = service.submit(req.schoolId(), req.scoreAttemptId(),
-                currentActor.requireUserId(), req.appealType(), req.appealReason());
+        ScoreAppealResult r = service.submit(req.scoreAttemptId(), currentActor.requireUserId(),
+                req.appealType(), req.appealReason());
         return ResponseEntity.created(URI.create("/api/v1/score-appeals/" + r.id()))
                 .body(new ScoreAppealResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/begin-processing")
     @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id, @Valid @RequestBody BeginProcessingRequest req) {
+    public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id) {
         ScoreAppealResult r = service.beginProcessing(id, currentActor.requireUserId());
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));
     }

@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record SubmitScoreAppealRequest(
-        @NotNull UUID schoolId,
         @NotNull UUID scoreAttemptId,
         @NotBlank String appealType,
         @NotBlank String appealReason) {}
