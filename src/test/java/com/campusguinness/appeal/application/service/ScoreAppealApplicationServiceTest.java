@@ -26,10 +26,22 @@ class ScoreAppealApplicationServiceTest {
 
     @Nested class Submit {
         @Test void success() {
+            UUID attemptId = UUID.randomUUID();
+            UUID currentStudentId = UUID.randomUUID();
             var attempt = mock(com.campusguinness.score.internal.domain.ScoreAttempt.class);
             when(attempt.schoolId()).thenReturn(UUID.randomUUID());
-            when(scoreAttemptRepo.findByIdAndStudentId(any(), any())).thenReturn(Optional.of(attempt));
-            assertThat(svc.submit(UUID.randomUUID(),UUID.randomUUID(),"SCORE","r").status()).isEqualTo("SUBMITTED"); verify(repo).save(any());
+            when(scoreAttemptRepo.findByIdAndStudentId(attemptId, currentStudentId)).thenReturn(Optional.of(attempt));
+            assertThat(svc.submit(attemptId, currentStudentId,"SCORE","r").status()).isEqualTo("SUBMITTED");
+            verify(repo).save(any());
+            verify(scoreAttemptRepo).findByIdAndStudentId(attemptId, currentStudentId);
+        }
+        @Test void rejectsForeignScoreAttempt() {
+            UUID attemptId = UUID.randomUUID();
+            UUID currentStudentId = UUID.randomUUID();
+            when(scoreAttemptRepo.findByIdAndStudentId(attemptId, currentStudentId)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.submit(attemptId, currentStudentId, "SCORE", "reason"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(repo, never()).save(any());
         }
     }
     @Nested class BeginProcessing {

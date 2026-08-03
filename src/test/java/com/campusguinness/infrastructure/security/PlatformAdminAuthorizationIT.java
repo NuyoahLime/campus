@@ -106,10 +106,37 @@ class PlatformAdminAuthorizationIT {
         mvc.perform(post("/api/v1/schools/" + schoolId + "/disable").with(csrf())
                 .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"t\"}")).andExpect(status().isForbidden());
     }
-    @Test void studentCannotAccessAdminEndpoints() throws Exception {
+    @Test void studentCanAccessOwnProfile() throws Exception {
         var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"" + studentName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
-        // Student can access /me
         mvc.perform(get("/api/v1/auth/me").cookie(new Cookie("SESSION", extractSessionValue(r)))).andExpect(status().isOk());
+    }
+
+    @Test void schoolAdminCannotApproveL3() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + schoolAdminName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/l3-authorizations/" + UUID.randomUUID() + "/approve").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+    }
+
+    @Test void schoolAdminCannotApproveSchoolRegistration() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + schoolAdminName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/approve").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+    }
+
+    @Test void studentCannotPublishActivityResult() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + studentName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/activity-results/" + UUID.randomUUID() + "/publish").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r)))).andExpect(status().isForbidden());
+    }
+
+    @Test void teacherCannotPublishActivityResult() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + teacherName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/activity-results/" + UUID.randomUUID() + "/publish").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r)))).andExpect(status().isForbidden());
     }
 }
