@@ -123,7 +123,7 @@ class PlatformAdminAuthorizationIT {
         var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"" + schoolAdminName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
         mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/approve").with(csrf())
-                .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+                .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{\"schoolId\":\"" + schoolId + "\"}")).andExpect(status().isForbidden());
     }
 
     @Test void studentCannotPublishActivityResult() throws Exception {
@@ -138,5 +138,27 @@ class PlatformAdminAuthorizationIT {
                 .content("{\"username\":\"" + teacherName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
         mvc.perform(post("/api/v1/activity-results/" + UUID.randomUUID() + "/publish").with(csrf())
                 .cookie(new Cookie("SESSION", extractSessionValue(r)))).andExpect(status().isForbidden());
+    }
+
+    // ── Positive auth: correct role reaches business layer (404 = auth passed) ──
+    @Test void superAdminCanReachL3Approve() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + superAdminName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/l3-authorizations/" + UUID.randomUUID() + "/approve").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{\"comment\":\"ok\"}")).andExpect(status().isNotFound());
+    }
+
+    @Test void superAdminCanReachSchoolRegistrationApprove() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + superAdminName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/approve").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r))).contentType(MediaType.APPLICATION_JSON).content("{\"schoolId\":\"" + schoolId + "\"}")).andExpect(status().isNotFound());
+    }
+
+    @Test void schoolAdminCanReachActivityResultPublish() throws Exception {
+        var r = mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + schoolAdminName + "\",\"password\":\"" + RAW_PW + "\"}")).andExpect(status().isOk()).andReturn();
+        mvc.perform(post("/api/v1/activity-results/" + UUID.randomUUID() + "/publish").with(csrf())
+                .cookie(new Cookie("SESSION", extractSessionValue(r)))).andExpect(status().isNotFound());
     }
 }
