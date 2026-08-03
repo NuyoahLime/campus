@@ -6,6 +6,7 @@ import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.infrastructure.security.ActorContext;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,26 +34,25 @@ public class ScoreAppealApplicationService {
         return result(a);
     }
 
-    public ScoreAppealResult beginProcessing(UUID id, UUID handlerId) {
-        var a = find(id); a.beginProcessing(handlerId); repo.save(a); return result(a);
+    public ScoreAppealResult beginProcessing(UUID id, ActorContext actor) {
+        var a = findManageable(id, actor);
+        a.beginProcessing(actor.userId());
+        repo.save(a);
+        return result(a);
     }
 
-    public ScoreAppealResult beginProcessing(UUID id, UUID handlerId, ActorContext actor) {
-        var a = findManageable(id, actor); a.beginProcessing(handlerId); repo.save(a); return result(a);
+    public ScoreAppealResult reject(UUID id, ActorContext actor, String resolution) {
+        var a = findManageable(id, actor);
+        a.reject(resolution);
+        repo.save(a);
+        return result(a);
     }
 
-    public ScoreAppealResult reject(UUID id, String resolution) {
-        var a = find(id); a.reject(resolution); repo.save(a); return result(a);
-    }
-
-    public ScoreAppealResult reject(UUID id, UUID handlerId, String resolution, ActorContext actor) {
-        var a = findManageable(id, actor); a.reject(resolution); repo.save(a); return result(a);
-    }
-
-    private ScoreAppeal findManageable(UUID id, ActorContext actor) {
-        if (actor.isSuperAdmin()) return find(id);
-        return repo.findByIdAndSchoolId(id, actor.requireSchoolId())
-                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found"));
+    public ScoreAppealResult resolve(UUID id, ActorContext actor, String resolution) {
+        var a = findManageable(id, actor);
+        a.resolve(resolution);
+        repo.save(a);
+        return result(a);
     }
 
     public ScoreAppealResult withdraw(UUID id, UUID currentStudentId) {
@@ -61,13 +61,13 @@ public class ScoreAppealApplicationService {
         a.withdraw(); repo.save(a); return result(a);
     }
 
-    public ScoreAppealResult resolve(UUID id, String resolution) {
-        var a = find(id); a.resolve(resolution); repo.save(a); return result(a);
-    }
-
-    private ScoreAppeal find(UUID id) {
-        return repo.findById(new ScoreAppealId(id))
-                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found: " + id));
+    private ScoreAppeal findManageable(UUID id, ActorContext actor) {
+        if (actor.isSuperAdmin()) return repo.findById(new ScoreAppealId(id))
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found"));
+        if (!actor.isSchoolAdmin()) throw new AccessDeniedException("School administrator role required");
+        if (actor.primarySchoolId() == null) throw new AccessDeniedException("School context required");
+        return repo.findByIdAndSchoolId(id, actor.primarySchoolId())
+                .orElseThrow(() -> new IllegalArgumentException("ScoreAppeal not found"));
     }
 
     private ScoreAppealResult result(ScoreAppeal a) {
