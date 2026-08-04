@@ -1,13 +1,17 @@
 package com.campusguinness.infrastructure.security;
 
+import com.campusguinness.identity.application.port.SecureTokenHasher;
 import com.campusguinness.identity.application.port.MailDeliveryPort;
 import com.campusguinness.identity.application.port.MailMessage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,8 +19,19 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(properties = {
         "campus-guinness.security.cors.allowed-origins=http://localhost:5173",
         "app.mail.public-frontend-url=https://app.example.com"
@@ -38,15 +54,22 @@ class PublicRegistrationBackendIT {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired SecureTokenHasher tokenHasher;
     @MockitoBean MailDeliveryPort mailDeliveryPort;
 
     @AfterEach
     void tearDown() {
         jdbc.update("""
+                DELETE FROM activation_audit_logs
+                WHERE failure_code = 'RESEND_VERIFICATION'
+                  AND username_normalized LIKE 'resend:%'
+                """);
+        jdbc.update("""
                 DELETE FROM school_memberships
                 WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'phase2-%')
                 """);
         jdbc.update("DELETE FROM users WHERE username LIKE 'phase2-%'");
+        jdbc.update("DELETE FROM schools WHERE name LIKE 'phase2-school-%'");
         reset(mailDeliveryPort);
     }
 
@@ -167,8 +190,32 @@ class PublicRegistrationBackendIT {
     }
 
     @Test
-    void mailFailureDoesNotRollbackRegistration() throws Exception {
-        doThrow(new IllegalStateException("smtp unavailable")).when(mailDeliveryPort).send(any(MailMessage.class));
+    void concurrentDuplicateRegistrationCreatesExactlyOneAccount() throws Exception {
+        String username = unique("phase2-concurrent-register");
+        String email = username + "@example.com";
+
+        List<MvcResult> results = runConcurrently(8, () -> mvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson(username, email, "Example123!", "Example123!")))
+                .andReturn());
+
+        assertThat(results).hasSize(8);
+        assertThat(results).filteredOn(result -> result.getResponse().getStatus() == 201).hasSize(1);
+        assertThat(results).filteredOn(result -> result.getResponse().getStatus() == 409).hasSize(7);
+        assertThat(results).filteredOn(result -> result.getResponse().getStatus() >= 500).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users WHERE username = ?",
+                Integer.class, username)).isOne();
+        assertThat(tokenCount(username)).isOne();
+        assertThat(activeTokenCount(username)).isOne();
+        verify(mailDeliveryPort, times(1)).send(any(MailMessage.class));
+    }
+
+    @Test
+    void mailFailureDoesNotRollbackRegistration(CapturedOutput output) throws Exception {
+        doThrow(new IllegalStateException(
+                "smtp unavailable for mailfail@example.com https://app.example.com/verify-email?token=secret-token"))
+                .when(mailDeliveryPort).send(any(MailMessage.class));
         String username = unique("phase2-mailfail");
 
         mvc.perform(post("/api/v1/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON)
@@ -181,6 +228,12 @@ class PublicRegistrationBackendIT {
                 JOIN users u ON u.id = evt.user_id
                 WHERE u.username = ?
                 """, Integer.class, username)).isOne();
+        assertThat(output).contains("Verification mail delivery failed");
+        assertThat(output).contains("recipient=m***@example.com");
+        assertThat(output).contains("errorType=IllegalStateException");
+        assertThat(output).doesNotContain("mailfail@example.com");
+        assertThat(output).doesNotContain("secret-token");
+        assertThat(output).doesNotContain("/verify-email?token=");
     }
 
     @Test
@@ -213,11 +266,111 @@ class PublicRegistrationBackendIT {
     }
 
     @Test
+    void sameVerificationTokenConcurrentUseOnlySucceedsOnce() throws Exception {
+        String username = unique("phase2-concurrent-verify");
+        register(username, "concurrent-verify@example.com");
+        String token = lastRawToken();
+
+        List<MvcResult> results = runConcurrently(8, () -> mvc.perform(post("/api/v1/auth/verify-email")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andReturn());
+
+        assertThat(results).hasSize(8);
+        assertThat(results).filteredOn(result -> result.getResponse().getStatus() == 204).hasSize(1);
+        assertThat(results).filteredOn(result -> result.getResponse().getStatus() == 400)
+                .hasSize(7)
+                .allSatisfy(result ->
+                        assertThat(result.getResponse().getContentAsString())
+                                .contains("\"code\":\"EMAIL_VERIFICATION_INVALID\""));
+        assertThat(results).filteredOn(result -> result.getResponse().getStatus() >= 500).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT email_verified_at IS NOT NULL FROM users WHERE username=?",
+                Boolean.class, username)).isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT used_at IS NOT NULL FROM email_verification_tokens
+                WHERE token_hash = ?
+                """, Boolean.class, tokenHasher.hash(token))).isTrue();
+    }
+
+    @Test
     void invalidVerificationCasesReturnGenericError() throws Exception {
-        mvc.perform(post("/api/v1/auth/verify-email").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"token\":\"not-a-real-token\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_INVALID"));
+        expectInvalidVerification("{\"token\":\"not-a-real-token\"}");
+    }
+
+    @Test
+    void blankVerificationTokenReturnsGenericError() throws Exception {
+        expectInvalidVerification("{\"token\":\"\"}");
+        expectInvalidVerification("{\"token\":\"   \"}");
+    }
+
+    @Test
+    void missingVerificationTokenReturnsGenericError() throws Exception {
+        expectInvalidVerification("{}");
+        expectInvalidVerification("{\"token\":null}");
+    }
+
+    @Test
+    void expiredVerificationReturnsGenericError() throws Exception {
+        String username = unique("phase2-expired");
+        register(username, "expired@example.com");
+        String token = lastRawToken();
+        jdbc.update("""
+                UPDATE email_verification_tokens
+                SET created_at = now() - INTERVAL '2 minutes',
+                    expires_at = now() - INTERVAL '1 minute'
+                WHERE token_hash = ?
+                """, tokenHasher.hash(token));
+
+        expectInvalidVerification("{\"token\":\"" + token + "\"}");
+    }
+
+    @Test
+    void usedVerificationReturnsGenericError() throws Exception {
+        String username = unique("phase2-used");
+        register(username, "used@example.com");
+        String token = lastRawToken();
+        verifyEmail(token);
+
+        expectInvalidVerification("{\"token\":\"" + token + "\"}");
+    }
+
+    @Test
+    void wrongPurposeReturnsGenericError() throws Exception {
+        String username = unique("phase2-purpose");
+        register(username, "purpose@example.com");
+        String token = lastRawToken();
+        jdbc.update("""
+                UPDATE email_verification_tokens
+                SET purpose = 'RECOVERY_EMAIL'
+                WHERE token_hash = ?
+                """, tokenHasher.hash(token));
+
+        expectInvalidVerification("{\"token\":\"" + token + "\"}");
+    }
+
+    @Test
+    void targetEmailMismatchReturnsGenericError() throws Exception {
+        String username = unique("phase2-email-mismatch");
+        register(username, "mismatch-token@example.com");
+        String token = lastRawToken();
+        jdbc.update("""
+                UPDATE email_verification_tokens
+                SET target_email_normalized = 'different@example.com'
+                WHERE token_hash = ?
+                """, tokenHasher.hash(token));
+
+        expectInvalidVerification("{\"token\":\"" + token + "\"}");
+    }
+
+    @Test
+    void wrongUserStatusReturnsGenericError() throws Exception {
+        String username = unique("phase2-wrong-status");
+        register(username, "wrong-status@example.com");
+        String token = lastRawToken();
+        jdbc.update("UPDATE users SET account_status = 'DISABLED' WHERE username = ?", username);
+
+        expectInvalidVerification("{\"token\":\"" + token + "\"}");
     }
 
     @Test
@@ -250,7 +403,7 @@ class PublicRegistrationBackendIT {
         for (int i = 0; i < 6; i++) {
             mvc.perform(post("/api/v1/auth/resend-verification")
                             .with(csrf())
-                            .header("X-Forwarded-For", "203.0.113.44")
+                            .with(remoteAddr("203.0.113.44"))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"" + email + "\"}"))
                     .andExpect(status().isAccepted())
@@ -258,6 +411,75 @@ class PublicRegistrationBackendIT {
         }
 
         verify(mailDeliveryPort, times(5)).send(any(MailMessage.class));
+    }
+
+    @Test
+    void spoofedForwardedForIsIgnored() throws Exception {
+        String username = unique("phase2-spoof");
+        String email = username + "@example.com";
+        register(username, email);
+        reset(mailDeliveryPort);
+
+        for (int i = 0; i < 6; i++) {
+            mvc.perform(post("/api/v1/auth/resend-verification")
+                            .with(csrf())
+                            .with(remoteAddr("203.0.113.10"))
+                            .header("X-Forwarded-For", "198.51.100." + i)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"" + email + "\"}"))
+                    .andExpect(status().isAccepted());
+        }
+
+        verify(mailDeliveryPort, times(5)).send(any(MailMessage.class));
+    }
+
+    @Test
+    void remoteAddressIsUsedForRateLimiting() throws Exception {
+        String remoteAddress = "203.0.113.99";
+
+        for (int i = 0; i < 6; i++) {
+            mvc.perform(post("/api/v1/auth/resend-verification")
+                            .with(csrf())
+                            .with(remoteAddr(remoteAddress))
+                            .header("X-Forwarded-For", "198.51.100." + i)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"unknown-" + i + "@example.com\"}"))
+                    .andExpect(status().isAccepted());
+        }
+
+        String ipKey = "resend:ip:" + tokenHasher.hash(remoteAddress);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM activation_audit_logs
+                WHERE username_normalized = ?
+                """, Integer.class, ipKey)).isEqualTo(6);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM activation_audit_logs
+                WHERE username_normalized = ? AND result = 'RATE_LIMITED'
+                """, Integer.class, ipKey)).isOne();
+        verify(mailDeliveryPort, never()).send(any(MailMessage.class));
+    }
+
+    @Test
+    void concurrentResendNeverExceedsFiveDeliveries() throws Exception {
+        String username = unique("phase2-concurrent-resend");
+        String email = username + "@example.com";
+        register(username, email);
+        reset(mailDeliveryPort);
+
+        List<MvcResult> results = runConcurrently(12, () -> mvc.perform(post("/api/v1/auth/resend-verification")
+                        .with(csrf())
+                        .with(remoteAddr("203.0.113.55"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\"}"))
+                .andReturn());
+
+        assertThat(results).hasSize(12);
+        assertThat(results).allSatisfy(result ->
+                assertThat(result.getResponse().getStatus()).isEqualTo(202));
+        assertThat(results).noneSatisfy(result ->
+                assertThat(result.getResponse().getStatus()).isGreaterThanOrEqualTo(500));
+        verify(mailDeliveryPort, atMost(5)).send(any(MailMessage.class));
+        assertThat(activeTokenCount(username)).isOne();
     }
 
     @Test
@@ -361,6 +583,94 @@ class PublicRegistrationBackendIT {
                 .andExpect(jsonPath("$.code").value("REGISTERED_USER_ONBOARDING_REQUIRED"));
     }
 
+    @Test
+    void registeredUserCannotAccessTeacherApi() throws Exception {
+        var sessionCookie = loginVerifiedRegisteredUser(unique("phase2-teacher-deny"), "teacher-deny@example.com");
+
+        assertRegisteredUserGate(get("/api/v1/teacher/responsible-projects").cookie(sessionCookie));
+    }
+
+    @Test
+    void registeredUserCannotAccessSchoolAdminApi() throws Exception {
+        var sessionCookie = loginVerifiedRegisteredUser(unique("phase2-school-admin-deny"), "school-admin-deny@example.com");
+
+        assertRegisteredUserGate(get("/api/v1/school-admin/score-attempts/mine").cookie(sessionCookie));
+    }
+
+    @Test
+    void registeredUserCannotAccessGenericBusinessApi() throws Exception {
+        var sessionCookie = loginVerifiedRegisteredUser(unique("phase2-business-deny"), "business-deny@example.com");
+
+        assertRegisteredUserGate(get("/api/v1/score-attempts/mine").cookie(sessionCookie));
+    }
+
+    @Test
+    void formalStudentIsNotBlockedByRegisteredUserFilter() throws Exception {
+        var sessionCookie = loginFormalSchoolUser(unique("phase2-formal-student"), "STUDENT");
+
+        assertNotRegisteredUserGate(get("/api/v1/student/scores").cookie(sessionCookie));
+    }
+
+    @Test
+    void formalTeacherIsNotBlockedByRegisteredUserFilter() throws Exception {
+        var sessionCookie = loginFormalSchoolUser(unique("phase2-formal-teacher"), "TEACHER");
+
+        assertNotRegisteredUserGate(get("/api/v1/teacher/responsible-projects").cookie(sessionCookie));
+    }
+
+    @Test
+    void schoolAdminIsNotBlockedByRegisteredUserFilter() throws Exception {
+        var sessionCookie = loginFormalSchoolUser(unique("phase2-formal-admin"), "SCHOOL_ADMIN");
+
+        assertNotRegisteredUserGate(get("/api/v1/school-admin/score-attempts/mine").cookie(sessionCookie));
+    }
+
+    @Test
+    void superAdminIsNotBlockedByRegisteredUserFilter() throws Exception {
+        var sessionCookie = loginSuperAdmin(unique("phase2-formal-super"));
+
+        assertNotRegisteredUserGate(get("/api/v1/admin/activities").cookie(sessionCookie));
+    }
+
+    @Test
+    void adminProvisionedActivationFlowStillWorks() throws Exception {
+        String username = unique("phase2-legacy-activation");
+        String temporaryPassword = "TempPass123!";
+        String newPassword = "NewPass123!";
+        jdbc.update("""
+                INSERT INTO users(id, username, password_hash, account_status,
+                    platform_role, activation_issued_at, activation_expires_at, registration_source)
+                VALUES (?, ?, ?, 'PENDING_ACTIVATION',
+                    'SUPER_ADMIN', now(), now() + INTERVAL '72 hours', 'ADMIN_PROVISIONED')
+                """, UUID.randomUUID(), username, passwordEncoder.encode(temporaryPassword));
+
+        mvc.perform(post("/api/v1/auth/activate").with(csrf())
+                        .with(remoteAddr("203.0.113.77"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"%s",
+                                  "temporaryPassword":"%s",
+                                  "newPassword":"%s",
+                                  "confirmPassword":"%s"
+                                }
+                                """.formatted(username, temporaryPassword, newPassword, newPassword)))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("""
+                SELECT account_status = 'NORMAL'
+                    AND activation_issued_at IS NULL
+                    AND activation_expires_at IS NULL
+                FROM users
+                WHERE username = ?
+                """, Boolean.class, username)).isTrue();
+
+        mvc.perform(post("/api/v1/auth/login").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson(username, newPassword)))
+                .andExpect(status().isOk());
+    }
+
     private void register(String username, String email) throws Exception {
         mvc.perform(post("/api/v1/auth/register").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -373,6 +683,105 @@ class PublicRegistrationBackendIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"" + token + "\"}"))
                 .andExpect(status().isNoContent());
+    }
+
+    private void expectInvalidVerification(String json) throws Exception {
+        mvc.perform(post("/api/v1/auth/verify-email").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_INVALID"))
+                .andExpect(jsonPath("$.message").value("The email verification link is invalid or expired."));
+    }
+
+    private jakarta.servlet.http.Cookie loginVerifiedRegisteredUser(String username, String email) throws Exception {
+        register(username, email);
+        verifyEmail(lastRawToken());
+        var login = mvc.perform(post("/api/v1/auth/login").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson(username, "Example123!")))
+                .andExpect(status().isOk())
+                .andReturn();
+        var sessionCookie = login.getResponse().getCookie("SESSION");
+        assertThat(sessionCookie).isNotNull();
+        return sessionCookie;
+    }
+
+    private jakarta.servlet.http.Cookie loginFormalSchoolUser(String username, String roleInSchool) throws Exception {
+        UUID userId = insertNormalUser(username, null);
+        UUID schoolId = insertSchool();
+        jdbc.update("""
+                INSERT INTO school_memberships(id, user_id, school_id, role_in_school, status)
+                VALUES (?, ?, ?, ?, 'ACTIVE')
+                """, UUID.randomUUID(), userId, schoolId, roleInSchool);
+        return login(username, "Example123!");
+    }
+
+    private jakarta.servlet.http.Cookie loginSuperAdmin(String username) throws Exception {
+        insertNormalUser(username, "SUPER_ADMIN");
+        return login(username, "Example123!");
+    }
+
+    private jakarta.servlet.http.Cookie login(String username, String password) throws Exception {
+        var login = mvc.perform(post("/api/v1/auth/login").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson(username, password)))
+                .andExpect(status().isOk())
+                .andReturn();
+        var sessionCookie = login.getResponse().getCookie("SESSION");
+        assertThat(sessionCookie).isNotNull();
+        return sessionCookie;
+    }
+
+    private UUID insertNormalUser(String username, String platformRole) {
+        UUID userId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO users(id, username, password_hash, account_status, platform_role, registration_source)
+                VALUES (?, ?, ?, 'NORMAL', ?, 'ADMIN_PROVISIONED')
+                """, userId, username, passwordEncoder.encode("Example123!"), platformRole);
+        return userId;
+    }
+
+    private void assertRegisteredUserGate(RequestBuilder request) throws Exception {
+        mvc.perform(request)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("REGISTERED_USER_ONBOARDING_REQUIRED"));
+    }
+
+    private void assertNotRegisteredUserGate(RequestBuilder request) throws Exception {
+        var result = mvc.perform(request).andReturn();
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("REGISTERED_USER_ONBOARDING_REQUIRED");
+    }
+
+    private List<MvcResult> runConcurrently(int count, Callable<MvcResult> operation) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(count);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<MvcResult>> futures = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                futures.add(executor.submit(() -> {
+                    assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+                    return operation.call();
+                }));
+            }
+            start.countDown();
+            List<MvcResult> results = new ArrayList<>();
+            for (Future<MvcResult> future : futures) {
+                results.add(future.get(15, TimeUnit.SECONDS));
+            }
+            return results;
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    private RequestPostProcessor remoteAddr(String remoteAddress) {
+        return request -> {
+            request.setRemoteAddr(remoteAddress);
+            return request;
+        };
     }
 
     private String lastRawToken() {

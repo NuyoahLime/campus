@@ -7,6 +7,8 @@ import com.campusguinness.identity.application.port.PasswordPolicy;
 import com.campusguinness.identity.internal.persistence.PublicRegistrationPersistenceService;
 import com.campusguinness.infrastructure.security.AuthTokenProperties;
 import com.campusguinness.infrastructure.security.LoginNameNormalizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,8 @@ import java.time.Clock;
 
 @Service
 public class PublicRegistrationService {
+
+    private static final Logger log = LoggerFactory.getLogger(PublicRegistrationService.class);
 
     private final LoginNameNormalizer loginNameNormalizer;
     private final EmailNormalizer emailNormalizer;
@@ -100,8 +104,20 @@ public class PublicRegistrationService {
     private void trySend(String email, String rawToken) {
         try {
             verificationMailService.sendVerificationMail(email, rawToken);
-        } catch (RuntimeException ignored) {
-            // Registration state is deliberately retained; no raw token or full URL is logged.
+        } catch (RuntimeException e) {
+            log.warn("Verification mail delivery failed: recipient={} errorType={}",
+                    maskEmail(email), e.getClass().getSimpleName());
         }
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "unknown";
+        }
+        int at = email.indexOf('@');
+        if (at <= 0 || at == email.length() - 1) {
+            return "***";
+        }
+        return email.charAt(0) + "***" + email.substring(at);
     }
 }

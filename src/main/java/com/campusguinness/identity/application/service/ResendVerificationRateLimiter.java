@@ -6,11 +6,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.sql.Timestamp;
+import java.util.List;
 
 @Component
 public class ResendVerificationRateLimiter {
 
     private static final int MAX_ATTEMPTS = 5;
+    private static final Duration WINDOW = Duration.ofMinutes(15);
     private final JdbcTemplate jdbc;
     private final SecureTokenHasher hasher;
     private final Clock clock;
@@ -25,23 +30,37 @@ public class ResendVerificationRateLimiter {
     public boolean isLimitedAndRecord(String emailNormalized, String clientIp) {
         String emailKey = "resend:email:" + hasher.hash(emailNormalized);
         String ipKey = "resend:ip:" + hasher.hash(clientIp == null ? "unknown" : clientIp);
-        boolean limited = countRecent(emailKey) >= MAX_ATTEMPTS || countRecent(ipKey) >= MAX_ATTEMPTS;
-        record(emailKey, limited);
-        record(ipKey, limited);
+        List<String> lockKeys = List.of(emailKey, ipKey).stream()
+                .sorted()
+                .toList();
+        lockKeys.forEach(this::lockKey);
+
+        Instant now = clock.instant();
+        Instant windowStart = now.minus(WINDOW);
+        boolean limited = countRecent(emailKey, windowStart) >= MAX_ATTEMPTS
+                || countRecent(ipKey, windowStart) >= MAX_ATTEMPTS;
+        record(emailKey, limited, now);
+        record(ipKey, limited, now);
         return limited;
     }
 
-    private int countRecent(String key) {
+    private void lockKey(String key) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+                ps -> ps.setString(1, key),
+                rs -> null);
+    }
+
+    private int countRecent(String key, Instant windowStart) {
         Integer count = jdbc.queryForObject("""
                 SELECT count(*)
                 FROM activation_audit_logs
                 WHERE username_normalized = ?
-                  AND occurred_at >= now() - INTERVAL '15 minutes'
-                """, Integer.class, key);
+                  AND occurred_at >= ?
+                """, Integer.class, key, Timestamp.from(windowStart));
         return count == null ? 0 : count;
     }
 
-    private void record(String key, boolean limited) {
+    private void record(String key, boolean limited, Instant now) {
         jdbc.update("""
                 INSERT INTO activation_audit_logs(
                     id, username_normalized, result, failure_code, occurred_at)
@@ -51,6 +70,6 @@ public class ResendVerificationRateLimiter {
                 key,
                 limited ? "RATE_LIMITED" : "FAILURE",
                 "RESEND_VERIFICATION",
-                java.sql.Timestamp.from(clock.instant()));
+                Timestamp.from(now));
     }
 }

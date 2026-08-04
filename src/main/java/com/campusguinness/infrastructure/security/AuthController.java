@@ -39,25 +39,28 @@ public class AuthController {
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
     private final LoginAttemptService loginAttemptService;
     private final PublicRegistrationService publicRegistrationService;
+    private final ClientIpResolver clientIpResolver;
 
     @Autowired
     public AuthController(AuthenticationManager authManager,
             SecurityContextRepository contextRepo,
             SessionAuthenticationStrategy sessionAuthenticationStrategy,
             LoginAttemptService loginAttemptService,
-            PublicRegistrationService publicRegistrationService) {
+            PublicRegistrationService publicRegistrationService,
+            ClientIpResolver clientIpResolver) {
         this.authManager = authManager;
         this.contextRepo = contextRepo;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
         this.loginAttemptService = loginAttemptService;
         this.publicRegistrationService = publicRegistrationService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     AuthController(AuthenticationManager authManager,
             SecurityContextRepository contextRepo,
             SessionAuthenticationStrategy sessionAuthenticationStrategy,
             LoginAttemptService loginAttemptService) {
-        this(authManager, contextRepo, sessionAuthenticationStrategy, loginAttemptService, null);
+        this(authManager, contextRepo, sessionAuthenticationStrategy, loginAttemptService, null, new ClientIpResolver());
     }
 
     @PostMapping("/register")
@@ -98,7 +101,7 @@ public class AuthController {
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification(@Valid @RequestBody ResendVerificationRequest req,
             HttpServletRequest request) {
-        var result = publicRegistrationService.resendVerification(req.email(), clientIp(request));
+        var result = publicRegistrationService.resendVerification(req.email(), clientIpResolver.resolve(request));
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .cacheControl(CacheControl.noStore())
                 .body(result);
@@ -235,11 +238,4 @@ public class AuthController {
         }
     }
 
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }
