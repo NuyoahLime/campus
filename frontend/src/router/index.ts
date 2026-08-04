@@ -50,9 +50,33 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/RegisterView.vue'),
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: () => import('@/views/VerifyEmailView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/verify-email-pending',
+      name: 'verify-email-pending',
+      component: () => import('@/views/VerifyEmailPendingView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/activate-account',
       name: 'activate',
       component: () => import('@/views/ActivateAccountView.vue'),
+    },
+    {
+      path: '/onboarding',
+      name: 'onboarding',
+      component: () => import('@/views/OnboardingView.vue'),
+      meta: { requiresAuth: true, roles: ['REGISTERED_USER'] },
     },
     {
       path: '/workspaces',
@@ -166,13 +190,32 @@ router.beforeEach(async (to) => {
 
   // guestOnly: redirect authenticated users to workspace
   if (to.meta.guestOnly && auth.authenticated) {
-    const redirect = (to.query.redirect as string) || auth.defaultWorkspaceRoute();
+    if (auth.user?.primaryRole === 'REGISTERED_USER') {
+      return { path: '/onboarding', replace: true };
+    }
+    const redirect = safeRedirect(to.query.redirect, auth.defaultWorkspaceRoute());
     return { path: redirect, replace: true };
   }
 
   // requiresAuth: redirect guests to login
   if (to.meta.requiresAuth && !auth.authenticated) {
     return { path: '/login', query: { redirect: to.fullPath }, replace: true };
+  }
+
+  if (auth.authenticated && auth.user?.primaryRole === 'REGISTERED_USER') {
+    const allowedRegisteredUserRoutes = new Set([
+      'onboarding',
+      'verify-email',
+      'verify-email-pending',
+      'forbidden',
+    ]);
+    if (!allowedRegisteredUserRoutes.has(String(to.name))) {
+      return { path: '/forbidden', replace: true };
+    }
+  }
+
+  if (auth.authenticated && auth.user?.primaryRole !== 'REGISTERED_USER' && to.name === 'onboarding') {
+    return { path: auth.defaultWorkspaceRoute(), replace: true };
   }
 
   // role check — use primaryRole only, not roles array
@@ -189,3 +232,12 @@ router.beforeEach(async (to) => {
 });
 
 export default router;
+
+export function safeRedirect(raw: unknown, fallback: string): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string') return fallback;
+  if (!value.startsWith('/')) return fallback;
+  if (value.startsWith('//')) return fallback;
+  if (/^\/\s*javascript:/i.test(value)) return fallback;
+  return value;
+}

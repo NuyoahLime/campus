@@ -183,6 +183,7 @@ async function withMounted(
     schoolMemberships: [],
     primaryRole: 'SCHOOL_ADMIN',
     primarySchoolId: SCHOOL_ID,
+    onboardingRequired: false,
   };
   const host = document.createElement('div');
   document.body.appendChild(host);

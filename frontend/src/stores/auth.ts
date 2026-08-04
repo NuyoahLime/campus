@@ -23,12 +23,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   function defaultWorkspaceRoute(): string {
     if (!user.value) return '/login';
-    const pr = user.value.primaryRole;
-    if (pr === 'SUPER_ADMIN') return '/admin';
-    if (pr === 'SCHOOL_ADMIN') return '/school-admin';
-    if (pr === 'TEACHER') return '/teacher';
-    if (pr === 'STUDENT') return '/student';
-    return '/account/no-access';
+    switch (user.value.primaryRole) {
+      case 'SUPER_ADMIN':
+        return '/admin';
+      case 'SCHOOL_ADMIN':
+        return '/school-admin';
+      case 'TEACHER':
+        return '/teacher';
+      case 'STUDENT':
+        return '/student';
+      case 'REGISTERED_USER':
+        return '/onboarding';
+      default:
+        return '/account/no-access';
+    }
   }
 
   async function restoreSession(): Promise<void> {

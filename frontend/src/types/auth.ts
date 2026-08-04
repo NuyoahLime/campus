@@ -3,15 +3,28 @@ export interface SchoolMembershipItem {
   roleInSchool: string;
 }
 
+export type PlatformRole =
+  | 'SUPER_ADMIN'
+  | 'REGISTERED_USER'
+  | null;
+
+export type PrimaryRole =
+  | 'SUPER_ADMIN'
+  | 'SCHOOL_ADMIN'
+  | 'TEACHER'
+  | 'STUDENT'
+  | 'REGISTERED_USER';
+
 export interface AuthContextResponse {
   userId: string;
   username: string;
   accountStatus: string;
-  platformRole: string | null;
+  platformRole: PlatformRole;
   roles: string[];
   schoolMemberships: SchoolMembershipItem[];
-  primaryRole: string | null;
+  primaryRole: PrimaryRole;
   primarySchoolId: string | null;
+  onboardingRequired: boolean;
 }
 
 export interface CsrfTokenResponse {

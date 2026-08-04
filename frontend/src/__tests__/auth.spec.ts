@@ -42,7 +42,17 @@ beforeEach(() => {
 describe('login', () => {
   it('includes CSRF header in login request', async () => {
     mockPost.mockResolvedValue({
-      data: { userId: 'u1', username: 'test', accountStatus: 'NORMAL', platformRole: null, roles: ['STUDENT'], schoolMemberships: [] },
+      data: {
+        userId: 'u1',
+        username: 'test',
+        accountStatus: 'NORMAL',
+        platformRole: null,
+        roles: ['STUDENT'],
+        schoolMemberships: [],
+        primaryRole: 'STUDENT',
+        primarySchoolId: null,
+        onboardingRequired: false,
+      },
     });
 
     await login({ username: 'test', password: 'pass' });
@@ -57,7 +67,17 @@ describe('login', () => {
   });
 
   it('returns auth context on success', async () => {
-    const context = { userId: 'u1', username: 'test', accountStatus: 'NORMAL', platformRole: 'SUPER_ADMIN', roles: ['SUPER_ADMIN'], schoolMemberships: [] };
+    const context = {
+      userId: 'u1',
+      username: 'test',
+      accountStatus: 'NORMAL',
+      platformRole: 'SUPER_ADMIN',
+      roles: ['SUPER_ADMIN'],
+      schoolMemberships: [],
+      primaryRole: 'SUPER_ADMIN',
+      primarySchoolId: null,
+      onboardingRequired: false,
+    };
     mockPost.mockResolvedValue({ data: context });
 
     const result = await login({ username: 'test', password: 'pass' });
@@ -71,7 +91,17 @@ describe('login', () => {
 describe('fetchMe', () => {
   it('returns context on success', async () => {
     mockGet.mockResolvedValue({
-      data: { userId: 'u1', username: 'test', accountStatus: 'NORMAL', platformRole: null, roles: ['TEACHER'], schoolMemberships: [{ schoolId: 's1', roleInSchool: 'TEACHER' }] },
+      data: {
+        userId: 'u1',
+        username: 'test',
+        accountStatus: 'NORMAL',
+        platformRole: null,
+        roles: ['TEACHER'],
+        schoolMemberships: [{ schoolId: 's1', roleInSchool: 'TEACHER' }],
+        primaryRole: 'TEACHER',
+        primarySchoolId: 's1',
+        onboardingRequired: false,
+      },
     });
 
     const result = await fetchMe();
@@ -85,7 +115,17 @@ describe('fetchMe', () => {
 describe('useAuthStore', () => {
   function mockMeResponse(roles: string[] = ['STUDENT']) {
     mockGet.mockResolvedValue({
-      data: { userId: 'u1', username: 'test', accountStatus: 'NORMAL', platformRole: null, roles, schoolMemberships: [] },
+      data: {
+        userId: 'u1',
+        username: 'test',
+        accountStatus: 'NORMAL',
+        platformRole: roles.includes('SUPER_ADMIN') ? 'SUPER_ADMIN' : null,
+        roles,
+        schoolMemberships: [],
+        primaryRole: roles[0],
+        primarySchoolId: null,
+        onboardingRequired: false,
+      },
     });
   }
 
@@ -145,9 +185,53 @@ describe('useAuthStore', () => {
   });
 
   it('defaultWorkspaceRoute uses primaryRole', async () => {
-    mockGet.mockResolvedValue({ data: { userId:'u', username:'t', accountStatus:'NORMAL', platformRole:null, roles:['STUDENT','SUPER_ADMIN'], schoolMemberships:[], primaryRole:'STUDENT', primarySchoolId:null } });
+    mockGet.mockResolvedValue({ data: { userId:'u', username:'t', accountStatus:'NORMAL', platformRole:null, roles:['STUDENT','SUPER_ADMIN'], schoolMemberships:[], primaryRole:'STUDENT', primarySchoolId:null, onboardingRequired:false } });
     await useAuthStore().restoreSession();
     expect(useAuthStore().defaultWorkspaceRoute()).toBe('/student');
+  });
+
+  it('registeredUserDefaultRouteIsOnboarding', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        userId: 'u',
+        username: 'registered',
+        accountStatus: 'NORMAL',
+        platformRole: 'REGISTERED_USER',
+        roles: ['REGISTERED_USER'],
+        schoolMemberships: [],
+        primaryRole: 'REGISTERED_USER',
+        primarySchoolId: null,
+        onboardingRequired: true,
+      },
+    });
+
+    const store = useAuthStore();
+    await store.restoreSession();
+
+    expect(store.defaultWorkspaceRoute()).toBe('/onboarding');
+  });
+
+  it('registeredUserSessionRestores', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        userId: 'u',
+        username: 'registered',
+        accountStatus: 'NORMAL',
+        platformRole: 'REGISTERED_USER',
+        roles: ['REGISTERED_USER'],
+        schoolMemberships: [],
+        primaryRole: 'REGISTERED_USER',
+        primarySchoolId: null,
+        onboardingRequired: true,
+      },
+    });
+
+    const store = useAuthStore();
+    await store.restoreSession();
+
+    expect(store.authenticated).toBe(true);
+    expect(store.user?.primaryRole).toBe('REGISTERED_USER');
+    expect(store.user?.onboardingRequired).toBe(true);
   });
 
   it('logout clears user', async () => {
