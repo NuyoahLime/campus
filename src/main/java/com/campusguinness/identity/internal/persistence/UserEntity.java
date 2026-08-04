@@ -36,6 +36,18 @@ public class UserEntity {
     @Column(name = "activation_expires_at")
     private Instant activationExpiresAt;
 
+    @Column(name = "email", length = 320)
+    private String email;
+
+    @Column(name = "email_normalized", length = 320)
+    private String emailNormalized;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "registration_source", nullable = false, length = 32)
+    private String registrationSource;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -57,6 +69,10 @@ public class UserEntity {
     void setLoginFailures(int v) { loginFailures = v; } public int getLoginFailures() { return loginFailures; }
     void setActivationIssuedAt(Instant v) { activationIssuedAt = v; } public Instant getActivationIssuedAt() { return activationIssuedAt; }
     void setActivationExpiresAt(Instant v) { activationExpiresAt = v; } public Instant getActivationExpiresAt() { return activationExpiresAt; }
+    void setEmail(String v) { email = v; } public String getEmail() { return email; }
+    void setEmailNormalized(String v) { emailNormalized = v; } public String getEmailNormalized() { return emailNormalized; }
+    void setEmailVerifiedAt(Instant v) { emailVerifiedAt = v; } public Instant getEmailVerifiedAt() { return emailVerifiedAt; }
+    void setRegistrationSource(String v) { registrationSource = v; } public String getRegistrationSource() { return registrationSource; }
     void setCreatedAt(Instant v) { createdAt = v; } public Instant getCreatedAt() { return createdAt; }
     void setUpdatedAt(Instant v) { updatedAt = v; } public Instant getUpdatedAt() { return updatedAt; }
     void setVersion(int v) { version = v; } public int getVersion() { return version; }

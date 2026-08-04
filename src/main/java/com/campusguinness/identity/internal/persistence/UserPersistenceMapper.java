@@ -12,6 +12,7 @@ final class UserPersistenceMapper {
         var e = new UserEntity();
         e.setId(domain.id().value()); e.setUsername(domain.username());
         e.setAccountStatus(domain.status().name()); e.setPlatformRole(domain.platformRole());
+        e.setRegistrationSource("ADMIN_PROVISIONED");
         e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
         return e;
     }
@@ -30,6 +31,10 @@ final class UserPersistenceMapper {
         e.setPlatformRole(domain.platformRole());
         e.setLoginFailures(0);
         e.setLockedUntil(null);
+        e.setEmail(null);
+        e.setEmailNormalized(null);
+        e.setEmailVerifiedAt(null);
+        e.setRegistrationSource("ADMIN_PROVISIONED");
         // PENDING_ACTIVATION users get a 72-hour activation window
         if ("PENDING_ACTIVATION".equals(domain.status().name())) {
             e.setActivationIssuedAt(now);
@@ -43,7 +48,7 @@ final class UserPersistenceMapper {
     /**
      * Update an existing entity from domain — preserves auth fields.
      * Only domain-owned fields are overwritten. passwordHash, loginFailures,
-     * and lockedUntil are left unchanged.
+     * lockedUntil, and email infrastructure fields are left unchanged.
      */
     static void updateEntity(UserEntity existing, User domain) {
         existing.setUsername(domain.username());

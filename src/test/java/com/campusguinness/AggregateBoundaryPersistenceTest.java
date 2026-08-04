@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - Cross-module references use scalar IDs (no JPA @ManyToOne across modules).
  * - Repositories do not expose entities from other modules.
  * - No CascadeType.ALL or FetchType.EAGER violations.
- * - Business tables enforce RESTRICT delete (no CASCADE from business tables).
+ * - Business tables enforce RESTRICT delete except lifecycle-owned infrastructure children.
  */
 class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport {
 
@@ -47,7 +47,7 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("All business table foreign keys use ON DELETE RESTRICT (business tables)")
+    @DisplayName("All business table foreign keys use ON DELETE RESTRICT except lifecycle-owned children")
     void businessTablesUseRestrictDelete() {
         // Query all FK constraints from business tables
         // Business tables should use RESTRICT, not CASCADE
@@ -61,12 +61,16 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
                         "  AND tc.constraint_type = 'FOREIGN KEY' " +
                         "  AND rc.delete_rule = 'CASCADE'");
 
-        // Only spring_session_attributes should have CASCADE
+        var allowedCascadeTables = Set.of(
+                "spring_session_attributes",
+                "email_verification_tokens",
+                "password_reset_tokens"
+        );
         for (var row : rows) {
             String tableName = row.get("table_name").toString();
-            assertThat(tableName)
-                    .as("Only spring_session_attributes may have CASCADE delete; found on '%s'", tableName)
-                    .isEqualTo("spring_session_attributes");
+            assertThat(allowedCascadeTables)
+                    .as("Unexpected CASCADE delete on '%s'", tableName)
+                    .contains(tableName);
         }
     }
 
@@ -93,13 +97,14 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("All 20 entities are mapped to known business tables")
+    @DisplayName("All 23 entities are mapped to known business tables")
     void entitiesMappedToCorrectTables() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(21);
+        assertThat(entities).hasSize(23);
 
         Set<String> expectedTableNames = Set.of(
                 "users", "school_memberships",
+                "email_verification_tokens", "password_reset_tokens",
                 "schools", "school_registrations",
                 "challenge_projects",
                 "activities", "activity_applications", "activity_projects",

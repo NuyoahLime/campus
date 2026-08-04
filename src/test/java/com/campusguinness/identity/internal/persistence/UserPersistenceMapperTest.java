@@ -55,6 +55,10 @@ class UserPersistenceMapperTest {
             assertThat(e.getUsername()).isEqualTo("testuser");
             assertThat(e.getAccountStatus()).isEqualTo("PENDING_ACTIVATION");
             assertThat(e.getPlatformRole()).isNull();
+            assertThat(e.getRegistrationSource()).isEqualTo("ADMIN_PROVISIONED");
+            assertThat(e.getEmail()).isNull();
+            assertThat(e.getEmailNormalized()).isNull();
+            assertThat(e.getEmailVerifiedAt()).isNull();
         }
     }
     @Nested class UpdateEntity {
@@ -97,6 +101,22 @@ class UserPersistenceMapperTest {
                     AccountStatus.NORMAL, java.util.List.of());
             UserPersistenceMapper.updateEntity(existing, domain);
             assertThat(existing.getLockedUntil()).isEqualTo(lockTime);
+        }
+        @Test void preservesEmailInfrastructureFields() {
+            var existing = entity("NORMAL");
+            var verifiedAt = Instant.parse("2026-08-04T10:00:00Z");
+            existing.setEmail("User@Example.com");
+            existing.setEmailNormalized("user@example.com");
+            existing.setEmailVerifiedAt(verifiedAt);
+            existing.setRegistrationSource("PUBLIC");
+            var domain = User.reconstitute(
+                    new User.Builder().id(new UserId(existing.getId())).username("u").platformRole(null),
+                    AccountStatus.NORMAL, java.util.List.of());
+            UserPersistenceMapper.updateEntity(existing, domain);
+            assertThat(existing.getEmail()).isEqualTo("User@Example.com");
+            assertThat(existing.getEmailNormalized()).isEqualTo("user@example.com");
+            assertThat(existing.getEmailVerifiedAt()).isEqualTo(verifiedAt);
+            assertThat(existing.getRegistrationSource()).isEqualTo("PUBLIC");
         }
         @Test void preservesId() {
             var existing = entity("NORMAL");
