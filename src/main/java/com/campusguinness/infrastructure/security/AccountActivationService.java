@@ -73,13 +73,15 @@ public class AccountActivationService {
         }
 
         // Check expiry before verifying password (avoids timing side-channel).
-        // When activation_expires_at is null (e.g. rows created before V025 or
-        // migrated without explicit values), treat as not expired — the account
-        // must still be activatable.
+        // Fail closed: a missing activation_expires_at is treated as expired.
+        // Rows created before V025 are backfilled by the migration; any remaining
+        // null values indicate corrupt data and must not be accepted.
         java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("activation_expires_at");
-        if (expiresAt != null && expiresAt.toInstant().isBefore(java.time.Instant.now())) {
+        if (expiresAt == null || expiresAt.toInstant().isBefore(java.time.Instant.now())) {
             rateLimiter.recordFailure(username, clientIp);
-            audit.recordFailure(userId, username, "ACTIVATION_EXPIRED", clientIp, userAgent);
+            audit.recordFailure(userId, username,
+                    expiresAt == null ? "ACTIVATION_EXPIRY_MISSING" : "ACTIVATION_EXPIRED",
+                    clientIp, userAgent);
             return new ActivationResult(false, "ACTIVATION_CREDENTIALS_INVALID", "激活信息无效或账号当前不可激活", null);
         }
 
