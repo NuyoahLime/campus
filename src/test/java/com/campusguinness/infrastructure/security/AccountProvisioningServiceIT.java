@@ -30,9 +30,10 @@ class AccountProvisioningServiceIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test void createSchoolAdminSucceeds() {
-        var r = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8), "TempPass1!");
+        var r = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
         assertThat(r.role()).isEqualTo("SCHOOL_ADMIN");
         assertThat(r.accountStatus()).isEqualTo("PENDING_ACTIVATION");
+        assertThat(r.temporaryPassword()).isNotBlank();
         // User and membership created in same transaction
         Integer userCount = jdbc.queryForObject("SELECT count(*) FROM users WHERE username=?", Integer.class, r.username());
         assertThat(userCount).isEqualTo(1);
@@ -41,12 +42,67 @@ class AccountProvisioningServiceIT extends PostgreSqlIntegrationTestSupport {
         // Audit written
         Integer auditCount = jdbc.queryForObject("SELECT count(*) FROM account_provisioning_audit_logs WHERE target_user_id=?", Integer.class, r.userId());
         assertThat(auditCount).isEqualTo(1);
+        // Activation timestamps set
+        var row = jdbc.queryForMap("SELECT activation_issued_at, activation_expires_at FROM users WHERE id=?", r.userId());
+        assertThat(row.get("activation_issued_at")).isNotNull();
+        assertThat(row.get("activation_expires_at")).isNotNull();
+    }
+
+    @Test void generatedTemporaryPasswordMeetsMinimumLength() {
+        var r = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
+        assertThat(r.temporaryPassword()).isNotBlank();
+        assertThat(r.temporaryPassword().length()).isGreaterThanOrEqualTo(16);
+    }
+
+    @Test void generatedTemporaryPasswordsAreNotConstant() {
+        var r1 = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
+        var r2 = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
+        assertThat(r1.temporaryPassword()).isNotEqualTo(r2.temporaryPassword());
+    }
+
+    @Test void temporaryPasswordIsStoredOnlyAsHash() {
+        var r = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
+        String storedHash = jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?", String.class, r.userId());
+        assertThat(storedHash).isNotNull();
+        // BCrypt hashes always start with $2a$, $2b$, or $2y$
+        assertThat(storedHash).startsWith("$2");
+        assertThat(storedHash).isNotEqualTo(r.temporaryPassword());
     }
 
     @Test void duplicateUsernameReturns409() {
         String un = "prov-" + UUID.randomUUID().toString().substring(0,8);
-        svc.createSchoolAdmin(actorId, schoolId, un, "TempPass1!");
-        assertThatThrownBy(() -> svc.createSchoolAdmin(actorId, schoolId, un, "TempPass2!"))
+        svc.createSchoolAdmin(actorId, schoolId, un);
+        assertThatThrownBy(() -> svc.createSchoolAdmin(actorId, schoolId, un))
                 .isInstanceOf(AccountProvisioningService.DuplicateUsernameException.class);
+    }
+
+    @Test void createTeacherOrStudentSucceeds() {
+        var r = svc.createTeacherOrStudent(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8), "STUDENT");
+        assertThat(r.role()).isEqualTo("STUDENT");
+        assertThat(r.temporaryPassword()).isNotBlank();
+        assertThat(r.accountStatus()).isEqualTo("PENDING_ACTIVATION");
+    }
+
+    @Test void listResponseDoesNotContainTemporaryPassword() {
+        svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
+        var list = svc.listSchoolAdmins(schoolId, 0, 100);
+        assertThat(list).isNotEmpty();
+        // AccountItem record has no temporaryPassword field at all
+        for (var item : list) {
+            assertThat(item.toString()).doesNotContain("temporaryPassword");
+        }
+    }
+
+    @Test void createAccountSetsActivationExpiry() {
+        var r = svc.createSchoolAdmin(actorId, schoolId, "prov-" + UUID.randomUUID().toString().substring(0,8));
+        var row = jdbc.queryForMap("SELECT activation_issued_at, activation_expires_at FROM users WHERE id=?", r.userId());
+        java.sql.Timestamp issued = (java.sql.Timestamp) row.get("activation_issued_at");
+        java.sql.Timestamp expires = (java.sql.Timestamp) row.get("activation_expires_at");
+        // Expiry must be after issued
+        assertThat(expires).isAfter(issued);
+        // Approximately 72 hours (allow ±5 minute tolerance)
+        long diffMs = expires.getTime() - issued.getTime();
+        long expectedMs = 72 * 60 * 60 * 1000L;
+        assertThat(Math.abs(diffMs - expectedMs)).isLessThan(5 * 60 * 1000L);
     }
 }

@@ -121,11 +121,11 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 24 migrations")
+    @DisplayName("Flyway executed exactly 25 migrations")
     void flywayExecutedAllMigrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(24);
+        assertThat(count).isEqualTo(25);
     }
 
     @Test

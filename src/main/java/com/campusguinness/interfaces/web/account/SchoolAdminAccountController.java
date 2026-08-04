@@ -7,6 +7,7 @@ import com.campusguinness.identity.application.query.port.SchoolMembershipQueryP
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -37,8 +38,11 @@ public class SchoolAdminAccountController {
     @PostMapping("/accounts")
     public ResponseEntity<Map<String,Object>> createAccount(@Valid @RequestBody CreateAccountRequest req) {
         UUID schoolId = actorSchoolId();
-        var r = service.createTeacherOrStudent(currentActor.requireUserId(), schoolId, req.username(), req.temporaryPassword(), req.role());
-        return ResponseEntity.ok(Map.of("userId", r.userId(), "username", r.username(), "role", r.role(), "schoolId", r.schoolId(), "schoolName", r.schoolName(), "accountStatus", r.accountStatus()));
+        var r = service.createTeacherOrStudent(currentActor.requireUserId(), schoolId, req.username(), req.role());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("Pragma", "no-cache")
+                .body(Map.of("userId", r.userId(), "username", r.username(), "role", r.role(), "schoolId", r.schoolId(), "schoolName", r.schoolName(), "accountStatus", r.accountStatus(), "temporaryPassword", r.temporaryPassword()));
     }
 
     @GetMapping("/accounts")
@@ -48,5 +52,5 @@ public class SchoolAdminAccountController {
                 "schoolName", a.schoolName(), "accountStatus", a.accountStatus(), "createdAt", a.createdAt())).toList();
     }
 
-    public record CreateAccountRequest(@NotBlank @Size(max=100) String username, @NotBlank String temporaryPassword, @NotBlank String role) {}
+    public record CreateAccountRequest(@NotBlank @Size(max=100) String username, @NotBlank String role) {}
 }

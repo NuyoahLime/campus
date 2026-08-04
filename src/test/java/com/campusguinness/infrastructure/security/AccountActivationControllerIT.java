@@ -23,7 +23,7 @@ class AccountActivationControllerIT extends PostgreSqlIntegrationTestSupport {
 
     @BeforeEach void setup() {
         userId = UUID.randomUUID(); username = "ctrl-" + UUID.randomUUID().toString().substring(0,8);
-        jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)", userId, username, "$2a$10$hash1234567890123456789012345", "PENDING_ACTIVATION");
+        jdbc.update("INSERT INTO users(id,username,password_hash,account_status,activation_issued_at,activation_expires_at) VALUES (?,?,?,?,now(),now() + INTERVAL '72 hours')", userId, username, "$2a$10$hash1234567890123456789012345", "PENDING_ACTIVATION");
     }
 
     @AfterEach void cleanup() { jdbc.update("DELETE FROM users WHERE id=?", userId); }

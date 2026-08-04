@@ -22,7 +22,7 @@ class AccountActivationConcurrencyIT extends PostgreSqlIntegrationTestSupport {
         userId = UUID.randomUUID(); username = "cc-" + UUID.randomUUID().toString().substring(0,8);
         // BCrypt hash of "temp123" — matches test password below
         correctHash = "$2a$10$DiqXqAqsCySLGxKHiRQbkeIzM0aKdhAtmJJ5pGScXkCUXF1H/Y5hy";
-        jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)", userId, username, correctHash, "PENDING_ACTIVATION");
+        jdbc.update("INSERT INTO users(id,username,password_hash,account_status,activation_issued_at,activation_expires_at) VALUES (?,?,?,?,now(),now() + INTERVAL '72 hours')", userId, username, correctHash, "PENDING_ACTIVATION");
     }
 
     @AfterEach void cleanup() { jdbc.update("DELETE FROM users WHERE id=?", userId); }
@@ -39,7 +39,7 @@ class AccountActivationConcurrencyIT extends PostgreSqlIntegrationTestSupport {
             try { barrier.await(3, TimeUnit.SECONDS); } catch (Exception ignored) {}
             try {
                 int rows = jdbc.update(
-                    "UPDATE users SET password_hash=?, account_status='NORMAL', updated_at=now() WHERE id=? AND account_status='PENDING_ACTIVATION'",
+                    "UPDATE users SET password_hash=?, account_status='NORMAL', activation_issued_at=NULL, activation_expires_at=NULL, updated_at=now() WHERE id=? AND account_status='PENDING_ACTIVATION'",
                     "$2a$10$newHashForWinnerTest", userId);
                 if (rows == 1) success.incrementAndGet();
                 else conflict.incrementAndGet();

@@ -50,8 +50,8 @@ public class AccountActivationService {
             return new ActivationResult(false, e.getMessage(), e.getMessage(), null);
         }
 
-        // Query by username — all states
-        var rows = jdbc.queryForList("SELECT id, password_hash, account_status FROM users WHERE username = ?", username);
+        // Query by username — all states, read expiry column
+        var rows = jdbc.queryForList("SELECT id, password_hash, account_status, activation_expires_at FROM users WHERE username = ?", username);
         if (rows.isEmpty()) {
             rateLimiter.recordFailure(username, clientIp);
             audit.recordFailure(null, username, "ACTIVATION_CREDENTIALS_INVALID", clientIp, userAgent);
@@ -61,7 +61,7 @@ public class AccountActivationService {
         String status = (String) row.get("account_status");
         UUID userId = (UUID) row.get("id");
 
-        // Already-activated accounts return 409
+        // Already-activated accounts — keep existing behaviour (AUTH-2B will unify error codes)
         if ("NORMAL".equals(status) || "LOCKED".equals(status) || "DISABLED".equals(status)) {
             audit.recordDuplicate(userId, username, "ACCOUNT_ALREADY_ACTIVATED", clientIp, userAgent);
             return new ActivationResult(false, "ACCOUNT_ALREADY_ACTIVATED", "账号已激活", userId);
@@ -72,6 +72,17 @@ public class AccountActivationService {
             return new ActivationResult(false, "ACCOUNT_STATE_INVALID", "账号状态异常", userId);
         }
 
+        // Check expiry before verifying password (avoids timing side-channel).
+        // When activation_expires_at is null (e.g. rows created before V025 or
+        // migrated without explicit values), treat as not expired — the account
+        // must still be activatable.
+        java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("activation_expires_at");
+        if (expiresAt != null && expiresAt.toInstant().isBefore(java.time.Instant.now())) {
+            rateLimiter.recordFailure(username, clientIp);
+            audit.recordFailure(userId, username, "ACTIVATION_EXPIRED", clientIp, userAgent);
+            return new ActivationResult(false, "ACTIVATION_CREDENTIALS_INVALID", "激活信息无效或账号当前不可激活", null);
+        }
+
         // PENDING_ACTIVATION — verify temp password
         if (!encoder.matches(tempPassword, (String) row.get("password_hash"))) {
             rateLimiter.recordFailure(username, clientIp);
@@ -79,9 +90,9 @@ public class AccountActivationService {
             return new ActivationResult(false, "ACTIVATION_CREDENTIALS_INVALID", "用户名或临时密码错误", null);
         }
 
-        // Atomic condition update
+        // Atomic condition update — must be PENDING_ACTIVATION AND not expired
         int updated = jdbc.update(
-            "UPDATE users SET password_hash = ?, account_status = 'NORMAL', updated_at = now() WHERE id = ? AND account_status = 'PENDING_ACTIVATION'",
+            "UPDATE users SET password_hash = ?, account_status = 'NORMAL', activation_issued_at = NULL, activation_expires_at = NULL, updated_at = now() WHERE id = ? AND account_status = 'PENDING_ACTIVATION' AND activation_expires_at > now()",
             encoder.encode(newPassword), userId);
         if (updated == 0) {
             audit.recordDuplicate(userId, username, "ACCOUNT_ALREADY_ACTIVATED", clientIp, userAgent);

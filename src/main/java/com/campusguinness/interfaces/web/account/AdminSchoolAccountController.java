@@ -6,6 +6,7 @@ import com.campusguinness.infrastructure.security.CurrentActor;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,8 +27,11 @@ public class AdminSchoolAccountController {
     @PostMapping("/api/v1/admin/schools/{schoolId}/administrators")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<Map<String,Object>> createSchoolAdmin(@PathVariable UUID schoolId, @Valid @RequestBody CreateRequest req) {
-        var r = service.createSchoolAdmin(currentActor.requireUserId(), schoolId, req.username(), req.temporaryPassword());
-        return ResponseEntity.ok(Map.of("userId", r.userId(), "username", r.username(), "role", r.role(), "schoolId", r.schoolId(), "schoolName", r.schoolName(), "accountStatus", r.accountStatus()));
+        var r = service.createSchoolAdmin(currentActor.requireUserId(), schoolId, req.username());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("Pragma", "no-cache")
+                .body(Map.of("userId", r.userId(), "username", r.username(), "role", r.role(), "schoolId", r.schoolId(), "schoolName", r.schoolName(), "accountStatus", r.accountStatus(), "temporaryPassword", r.temporaryPassword()));
     }
 
     @GetMapping("/api/v1/admin/schools/{schoolId}/administrators")
@@ -38,5 +42,5 @@ public class AdminSchoolAccountController {
                 "schoolName", a.schoolName(), "accountStatus", a.accountStatus(), "createdAt", a.createdAt())).toList();
     }
 
-    public record CreateRequest(@NotBlank @Size(max=100) String username, @NotBlank String temporaryPassword) {}
+    public record CreateRequest(@NotBlank @Size(max=100) String username) {}
 }

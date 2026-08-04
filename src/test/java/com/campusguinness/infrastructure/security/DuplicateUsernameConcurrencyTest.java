@@ -47,7 +47,7 @@ class DuplicateUsernameConcurrencyTest extends PostgreSqlIntegrationTestSupport 
         Runnable task = () -> {
             try { barrier.await(3, TimeUnit.SECONDS); } catch (Exception e) { unexpected.incrementAndGet(); latch.countDown(); return; }
             try {
-                svc.createSchoolAdmin(actorId, schoolId, sharedName, "TempPass1!");
+                svc.createSchoolAdmin(actorId, schoolId, sharedName);
                 success.incrementAndGet();
             } catch (AccountProvisioningService.DuplicateUsernameException e) {
                 conflict.incrementAndGet();

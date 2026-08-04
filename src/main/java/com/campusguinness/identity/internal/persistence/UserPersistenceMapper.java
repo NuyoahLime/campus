@@ -21,6 +21,7 @@ final class UserPersistenceMapper {
      * This is the only path for creating new users with credentials.
      */
     static UserEntity toNewEntity(User domain, String passwordHash) {
+        var now = Instant.now();
         var e = new UserEntity();
         e.setId(domain.id().value());
         e.setUsername(domain.username());
@@ -29,8 +30,13 @@ final class UserPersistenceMapper {
         e.setPlatformRole(domain.platformRole());
         e.setLoginFailures(0);
         e.setLockedUntil(null);
-        e.setCreatedAt(Instant.now());
-        e.setUpdatedAt(Instant.now());
+        // PENDING_ACTIVATION users get a 72-hour activation window
+        if ("PENDING_ACTIVATION".equals(domain.status().name())) {
+            e.setActivationIssuedAt(now);
+            e.setActivationExpiresAt(now.plusSeconds(72 * 3600));
+        }
+        e.setCreatedAt(now);
+        e.setUpdatedAt(now);
         return e;
     }
 

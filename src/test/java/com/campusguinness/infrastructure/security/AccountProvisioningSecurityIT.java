@@ -36,14 +36,14 @@ class AccountProvisioningSecurityIT extends PostgreSqlIntegrationTestSupport {
     @Test void unauthenticatedDeniedOnProvisioning() throws Exception {
         mvc.perform(post("/api/v1/admin/schools/" + schoolId + "/administrators")
                 .with(csrf()).contentType("application/json")
-                .content("{\"username\":\"x\",\"temporaryPassword\":\"P@ss123!\"}"))
+                .content("{\"username\":\"x\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test void unauthenticatedDeniedOnSchoolAdminProvisioning() throws Exception {
         mvc.perform(post("/api/v1/school-admin/accounts")
                 .with(csrf()).contentType("application/json")
-                .content("{\"username\":\"x\",\"temporaryPassword\":\"P@ss123!\",\"role\":\"TEACHER\"}"))
+                .content("{\"username\":\"x\",\"role\":\"TEACHER\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }
