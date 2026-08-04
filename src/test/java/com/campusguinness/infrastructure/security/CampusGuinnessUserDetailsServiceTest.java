@@ -85,6 +85,13 @@ class CampusGuinnessUserDetailsServiceTest {
             var ud = service.loadUserByUsername("u");
             assertThat(ud.getAuthorities()).extracting("authority").contains("ROLE_SUPER_ADMIN");
         }
+        @Test void registeredUserGetsRole() {
+            when(accountQuery.findByLoginName(anyString())).thenReturn(Optional.of(account("NORMAL", "REGISTERED_USER")));
+            var ud = service.loadUserByUsername("u");
+            assertThat(ud.getAuthorities()).extracting("authority").contains("ROLE_REGISTERED_USER");
+            assertThat(((CampusGuinnessUserDetails) ud).getResolvedIdentity().primaryRole())
+                    .isEqualTo("REGISTERED_USER");
+        }
         @Test void nullPlatformRoleGetsNoPlatformAuthority() {
             when(accountQuery.findByLoginName(anyString())).thenReturn(Optional.of(account("NORMAL", null)));
             var ud = service.loadUserByUsername("u");

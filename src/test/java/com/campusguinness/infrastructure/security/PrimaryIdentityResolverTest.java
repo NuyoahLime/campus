@@ -60,6 +60,19 @@ class PrimaryIdentityResolverTest {
         assertThat(r.errorCode()).isEqualTo("IDENTITY_INVALID");
     }
 
+    @Test void registeredUserWithoutMembershipResolves() {
+        var r = resolver.resolve(account("REGISTERED_USER", List.of()));
+        assertThat(r.primaryRole()).isEqualTo("REGISTERED_USER");
+        assertThat(r.primarySchoolId()).isNull();
+        assertThat(r.isError()).isFalse();
+    }
+
+    @Test void registeredUserWithMembershipIsAmbiguous() {
+        var r = resolver.resolve(account("REGISTERED_USER",
+                List.of(new SchoolMembershipRecord(schoolId, "STUDENT"))));
+        assertThat(r.errorCode()).isEqualTo("IDENTITY_AMBIGUOUS");
+    }
+
     private AuthenticationAccount account(String platformRole, List<SchoolMembershipRecord> memberships) {
         return new AuthenticationAccount(userId, "test", "hash", "NORMAL", platformRole, memberships, 0, null);
     }

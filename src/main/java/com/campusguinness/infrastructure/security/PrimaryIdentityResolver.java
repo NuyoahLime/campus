@@ -16,6 +16,7 @@ public class PrimaryIdentityResolver {
 
     public ResolvedIdentity resolve(AuthenticationAccount account) {
         boolean isSuperAdmin = "SUPER_ADMIN".equals(account.platformRole());
+        boolean isRegisteredUser = "REGISTERED_USER".equals(account.platformRole());
         List<SchoolMembershipRecord> memberships = account.memberships();
 
         if (isSuperAdmin && memberships.isEmpty()) {
@@ -23,6 +24,14 @@ public class PrimaryIdentityResolver {
         }
 
         if (isSuperAdmin && !memberships.isEmpty()) {
+            return ResolvedIdentity.ambiguous(account.userId());
+        }
+
+        if (isRegisteredUser && memberships.isEmpty()) {
+            return new ResolvedIdentity(account.userId(), "REGISTERED_USER", null, account.accountStatus());
+        }
+
+        if (isRegisteredUser && !memberships.isEmpty()) {
             return ResolvedIdentity.ambiguous(account.userId());
         }
 

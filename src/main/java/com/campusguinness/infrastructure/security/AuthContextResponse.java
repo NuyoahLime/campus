@@ -18,7 +18,8 @@ public record AuthContextResponse(
         List<String> roles,
         List<SchoolMembershipItem> schoolMemberships,
         String primaryRole,
-        UUID primarySchoolId
+        UUID primarySchoolId,
+        boolean onboardingRequired
 ) {
     public record SchoolMembershipItem(UUID schoolId, String roleInSchool) {}
 
@@ -28,8 +29,7 @@ public record AuthContextResponse(
                 .sorted()
                 .toList();
 
-        String platformRole = user.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN")) ? "SUPER_ADMIN" : null;
+        String platformRole = user.getPlatformRole();
 
         var memberships = user.getSchoolMemberships().stream()
                 .map(m -> new SchoolMembershipItem(m.schoolId(), m.roleInSchool()))
@@ -42,9 +42,10 @@ public record AuthContextResponse(
 
         return new AuthContextResponse(
                 user.getUserId(), user.getUsername(),
-                user.isEnabled() && user.isAccountNonLocked() ? "NORMAL" : "LOCKED",
+                user.getAccountStatusValue(),
                 platformRole, roles, memberships,
-                primaryRole, primarySchoolId
+                primaryRole, primarySchoolId,
+                "REGISTERED_USER".equals(primaryRole)
         );
     }
 }

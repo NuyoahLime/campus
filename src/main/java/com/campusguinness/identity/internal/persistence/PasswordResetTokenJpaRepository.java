@@ -28,6 +28,6 @@ public interface PasswordResetTokenJpaRepository
              where t.userId = :userId
                and t.usedAt is null
             """)
-    int markActiveTokensUsed(@Param("userId") UUID userId,
+    int markUnusedTokensUsed(@Param("userId") UUID userId,
             @Param("usedAt") Instant usedAt);
 }

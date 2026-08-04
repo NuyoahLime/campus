@@ -28,7 +28,7 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
     private static final Logger log = LoggerFactory.getLogger(CampusGuinnessUserDetailsService.class);
 
     /** Known platform roles that map to Spring Security authorities. */
-    private static final Set<String> KNOWN_PLATFORM_ROLES = Set.of("SUPER_ADMIN");
+    private static final Set<String> KNOWN_PLATFORM_ROLES = Set.of("SUPER_ADMIN", "REGISTERED_USER");
 
     /** Known school roles that map to Spring Security authorities. */
     private static final Set<String> KNOWN_SCHOOL_ROLES = Set.of("STUDENT", "TEACHER", "SCHOOL_ADMIN");
@@ -63,6 +63,10 @@ public class CampusGuinnessUserDetailsService implements UserDetailsService {
                 account.loginName(),
                 account.passwordHash(),
                 account.accountStatus(),
+                account.platformRole(),
+                account.email(),
+                account.emailVerifiedAt(),
+                account.registrationSource(),
                 account.lockedUntil(),
                 authorities,
                 account.memberships(),

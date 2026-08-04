@@ -44,6 +44,8 @@ public class SecurityConfig {
     @Bean
     public CsrfTokenRepository csrfTokenRepository() {
         var repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repo.setHeaderName("X-XSRF-TOKEN");
+        repo.setCookieName("XSRF-TOKEN");
         repo.setCookieCustomizer(cookie -> cookie.sameSite("Lax"));
         return repo;
     }
@@ -64,14 +66,21 @@ public class SecurityConfig {
     }
 
     @Bean
+    public RegisteredUserApiAccessFilter registeredUserApiAccessFilter() {
+        return new RegisteredUserApiAccessFilter();
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             SecurityContextRepository repo,
             CsrfTokenRepository csrfTokenRepository,
-            AccountStatusValidationFilter accountStatusFilter) throws Exception {
+            AccountStatusValidationFilter accountStatusFilter,
+            RegisteredUserApiAccessFilter registeredUserApiAccessFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository))
             .addFilterAfter(accountStatusFilter, SecurityContextHolderFilter.class)
+            .addFilterAfter(registeredUserApiAccessFilter, AccountStatusValidationFilter.class)
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(new JsonAuthenticationEntryPoint())
                 .accessDeniedHandler(new JsonAccessDeniedHandler()))
@@ -81,6 +90,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/activate").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/verify-email").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/resend-verification").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/public/**").permitAll()
                 .requestMatchers("/api/v1/users/**").hasRole("SUPER_ADMIN")
                 .requestMatchers("/api/**").authenticated()

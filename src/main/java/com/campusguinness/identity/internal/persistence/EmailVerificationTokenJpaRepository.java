@@ -29,7 +29,7 @@ public interface EmailVerificationTokenJpaRepository
                and t.purpose = :purpose
                and t.usedAt is null
             """)
-    int markActiveTokensUsed(@Param("userId") UUID userId,
+    int markUnusedTokensUsed(@Param("userId") UUID userId,
             @Param("purpose") String purpose,
             @Param("usedAt") Instant usedAt);
 }

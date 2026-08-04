@@ -19,7 +19,7 @@ class DatabaseMigrationTest {
     void flywayMigrationsExecuted() {
         Integer count = jdbc.queryForObject(
             "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(26);
+        assertThat(count).isEqualTo(27);
     }
 
     @Test
@@ -112,5 +112,43 @@ class DatabaseMigrationTest {
                     'fk_password_reset_token_user')
                 """, Integer.class);
         assertThat(tokenForeignKeys).isEqualTo(2);
+    }
+
+    @Test
+    void registeredUserPlatformRoleIsAllowedButRegisteredAccountStatusIsRejected() {
+        var id = java.util.UUID.randomUUID();
+        var email = "registered-role-" + id + "@example.com";
+        jdbc.update("""
+                INSERT INTO users(id, username, password_hash, account_status, platform_role,
+                    email, email_normalized, registration_source)
+                VALUES (?, ?, ?, 'NORMAL', 'REGISTERED_USER', ?, ?, 'PUBLIC')
+                """,
+                id,
+                "registered-role-" + id,
+                "$2a$12$012345678901234567890u0123456789012345678901234567890123",
+                email,
+                email);
+
+        assertThat(jdbc.queryForObject(
+                "SELECT platform_role FROM users WHERE id = ?", String.class, id))
+                .isEqualTo("REGISTERED_USER");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO users(id, username, password_hash, account_status, platform_role)
+                VALUES (?, ?, ?, 'NORMAL', 'UNKNOWN_PLATFORM_ROLE')
+                """,
+                java.util.UUID.randomUUID(),
+                "unknown-role-" + java.util.UUID.randomUUID(),
+                "$2a$12$012345678901234567890u0123456789012345678901234567890123"))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO users(id, username, password_hash, account_status, platform_role)
+                VALUES (?, ?, ?, 'REGISTERED', NULL)
+                """,
+                java.util.UUID.randomUUID(),
+                "registered-status-" + java.util.UUID.randomUUID(),
+                "$2a$12$012345678901234567890u0123456789012345678901234567890123"))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 }

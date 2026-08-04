@@ -30,6 +30,10 @@ public final class CampusGuinnessUserDetails implements UserDetails {
     private final String loginName;
     private final String passwordHash;
     private final String accountStatus;
+    private final String platformRole;
+    private final String email;
+    private final Instant emailVerifiedAt;
+    private final String registrationSource;
     private final Instant lockedUntil;
     private final Set<GrantedAuthority> authorities;
     private final List<SchoolMembershipRecord> schoolMemberships;
@@ -40,6 +44,10 @@ public final class CampusGuinnessUserDetails implements UserDetails {
             String loginName,
             String passwordHash,
             String accountStatus,
+            String platformRole,
+            String email,
+            Instant emailVerifiedAt,
+            String registrationSource,
             Instant lockedUntil,
             Set<GrantedAuthority> authorities,
             List<SchoolMembershipRecord> schoolMemberships,
@@ -48,14 +56,42 @@ public final class CampusGuinnessUserDetails implements UserDetails {
         this.loginName = loginName;
         this.passwordHash = passwordHash;
         this.accountStatus = accountStatus;
+        this.platformRole = platformRole;
+        this.email = email;
+        this.emailVerifiedAt = emailVerifiedAt;
+        this.registrationSource = registrationSource;
         this.lockedUntil = lockedUntil;
         this.authorities = Collections.unmodifiableSet(authorities);
         this.schoolMemberships = List.copyOf(schoolMemberships);
         this.resolvedIdentity = resolvedIdentity;
     }
 
+    public CampusGuinnessUserDetails(
+            UUID userId,
+            String loginName,
+            String passwordHash,
+            String accountStatus,
+            Instant lockedUntil,
+            Set<GrantedAuthority> authorities,
+            List<SchoolMembershipRecord> schoolMemberships,
+            ResolvedIdentity resolvedIdentity) {
+        this(userId, loginName, passwordHash, accountStatus, null, null, null,
+                "ADMIN_PROVISIONED", lockedUntil, authorities, schoolMemberships, resolvedIdentity);
+    }
+
     /** The resolved primary identity (role + school) for this user. */
     public ResolvedIdentity getResolvedIdentity() { return resolvedIdentity; }
+    public String getAccountStatusValue() { return accountStatus; }
+    public String getPlatformRole() { return platformRole; }
+    public String getEmail() { return email; }
+    public Instant getEmailVerifiedAt() { return emailVerifiedAt; }
+    public String getRegistrationSource() { return registrationSource; }
+
+    public boolean requiresEmailVerification() {
+        return "PUBLIC".equals(registrationSource)
+                && "REGISTERED_USER".equals(platformRole)
+                && emailVerifiedAt == null;
+    }
 
     /** The domain User UUID — the single source of truth for actorId. */
     public UUID getUserId() {

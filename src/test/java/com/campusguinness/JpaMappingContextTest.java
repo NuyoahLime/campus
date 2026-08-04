@@ -51,11 +51,11 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 26 successful migrations")
+    @DisplayName("Flyway executed exactly 27 successful migrations")
     void flywayExecutedAllMigrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(26);
+        assertThat(count).isEqualTo(27);
     }
 
     @Test

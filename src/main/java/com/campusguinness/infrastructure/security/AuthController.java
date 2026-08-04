@@ -1,6 +1,9 @@
 package com.campusguinness.infrastructure.security;
 
 import com.campusguinness.interfaces.web.common.ApiErrorResponse;
+import com.campusguinness.identity.application.service.EmailVerificationInvalidException;
+import com.campusguinness.identity.application.service.PublicRegistrationService;
+import com.campusguinness.identity.application.service.PublicRegistrationUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -8,6 +11,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AccountStatusException;
@@ -22,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.session.SessionAuthenticationException;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -33,15 +38,70 @@ public class AuthController {
     private final SecurityContextRepository contextRepo;
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
     private final LoginAttemptService loginAttemptService;
+    private final PublicRegistrationService publicRegistrationService;
 
+    @Autowired
     public AuthController(AuthenticationManager authManager,
             SecurityContextRepository contextRepo,
             SessionAuthenticationStrategy sessionAuthenticationStrategy,
-            LoginAttemptService loginAttemptService) {
+            LoginAttemptService loginAttemptService,
+            PublicRegistrationService publicRegistrationService) {
         this.authManager = authManager;
         this.contextRepo = contextRepo;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
         this.loginAttemptService = loginAttemptService;
+        this.publicRegistrationService = publicRegistrationService;
+    }
+
+    AuthController(AuthenticationManager authManager,
+            SecurityContextRepository contextRepo,
+            SessionAuthenticationStrategy sessionAuthenticationStrategy,
+            LoginAttemptService loginAttemptService) {
+        this(authManager, contextRepo, sessionAuthenticationStrategy, loginAttemptService, null);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req,
+            HttpServletRequest request) {
+        try {
+            var result = publicRegistrationService.register(
+                    req.username(), req.email(), req.password(), req.confirmPassword());
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .cacheControl(CacheControl.noStore())
+                    .body(new RegisterResponse(result.username(),
+                            result.verificationRequired(), result.nextAction()));
+        } catch (PublicRegistrationUnavailableException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .cacheControl(CacheControl.noStore())
+                    .body(ApiErrorResponse.of("REGISTRATION_UNAVAILABLE",
+                            "The requested registration is unavailable.", request.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@Valid @RequestBody VerifyEmailRequest req,
+            HttpServletRequest request) {
+        try {
+            publicRegistrationService.verifyEmail(req.token());
+            return ResponseEntity.noContent()
+                    .cacheControl(CacheControl.noStore())
+                    .build();
+        } catch (EmailVerificationInvalidException e) {
+            return ResponseEntity.badRequest()
+                    .cacheControl(CacheControl.noStore())
+                    .body(ApiErrorResponse.of("EMAIL_VERIFICATION_INVALID",
+                            "The email verification link is invalid or expired.",
+                            request.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<?> resendVerification(@Valid @RequestBody ResendVerificationRequest req,
+            HttpServletRequest request) {
+        var result = publicRegistrationService.resendVerification(req.email(), clientIp(request));
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .cacheControl(CacheControl.noStore())
+                .body(result);
     }
 
     @PostMapping("/login")
@@ -57,6 +117,8 @@ public class AuthController {
 
             var identityResult = checkIdentity(user.getResolvedIdentity(), "/api/v1/auth/login");
             if (identityResult != null) return identityResult;
+            var verificationResult = checkEmailVerification(user, request);
+            if (verificationResult != null) return verificationResult;
 
             // Session fixation defense.
             request.getSession(true);
@@ -135,6 +197,18 @@ public class AuthController {
         return null;
     }
 
+    private ResponseEntity<ApiErrorResponse> checkEmailVerification(
+            CampusGuinnessUserDetails user, HttpServletRequest request) {
+        if (user.requiresEmailVerification()) {
+            clearAuthenticationState(request);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .cacheControl(CacheControl.noStore())
+                    .body(ApiErrorResponse.of("EMAIL_VERIFICATION_REQUIRED",
+                            "Email verification is required.", request.getRequestURI()));
+        }
+        return null;
+    }
+
     private ResponseEntity<ApiErrorResponse> identityError(String code, String path) {
         SecurityContextHolder.clearContext();
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -159,5 +233,13 @@ public class AuthController {
         if (session != null) {
             try { session.invalidate(); } catch (IllegalStateException ignored) {}
         }
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

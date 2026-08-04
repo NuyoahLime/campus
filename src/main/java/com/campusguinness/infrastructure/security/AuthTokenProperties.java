@@ -16,5 +16,11 @@ public record AuthTokenProperties(
         if (passwordResetTtl == null) {
             passwordResetTtl = Duration.ofMinutes(30);
         }
+        if (!emailVerificationTtl.isPositive()) {
+            throw new IllegalArgumentException("emailVerificationTtl must be positive");
+        }
+        if (!passwordResetTtl.isPositive()) {
+            throw new IllegalArgumentException("passwordResetTtl must be positive");
+        }
     }
 }
