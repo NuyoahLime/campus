@@ -3,13 +3,13 @@
     <div v-if="loading"><el-skeleton :rows="4" animated /></div>
     <div v-else-if="error"><el-result icon="error" title="加载失败" :sub-title="error"><template #extra><el-button type="primary" @click="load">重试</el-button></template></el-result></div>
     <el-table v-else :data="items" style="width:100%"><el-table-column prop="username" label="用户名" /><el-table-column label="角色"><template #default><el-tag size="small">学校管理员</el-tag></template></el-table-column><el-table-column label="状态"><template #default="{row}">{{ statusLabel(row.accountStatus) }}</template></el-table-column></el-table>
-    <el-button type="primary" @click="openCreate" style="margin-top:16px">创建学校管理员</el-button>
+    <el-button data-testid="open-create-admin" type="primary" @click="openCreate" style="margin-top:16px">创建学校管理员</el-button>
 
     <!-- Create form dialog -->
     <el-dialog v-model="showCreate" title="创建学校管理员" width="420px">
-      <el-form ref="cf" :model="c" :rules="cr" label-position="top"><el-form-item label="用户名" prop="username"><el-input v-model="c.username" placeholder="登录用户名" maxlength="100" /></el-form-item></el-form>
+      <el-form ref="cf" :model="c" :rules="cr" label-position="top"><el-form-item label="用户名" prop="username"><el-input data-testid="create-admin-username" v-model="c.username" placeholder="登录用户名" maxlength="100" /></el-form-item></el-form>
       <div v-if="createErr" class="e"><el-alert :title="createErr" type="error" show-icon /></div>
-      <template #footer><el-button @click="showCreate=false">取消</el-button><el-button type="primary" :loading="creating" :disabled="creating" @click="handleCreate">创建</el-button></template>
+      <template #footer><el-button @click="showCreate=false">取消</el-button><el-button data-testid="submit-create-admin" type="primary" :loading="creating" :disabled="creating" @click="handleCreate">创建</el-button></template>
     </el-dialog>
 
     <!-- Credential result dialog — shown once after creation, then cleared -->
@@ -19,13 +19,13 @@
         <el-descriptions-item label="用户名">{{ credential.username }}</el-descriptions-item>
         <el-descriptions-item label="角色">学校管理员</el-descriptions-item>
         <el-descriptions-item label="临时密码">
-          <el-input :model-value="credential.temporaryPassword" readonly type="text" style="font-family:monospace">
+          <el-input data-testid="admin-credential-password" :model-value="credential.temporaryPassword" readonly type="text" style="font-family:monospace">
             <template #append><el-button @click="copyPassword">复制</el-button></template>
           </el-input>
         </el-descriptions-item>
       </el-descriptions>
       <el-alert type="warning" title="请立即将临时密码交给管理员。该密码将在 72 小时内有效，关闭此对话框后将无法再次查看。" :closable="false" style="margin-top:16px" />
-      <template #footer><el-button type="primary" @click="showCredential=false">确认</el-button></template>
+      <template #footer><el-button data-testid="close-admin-credential" type="primary" @click="showCredential=false">确认</el-button></template>
     </el-dialog>
   </div>
 </template>
@@ -74,5 +74,6 @@ async function copyPassword(){
 }
 
 onMounted(load);
+defineExpose({ clearCredential });
 </script>
 <style scoped>.e{margin-bottom:12px}</style>

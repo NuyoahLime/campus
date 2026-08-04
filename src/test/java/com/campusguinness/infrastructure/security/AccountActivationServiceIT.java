@@ -87,5 +87,10 @@ class AccountActivationServiceIT extends com.campusguinness.PostgreSqlIntegratio
         var r = service.activate(username, tempPw, "NewPass123!", "1.2.3.4", "test");
         assertThat(r.success()).isFalse();
         assertThat(r.code()).isEqualTo("ACTIVATION_CREDENTIALS_INVALID");
+
+        // DB must be unchanged — no password overwrite, no status change
+        var row = jdbc.queryForMap("SELECT account_status, password_hash FROM users WHERE id = ?", userId);
+        assertThat(row.get("account_status")).isEqualTo("PENDING_ACTIVATION");
+        assertThat(row.get("password_hash")).isEqualTo(tempPwHash);
     }
 }

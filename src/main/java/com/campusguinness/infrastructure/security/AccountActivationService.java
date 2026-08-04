@@ -77,7 +77,7 @@ public class AccountActivationService {
         // Rows created before V025 are backfilled by the migration; any remaining
         // null values indicate corrupt data and must not be accepted.
         java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("activation_expires_at");
-        if (expiresAt == null || expiresAt.toInstant().isBefore(java.time.Instant.now())) {
+        if (expiresAt == null || !expiresAt.toInstant().isAfter(java.time.Instant.now())) {
             rateLimiter.recordFailure(username, clientIp);
             audit.recordFailure(userId, username,
                     expiresAt == null ? "ACTIVATION_EXPIRY_MISSING" : "ACTIVATION_EXPIRED",

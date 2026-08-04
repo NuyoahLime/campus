@@ -4,7 +4,7 @@
       <el-form-item label="角色"><el-select v-model="f.role" placeholder="全部" clearable @change="search"><el-option label="教师" value="TEACHER" /><el-option label="学生" value="STUDENT" /></el-select></el-form-item>
       <el-form-item label="状态"><el-select v-model="f.status" placeholder="全部" clearable @change="search"><el-option v-for="s in statusOpts" :key="s.v" :label="s.l" :value="s.v" /></el-select></el-form-item>
       <el-form-item label="关键词"><el-input v-model="f.keyword" placeholder="用户名" clearable @change="search" /></el-form-item>
-      <el-form-item><el-button type="primary" @click="openCreate">创建账号</el-button></el-form-item>
+      <el-form-item><el-button data-testid="open-create-account" type="primary" @click="openCreate">创建账号</el-button></el-form-item>
     </el-form></el-card>
     <div v-if="loading"><el-skeleton :rows="5" animated /></div>
     <div v-else-if="error"><el-result icon="error" title="加载失败" :sub-title="error"><template #extra><el-button type="primary" @click="load">重试</el-button></template></el-result></div>
@@ -13,10 +13,10 @@
 
     <!-- Create form dialog -->
     <el-dialog v-model="showCreate" title="创建账号" width="420px">
-      <el-form ref="cf" :model="c" :rules="cr" label-position="top"><el-form-item label="角色" prop="role"><el-select v-model="c.role" style="width:100%"><el-option label="教师" value="TEACHER" /><el-option label="学生" value="STUDENT" /></el-select></el-form-item>
-      <el-form-item label="用户名" prop="username"><el-input v-model="c.username" placeholder="登录用户名" maxlength="100" /></el-form-item></el-form>
+      <el-form ref="cf" :model="c" :rules="cr" label-position="top"><el-form-item label="角色" prop="role"><el-select data-testid="create-account-role" v-model="c.role" style="width:100%"><el-option label="教师" value="TEACHER" /><el-option label="学生" value="STUDENT" /></el-select></el-form-item>
+      <el-form-item label="用户名" prop="username"><el-input data-testid="create-account-username" v-model="c.username" placeholder="登录用户名" maxlength="100" /></el-form-item></el-form>
       <div v-if="createErr" class="e"><el-alert :title="createErr" type="error" show-icon /></div>
-      <template #footer><el-button @click="showCreate=false">取消</el-button><el-button type="primary" :loading="creating" :disabled="creating" @click="handleCreate">创建</el-button></template>
+      <template #footer><el-button @click="showCreate=false">取消</el-button><el-button data-testid="submit-create-account" type="primary" :loading="creating" :disabled="creating" @click="handleCreate">创建</el-button></template>
     </el-dialog>
 
     <!-- Credential result dialog — shown once after creation, then cleared -->
@@ -26,13 +26,13 @@
         <el-descriptions-item label="用户名">{{ credential.username }}</el-descriptions-item>
         <el-descriptions-item label="角色">{{ roleLabel(credential.role) }}</el-descriptions-item>
         <el-descriptions-item label="临时密码">
-          <el-input :model-value="credential.temporaryPassword" readonly type="text" style="font-family:monospace">
+          <el-input data-testid="account-credential-password" :model-value="credential.temporaryPassword" readonly type="text" style="font-family:monospace">
             <template #append><el-button @click="copyPassword">复制</el-button></template>
           </el-input>
         </el-descriptions-item>
       </el-descriptions>
       <el-alert type="warning" title="请立即将临时密码交给用户。该密码将在 72 小时内有效，关闭此对话框后将无法再次查看。" :closable="false" style="margin-top:16px" />
-      <template #footer><el-button type="primary" @click="showCredential=false">确认</el-button></template>
+      <template #footer><el-button data-testid="close-account-credential" type="primary" @click="showCredential=false">确认</el-button></template>
     </el-dialog>
   </div>
 </template>
@@ -87,5 +87,6 @@ async function copyPassword(){
 
 function search(){load()}
 onMounted(load);
+defineExpose({ clearCredential });
 </script>
 <style scoped>.fc{margin-bottom:16px}.e{margin-bottom:12px}</style>

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { nextTick } from 'vue';
 
 // ── Mocks ──────────────────────────────────────────────
 
@@ -20,7 +19,6 @@ vi.mock('@/api/http', () => ({
   },
 }));
 
-// Stub vue-router
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual('vue-router');
   return {
@@ -38,13 +36,59 @@ vi.mock('@/stores/auth', () => ({
   }),
 }));
 
-// ── Imports after mocks ────────────────────────────────
 import AdminSchoolAdministrators from '@/views/workbench/AdminSchoolAdministrators.vue';
+
+// ── Stubs ──────────────────────────────────────────────
+
+function mountComponent() {
+  return mount(AdminSchoolAdministrators, {
+    global: {
+      stubs: {
+        'el-table': true, 'el-table-column': true, 'el-tag': true,
+        'el-skeleton': true, 'el-result': true, 'el-empty': true,
+        'el-alert': true,
+        'el-descriptions': { template: '<div><slot /></div>', props: ['column', 'border'] },
+        'el-descriptions-item': { template: '<div><slot /></div>', props: ['label'] },
+        'el-form': { template: '<form><slot /></form>', props: ['model', 'rules'] },
+        'el-form-item': { template: '<div><slot /></div>', props: ['label', 'prop'] },
+        'el-option': true,
+        'el-select': {
+          template: '<select data-testid="select"><slot /></select>',
+        },
+        'el-input': {
+          template: '<input :data-testid="$attrs[\'data-testid\']" :value="modelValue" :placeholder="placeholder" :readonly="readonly" :type="type" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+          props: ['modelValue', 'type', 'placeholder', 'maxlength', 'readonly'],
+          emits: ['update:modelValue'],
+        },
+        'el-button': {
+          template: '<button :data-testid="$attrs[\'data-testid\']" :disabled="disabled || loading" @click="$emit(\'click\')"><slot /></button>',
+          props: { disabled: Boolean, loading: Boolean },
+          emits: ['click'],
+        },
+        'el-dialog': {
+          template: '<div v-if="modelValue"><slot /><slot name="footer" /></div>',
+          props: { modelValue: Boolean, title: String, width: String, closeOnClickModal: Boolean },
+          emits: ['update:modelValue', 'closed'],
+        },
+        'router-link': true,
+      },
+    },
+  });
+}
+
+// ── Tests ──────────────────────────────────────────────
 
 describe('AdminSchoolAdministrators — credential exposure', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet.mockResolvedValue({ data: [] });
+    mockPost.mockResolvedValue({
+      data: {
+        userId: 'u1', username: 'admin1', role: 'SCHOOL_ADMIN',
+        schoolId: 's1', schoolName: 'Test School', accountStatus: 'PENDING_ACTIVATION',
+        temporaryPassword: 'generatedSecretPass999',
+      },
+    });
   });
 
   afterEach(() => {
@@ -52,163 +96,101 @@ describe('AdminSchoolAdministrators — credential exposure', () => {
     sessionStorage.clear();
   });
 
-  function mountComponent() {
-    return mount(AdminSchoolAdministrators, {
-      global: {
-        stubs: {
-          'el-table': true,
-          'el-table-column': true,
-          'el-tag': true,
-          'el-skeleton': true,
-          'el-result': true,
-          'el-empty': true,
-          'el-alert': true,
-          'el-descriptions': true,
-          'el-descriptions-item': true,
-          'el-button': {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            emits: ['click'],
-          },
-          'el-dialog': {
-            template: '<div v-if="modelValue"><slot /><slot name="footer" /></div>',
-            props: ['modelValue', 'title'],
-            emits: ['update:modelValue', 'closed'],
-          },
-          'el-form': {
-            template: '<form><slot /></form>',
-            props: ['model', 'rules'],
-          },
-          'el-form-item': {
-            template: '<div><slot /></div>',
-            props: ['label', 'prop'],
-          },
-          'el-input': {
-            template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ['modelValue', 'type', 'placeholder', 'maxlength', 'readonly'],
-            emits: ['update:modelValue'],
-          },
-          'el-select': {
-            template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
-            props: ['modelValue'],
-            emits: ['update:modelValue'],
-          },
-          'el-option': true,
-          'router-link': true,
-        },
-      },
-    });
+  async function completeSuccessfulCreation(wrapper: ReturnType<typeof mountComponent>) {
+    await flushPromises();
+    await wrapper.get('[data-testid="open-create-admin"]').trigger('click');
+    await wrapper.get('[data-testid="create-admin-username"]').setValue('admin1');
+    await wrapper.get('[data-testid="submit-create-admin"]').trigger('click');
+    await flushPromises();
   }
 
-  it('create form has no temporary password input', async () => {
+  it('POST is called with exact URL and body (no temporaryPassword)', async () => {
     const wrapper = mountComponent();
-    await flushPromises();
+    await completeSuccessfulCreation(wrapper);
 
-    const html = wrapper.html();
-    expect(html).not.toContain('临时密码');
-    expect(html).not.toContain('temporaryPassword');
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body] = mockPost.mock.calls[0];
+    expect(url).toBe('/v1/admin/schools/b2222222-2222-2222-2222-222222222222/administrators');
+    expect(body).toEqual({ username: 'admin1' });
+    expect(body).not.toHaveProperty('temporaryPassword');
   });
 
-  it('create request sends only username (no temporaryPassword)', async () => {
-    mockPost.mockResolvedValue({
+  it('credential state is set after successful creation', async () => {
+    const wrapper = mountComponent();
+    await completeSuccessfulCreation(wrapper);
+
+    const vm = wrapper.vm as unknown as { credential: { username: string; temporaryPassword: string } };
+    expect(vm.credential.temporaryPassword).toBe('generatedSecretPass999');
+    expect(vm.credential.username).toBe('admin1');
+  });
+
+  it('clearCredential clears temporary password and username', async () => {
+    const wrapper = mountComponent();
+    await completeSuccessfulCreation(wrapper);
+
+    const vm = wrapper.vm as unknown as {
+      credential: { username: string; temporaryPassword: string };
+      clearCredential: () => void;
+    };
+    expect(vm.credential.temporaryPassword).toBe('generatedSecretPass999');
+
+    vm.clearCredential();
+
+    expect(vm.credential.temporaryPassword).toBe('');
+    expect(vm.credential.username).toBe('');
+  });
+
+  it('second creation does not expose previous password', async () => {
+    const wrapper = mountComponent();
+
+    // First creation: password A
+    mockPost.mockResolvedValueOnce({
       data: {
         userId: 'u1', username: 'admin1', role: 'SCHOOL_ADMIN',
         schoolId: 's1', schoolName: 'Test', accountStatus: 'PENDING_ACTIVATION',
-        temporaryPassword: 'generatedPass123',
+        temporaryPassword: 'firstPasswordAAA',
       },
     });
+    await completeSuccessfulCreation(wrapper);
 
-    const wrapper = mountComponent();
-    await flushPromises();
+    const vm = wrapper.vm as unknown as {
+      credential: { temporaryPassword: string };
+      clearCredential: () => void;
+    };
+    expect(vm.credential.temporaryPassword).toBe('firstPasswordAAA');
+    vm.clearCredential();
 
-    // Fill in username and submit
-    const input = wrapper.find('input[placeholder="登录用户名"]');
-    if (input.exists()) {
-      await input.setValue('admin1');
-    }
-    // Find the create button and trigger
-    const buttons = wrapper.findAll('button');
-    for (const btn of buttons) {
-      if (btn.text().includes('创建')) {
-        await btn.trigger('click');
-        break;
-      }
-    }
-    await nextTick();
-
-    // Verify POST body has no temporaryPassword field
-    if (mockPost.mock.calls.length > 0) {
-      const postBody = mockPost.mock.calls[0][1];
-      expect(postBody).not.toHaveProperty('temporaryPassword');
-      expect(postBody).toHaveProperty('username');
-    }
-  });
-
-  it('temporaryPassword is not written to localStorage', async () => {
-    mockPost.mockResolvedValue({
+    // Second creation: password B
+    mockPost.mockResolvedValueOnce({
       data: {
-        userId: 'u1', username: 'admin1', role: 'SCHOOL_ADMIN',
+        userId: 'u2', username: 'admin2', role: 'SCHOOL_ADMIN',
         schoolId: 's1', schoolName: 'Test', accountStatus: 'PENDING_ACTIVATION',
-        temporaryPassword: 'secretPass999',
+        temporaryPassword: 'secondPasswordBBB',
       },
     });
+    await completeSuccessfulCreation(wrapper);
 
-    const wrapper = mountComponent();
-    await flushPromises();
-
-    const input = wrapper.find('input[placeholder="登录用户名"]');
-    if (input.exists()) {
-      await input.setValue('admin1');
-    }
-    for (const btn of wrapper.findAll('button')) {
-      if (btn.text().includes('创建')) {
-        await btn.trigger('click');
-        break;
-      }
-    }
-    await flushPromises();
-
-    // localStorage must not contain the temporary password
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i) || '';
-      const val = localStorage.getItem(key) || '';
-      expect(val).not.toContain('secretPass999');
-    }
+    // Must show second password, not first
+    expect(vm.credential.temporaryPassword).toBe('secondPasswordBBB');
+    expect(vm.credential.temporaryPassword).not.toBe('firstPasswordAAA');
   });
 
-  it('temporaryPassword is not written to sessionStorage', async () => {
-    mockPost.mockResolvedValue({
-      data: {
-        userId: 'u1', username: 'admin1', role: 'SCHOOL_ADMIN',
-        schoolId: 's1', schoolName: 'Test', accountStatus: 'PENDING_ACTIVATION',
-        temporaryPassword: 'secretPass999',
-      },
-    });
+  it('temporaryPassword is not written to localStorage or sessionStorage', async () => {
+    const localSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const sessionSpy = vi.spyOn(Storage.prototype, 'setItem');
 
     const wrapper = mountComponent();
-    await flushPromises();
+    await completeSuccessfulCreation(wrapper);
 
-    const input = wrapper.find('input[placeholder="登录用户名"]');
-    if (input.exists()) {
-      await input.setValue('admin1');
+    // Neither storage should receive the secret
+    for (const call of localSpy.mock.calls) {
+      expect(call[1]).not.toContain('generatedSecretPass999');
     }
-    for (const btn of wrapper.findAll('button')) {
-      if (btn.text().includes('创建')) {
-        await btn.trigger('click');
-        break;
-      }
+    for (const call of sessionSpy.mock.calls) {
+      expect(call[1]).not.toContain('generatedSecretPass999');
     }
-    await flushPromises();
 
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i) || '';
-      const val = sessionStorage.getItem(key) || '';
-      expect(val).not.toContain('secretPass999');
-    }
-  });
-
-  it('createRequest has only username field', () => {
-    // Static check that the reactive form model only has username
-    const fields = ['username'];
-    expect(fields).not.toContain('temporaryPassword');
+    localSpy.mockRestore();
+    sessionSpy.mockRestore();
   });
 });
