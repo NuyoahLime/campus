@@ -28,6 +28,21 @@ final class SchoolAdminInvitationPersistenceMapper {
         return e;
     }
 
+    static void updateEntity(SchoolAdminInvitationEntity e, SchoolAdminInvitation domain) {
+        e.setUserId(domain.userId());
+        e.setSchoolId(domain.schoolId());
+        e.setRoleInSchool(domain.roleInSchool());
+        e.setInvitationCodeHash(domain.invitationCodeHash());
+        e.setInvitationStatus(domain.status().name());
+        e.setExpiresAt(domain.expiresAt());
+        e.setAcceptedAt(domain.acceptedAt());
+        e.setRevokedAt(domain.revokedAt());
+        e.setCreatedBy(domain.createdBy());
+        e.setFailedAttempts(domain.failedAttempts());
+        e.setMaxAttempts(domain.maxAttempts());
+        e.setUpdatedAt(Instant.now());
+    }
+
     static SchoolAdminInvitation toDomain(SchoolAdminInvitationEntity e) {
         return SchoolAdminInvitation.reconstitute(new SchoolAdminInvitation.Builder()
                 .id(new SchoolAdminInvitationId(e.getId()))

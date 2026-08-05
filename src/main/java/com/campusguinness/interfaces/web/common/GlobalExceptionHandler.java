@@ -1,8 +1,11 @@
 package com.campusguinness.interfaces.web.common;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,6 +29,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleMalformed(HttpMessageNotReadableException ex, HttpServletRequest req) {
         return ResponseEntity.badRequest()
                 .body(ApiErrorResponse.of("MALFORMED_REQUEST", "Request body is malformed", req.getRequestURI()));
+    }
+
+    @ExceptionHandler(IdentityApplicationException.class)
+    public ResponseEntity<ApiErrorResponse> handleIdentityApplication(IdentityApplicationException ex, HttpServletRequest req) {
+        return ResponseEntity.status(statusFor(ex.code()))
+                .body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(RuntimeException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorResponse.of("ACCESS_DENIED", "Access is denied.", req.getRequestURI()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -72,5 +87,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnknown(Exception ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));
+    }
+
+    private HttpStatus statusFor(String code) {
+        return switch (code) {
+            case "INVITATION_ACTIVATION_FAILED" -> HttpStatus.UNAUTHORIZED;
+            case "INVITATION_EXPIRED" -> HttpStatus.GONE;
+            case "USERNAME_ALREADY_EXISTS",
+                    "ACTIVE_INVITATION_ALREADY_EXISTS",
+                    "INVITATION_NOT_PENDING",
+                    "ACCOUNT_ALREADY_ACTIVATED",
+                    "ACCOUNT_NOT_ACTIVATABLE",
+                    "SCHOOL_ADMIN_MEMBERSHIP_CONFLICT" -> HttpStatus.CONFLICT;
+            case "INVITATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            default -> HttpStatus.BAD_REQUEST;
+        };
     }
 }

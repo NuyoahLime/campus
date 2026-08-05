@@ -69,11 +69,15 @@ public final class SchoolAdminInvitation {
         this.status = SchoolAdminInvitationStatus.EXPIRED;
     }
 
-    public void recordFailedAttempt() {
+    public void recordFailedAttempt(Instant now) {
         ensurePending("record failed attempt");
+        if (now == null) {
+            throw new IllegalArgumentException("now required");
+        }
         this.failedAttempts++;
         if (failedAttempts >= maxAttempts) {
-            this.status = SchoolAdminInvitationStatus.EXPIRED;
+            this.status = SchoolAdminInvitationStatus.REVOKED;
+            this.revokedAt = now;
         }
     }
 
