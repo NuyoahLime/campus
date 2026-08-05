@@ -24,6 +24,21 @@ class UserPersistenceMapperTest {
     @Nested class Fields {
         @Test void keepsUsername() { var e=entity("NORMAL"); e.setUsername("testuser"); assertThat(UserPersistenceMapper.toDomain(e).username()).isEqualTo("testuser"); }
         @Test void keepsPlatformRole() { var e=entity("NORMAL"); e.setPlatformRole("SUPER_ADMIN"); assertThat(UserPersistenceMapper.toDomain(e).platformRole()).isEqualTo("SUPER_ADMIN"); }
+        @Test void restoresMemberships() {
+            var e = entity("NORMAL");
+            var membership = SchoolMembership.reconstitute(
+                    new SchoolMembershipId(UUID.randomUUID()),
+                    UUID.randomUUID(),
+                    SchoolRole.STUDENT,
+                    MembershipStatus.ACTIVE,
+                    Instant.parse("2026-08-06T01:00:00Z"),
+                    null,
+                    1);
+
+            var user = UserPersistenceMapper.toDomain(e, java.util.List.of(membership));
+
+            assertThat(user.memberships()).containsExactly(membership);
+        }
     }
     @Nested class ToEntity {
         @Test void mapsToEntity() {
