@@ -72,11 +72,12 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("All 33 business tables + infrastructure tables exist in PostgreSQL")
+    @DisplayName("All 35 business tables + infrastructure tables exist in PostgreSQL")
     void keyBusinessTablesExist() {
         List<String> requiredBusinessTables = List.of(
                 "users", "schools", "school_registrations", "school_memberships",
                 "student_profiles", "teacher_profiles",
+                "student_identity_applications", "school_admin_invitations",
                 "challenge_projects", "project_rule_versions", "project_rule_compatibilities",
                 "activity_applications", "activities", "activity_projects",
                 "responsible_teachers", "activity_participants",
@@ -118,22 +119,22 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 15 migrations")
-    void flywayExecuted15Migrations() {
+    @DisplayName("Flyway executed exactly 16 migrations")
+    void flywayExecuted16Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(15);
+        assertThat(count).isEqualTo(16);
     }
 
     @Test
-    @DisplayName("Entity count matches known expected count (16)")
+    @DisplayName("Entity count matches known expected count (18)")
     void entityCountIsAsExpected() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(16);
+        assertThat(entities).hasSize(18);
     }
 
     @Test
-    @DisplayName("All 16 entity table names match their @Table annotations")
+    @DisplayName("All 18 entity table names match their @Table annotations")
     void entityTableNamesAreCorrect() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         Set<String> actualTableNames = entities.stream()
@@ -142,6 +143,7 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
 
         Set<String> expectedTables = Set.of(
                 "users", "schools", "school_registrations", "school_memberships",
+                "student_identity_applications", "school_admin_invitations",
                 "challenge_projects",
                 "activities", "activity_applications",
                 "score_attempts",

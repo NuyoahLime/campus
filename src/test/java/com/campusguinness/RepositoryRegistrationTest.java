@@ -4,6 +4,8 @@ import com.campusguinness.activity.internal.persistence.ActivityApplicationJpaRe
 import com.campusguinness.activity.internal.persistence.ActivityJpaRepository;
 import com.campusguinness.appeal.internal.persistence.ScoreAppealJpaRepository;
 import com.campusguinness.feedback.internal.persistence.FeedbackJpaRepository;
+import com.campusguinness.identity.internal.persistence.SchoolAdminInvitationJpaRepository;
+import com.campusguinness.identity.internal.persistence.StudentIdentityApplicationJpaRepository;
 import com.campusguinness.identity.internal.persistence.UserJpaRepository;
 import com.campusguinness.media.internal.persistence.MediaJpaRepository;
 import com.campusguinness.project.internal.persistence.ChallengeProjectJpaRepository;
@@ -28,6 +30,8 @@ class RepositoryRegistrationTest {
     @Autowired private ApplicationContext ctx;
 
     @Test void userRepositoryExists() { assertThat(ctx.getBean(UserJpaRepository.class)).isNotNull(); }
+    @Test void studentIdentityApplicationRepositoryExists() { assertThat(ctx.getBean(StudentIdentityApplicationJpaRepository.class)).isNotNull(); }
+    @Test void schoolAdminInvitationRepositoryExists() { assertThat(ctx.getBean(SchoolAdminInvitationJpaRepository.class)).isNotNull(); }
     @Test void schoolRepositoryExists() { assertThat(ctx.getBean(SchoolJpaRepository.class)).isNotNull(); }
     @Test void schoolRegistrationRepositoryExists() { assertThat(ctx.getBean(SchoolRegistrationJpaRepository.class)).isNotNull(); }
     @Test void challengeProjectRepositoryExists() { assertThat(ctx.getBean(ChallengeProjectJpaRepository.class)).isNotNull(); }
