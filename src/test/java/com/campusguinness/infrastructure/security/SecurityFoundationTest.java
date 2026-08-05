@@ -59,7 +59,7 @@ class SecurityFoundationTest {
 
     // ── CSRF protection ──
 
-    @Test @WithMockUser
+    @Test @WithMockUser(roles = "SUPER_ADMIN")
     void postWithoutCsrfReturns403() throws Exception {
         mvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -69,7 +69,7 @@ class SecurityFoundationTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
-    @Test @WithMockUser
+    @Test @WithMockUser(roles = "SUPER_ADMIN")
     void postWithCsrfReachesController() throws Exception {
         mvc.perform(post("/api/v1/users")
                 .with(csrf())
