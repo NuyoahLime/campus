@@ -9,7 +9,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Explicit registry of all 13 aggregate roots with their implementation status.
+ * Explicit registry of all 15 aggregate roots with their implementation status.
  * This test does NOT rely on classpath scanning or naming conventions.
  */
 class DomainModelRegistryTest {
@@ -28,6 +28,10 @@ class DomainModelRegistryTest {
                 "COMPLETED", null, "docs/domain/rule-packets/challenge-project-rule-packet.md"));
         m.put("User", new AggregateEntry("User", "identity",
                 "COMPLETED", null, "docs/domain/rule-packets/user-rule-packet.md"));
+        m.put("StudentIdentityApplication", new AggregateEntry("StudentIdentityApplication", "identity",
+                "COMPLETED", null, "docs/domain/rule-packets/student-identity-application-rule-packet.md"));
+        m.put("SchoolAdminInvitation", new AggregateEntry("SchoolAdminInvitation", "identity",
+                "COMPLETED", null, "docs/domain/rule-packets/school-admin-invitation-rule-packet.md"));
         m.put("School", new AggregateEntry("School", "school",
                 "COMPLETED", null, "docs/domain/rule-packets/school-rule-packet.md"));
         m.put("SchoolRegistration", new AggregateEntry("SchoolRegistration", "school",
@@ -54,13 +58,13 @@ class DomainModelRegistryTest {
     }
 
     @Test
-    @DisplayName("Registry contains exactly 13 aggregate roots")
-    void registryHasExactly13Aggregates() {
-        assertThat(registry()).hasSize(13);
+    @DisplayName("Registry contains exactly 15 aggregate roots")
+    void registryHasExactly15Aggregates() {
+        assertThat(registry()).hasSize(15);
     }
 
     @Test
-    @DisplayName("All 13 aggregates have a module assignment")
+    @DisplayName("All 15 aggregates have a module assignment")
     void allAggregatesHaveModuleAssignment() {
         registry().forEach((name, entry) ->
                 assertThat(entry.module())
@@ -69,13 +73,15 @@ class DomainModelRegistryTest {
     }
 
     @Test
-    @DisplayName("5 aggregates completed: ChallengeProject, SchoolRegistration, School, ActivityApplication, Activity")
+    @DisplayName("All registered aggregates are completed")
     void completedAggregatesCount() {
         long completed = registry().values().stream()
                 .filter(e -> "COMPLETED".equals(e.status())).count();
-        assertThat(completed).isEqualTo(13);
+        assertThat(completed).isEqualTo(15);
 
         assertThat(registry().get("ChallengeProject").status()).isEqualTo("COMPLETED");
+        assertThat(registry().get("StudentIdentityApplication").status()).isEqualTo("COMPLETED");
+        assertThat(registry().get("SchoolAdminInvitation").status()).isEqualTo("COMPLETED");
         assertThat(registry().get("SchoolRegistration").status()).isEqualTo("COMPLETED");
         assertThat(registry().get("School").status()).isEqualTo("COMPLETED");
         assertThat(registry().get("ActivityApplication").status()).isEqualTo("COMPLETED");
@@ -84,7 +90,7 @@ class DomainModelRegistryTest {
     }
 
     @Test
-    @DisplayName("All 12 PENDING aggregates have no blocker")
+    @DisplayName("PENDING aggregates have no blocker")
     void pendingAggregatesHaveNoBlocker() {
         registry().values().stream()
                 .filter(e -> "PENDING".equals(e.status()))
@@ -102,7 +108,7 @@ class DomainModelRegistryTest {
     }
 
     @Test
-    @DisplayName("Module names match the 13 Modulith modules")
+    @DisplayName("Module names match the Modulith modules")
     void modulesMatchModulithStructure() {
         var expectedModules = java.util.Set.of(
                 "identity", "school", "project", "activity", "score",

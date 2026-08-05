@@ -4,6 +4,8 @@ import com.campusguinness.activity.internal.persistence.ActivityApplicationJpaRe
 import com.campusguinness.activity.internal.persistence.ActivityJpaRepository;
 import com.campusguinness.appeal.internal.persistence.ScoreAppealJpaRepository;
 import com.campusguinness.feedback.internal.persistence.FeedbackJpaRepository;
+import com.campusguinness.identity.internal.persistence.SchoolAdminInvitationJpaRepository;
+import com.campusguinness.identity.internal.persistence.StudentIdentityApplicationJpaRepository;
 import com.campusguinness.identity.internal.persistence.UserJpaRepository;
 import com.campusguinness.media.internal.persistence.MediaJpaRepository;
 import com.campusguinness.project.internal.persistence.ChallengeProjectJpaRepository;
@@ -39,6 +41,8 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
      */
     private static final Set<Class<?>> AGGREGATE_ROOT_REPOSITORIES = Set.of(
             UserJpaRepository.class,
+            StudentIdentityApplicationJpaRepository.class,
+            SchoolAdminInvitationJpaRepository.class,
             SchoolJpaRepository.class,
             SchoolRegistrationJpaRepository.class,
             ChallengeProjectJpaRepository.class,
@@ -77,13 +81,13 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
     }
 
     @Test
-    @DisplayName("Total aggregate root Repository count is exactly 13")
-    void aggregateRootRepositoryCountIs13() {
-        assertThat(AGGREGATE_ROOT_REPOSITORIES).hasSize(13);
+    @DisplayName("Total aggregate root Repository count is exactly 15")
+    void aggregateRootRepositoryCountIs15() {
+        assertThat(AGGREGATE_ROOT_REPOSITORIES).hasSize(15);
     }
 
     @Test
-    @DisplayName("All 13 aggregate root Repository beans are registered")
+    @DisplayName("All 15 aggregate root Repository beans are registered")
     void allAggregateRootRepositoriesRegistered() {
         // Simply verify each known repository bean exists in context
         String[] allRepoNames = ctx.getBeanNamesForType(org.springframework.data.repository.Repository.class);
@@ -102,14 +106,14 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
                     .isTrue();
             if (found) matched++;
         }
-        assertThat(matched).isEqualTo(13);
+        assertThat(matched).isEqualTo(15);
     }
 
     @Test
     @DisplayName("No aggregate root Entity exists without a Repository decision")
     void noAggregateRootWithoutRepository() {
-        // All 13 aggregate roots have corresponding Repository beans
-        // This test confirms the documented design: 13 aggregate roots = 13 repositories
+        // All 15 aggregate roots have corresponding Repository beans
+        // This test confirms the documented design: 15 aggregate roots = 15 repositories
         for (Class<?> repoClass : AGGREGATE_ROOT_REPOSITORIES) {
             assertThat(ctx.getBeanNamesForType(repoClass))
                     .as("Repository '%s' must be registered", repoClass.getSimpleName())
