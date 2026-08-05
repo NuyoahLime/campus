@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class SchoolAdminInvitationRepositoryAdapter implements SchoolAdminInvitationRepository {
@@ -20,7 +21,14 @@ class SchoolAdminInvitationRepositoryAdapter implements SchoolAdminInvitationRep
     @Override
     @Transactional
     public void save(SchoolAdminInvitation invitation) {
-        jpaRepository.save(SchoolAdminInvitationPersistenceMapper.toEntity(invitation));
+        saveInternal(invitation);
+    }
+
+    @Override
+    @Transactional
+    public void saveAndFlush(SchoolAdminInvitation invitation) {
+        saveInternal(invitation);
+        jpaRepository.flush();
     }
 
     @Override
@@ -28,5 +36,29 @@ class SchoolAdminInvitationRepositoryAdapter implements SchoolAdminInvitationRep
     public Optional<SchoolAdminInvitation> findById(SchoolAdminInvitationId id) {
         return jpaRepository.findById(id.value())
                 .map(SchoolAdminInvitationPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<SchoolAdminInvitation> findByIdForUpdate(SchoolAdminInvitationId id) {
+        return jpaRepository.findByIdForUpdate(id.value())
+                .map(SchoolAdminInvitationPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<SchoolAdminInvitation> findPendingByUserIdForUpdate(UUID userId) {
+        return jpaRepository.findPendingByUserIdForUpdate(userId)
+                .map(SchoolAdminInvitationPersistenceMapper::toDomain);
+    }
+
+    private void saveInternal(SchoolAdminInvitation invitation) {
+        var existing = jpaRepository.findById(invitation.id().value());
+        if (existing.isPresent()) {
+            SchoolAdminInvitationPersistenceMapper.updateEntity(existing.get(), invitation);
+            jpaRepository.save(existing.get());
+        } else {
+            jpaRepository.save(SchoolAdminInvitationPersistenceMapper.toEntity(invitation));
+        }
     }
 }

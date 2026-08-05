@@ -52,6 +52,12 @@ class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findByUsername(String username) {
+        return jpa.findByUsername(username).map(this::toDomainWithMemberships);
+    }
+
+    @Override
     public boolean existsByUsername(String username) {
         return jpa.existsByUsername(username);
     }

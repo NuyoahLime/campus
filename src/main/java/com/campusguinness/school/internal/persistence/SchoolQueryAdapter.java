@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @Transactional(readOnly = true)
@@ -26,5 +27,10 @@ class SchoolQueryAdapter implements SchoolQueryPort {
                 .map(e -> new SchoolListResult(e.getId(), e.getName(), e.getSchoolType(), e.getRegion()))
                 .toList();
         return new QueryPage<>(items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Override
+    public boolean isEligibleForMembership(UUID schoolId) {
+        return schoolId != null && jpa.existsByIdAndSchoolStatus(schoolId, "NORMAL");
     }
 }

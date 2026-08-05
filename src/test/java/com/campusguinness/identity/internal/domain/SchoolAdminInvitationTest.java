@@ -92,16 +92,18 @@ class SchoolAdminInvitationTest {
         }
 
         @Test
-        @DisplayName("failed attempts expire invitation at maxAttempts")
-        void failedAttemptsExpireAtLimit() {
+        @DisplayName("failed attempts revoke invitation at maxAttempts")
+        void failedAttemptsRevokeAtLimit() {
+            var now = Instant.parse("2026-08-05T10:15:30Z");
             var invitation = SchoolAdminInvitation.create(validBuilder().maxAttempts(2));
 
-            invitation.recordFailedAttempt();
+            invitation.recordFailedAttempt(now);
             assertThat(invitation.status()).isEqualTo(SchoolAdminInvitationStatus.PENDING);
-            invitation.recordFailedAttempt();
+            invitation.recordFailedAttempt(now.plusSeconds(1));
 
             assertThat(invitation.failedAttempts()).isEqualTo(2);
-            assertThat(invitation.status()).isEqualTo(SchoolAdminInvitationStatus.EXPIRED);
+            assertThat(invitation.status()).isEqualTo(SchoolAdminInvitationStatus.REVOKED);
+            assertThat(invitation.revokedAt()).isEqualTo(now.plusSeconds(1));
         }
     }
 
