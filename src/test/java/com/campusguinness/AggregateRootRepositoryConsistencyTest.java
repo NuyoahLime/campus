@@ -5,6 +5,7 @@ import com.campusguinness.activity.internal.persistence.ActivityJpaRepository;
 import com.campusguinness.appeal.internal.persistence.ScoreAppealJpaRepository;
 import com.campusguinness.feedback.internal.persistence.FeedbackJpaRepository;
 import com.campusguinness.identity.internal.persistence.SchoolAdminInvitationJpaRepository;
+import com.campusguinness.identity.internal.persistence.SchoolMembershipJpaRepository;
 import com.campusguinness.identity.internal.persistence.StudentIdentityApplicationJpaRepository;
 import com.campusguinness.identity.internal.persistence.UserJpaRepository;
 import com.campusguinness.media.internal.persistence.MediaJpaRepository;
@@ -58,8 +59,9 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
     );
 
     /**
-     * Entities that are NOT aggregate roots and should NOT have their own Repository:
-     * - SchoolMembershipEntity: internal to User/School aggregate
+     * Entities that are NOT aggregate roots:
+     * - SchoolMembershipEntity: internal to User aggregate; may use an internal JPA repository
+     *   behind UserRepositoryAdapter, but is not an aggregate-root repository.
      * - NotificationEntity: infrastructure table, system write
      * - AuditRecordEntity: append-only, interceptor write
      */
@@ -124,9 +126,16 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
     @Test
     @DisplayName("NotificationEntity and AuditRecordEntity are classified as non-aggregate-root infrastructure entities")
     void nonAggregateRootEntitiesAreClassifiedCorrectly() {
-        // These entities exist in the persistence layer but deliberately lack Repositories
-        // because they follow append-only/infrastructure persistence patterns
         assertThat(NON_AGGREGATE_ROOT_ENTITIES)
                 .contains("NotificationEntity", "AuditRecordEntity", "SchoolMembershipEntity");
+    }
+
+    @Test
+    @DisplayName("SchoolMembershipJpaRepository is internal and does not increase aggregate root count")
+    void schoolMembershipRepositoryIsInternalOnly() {
+        assertThat(ctx.getBean(SchoolMembershipJpaRepository.class)).isNotNull();
+        assertThat(AGGREGATE_ROOT_REPOSITORIES)
+                .doesNotContain(SchoolMembershipJpaRepository.class)
+                .hasSize(15);
     }
 }

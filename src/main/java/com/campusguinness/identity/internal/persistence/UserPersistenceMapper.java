@@ -2,7 +2,7 @@ package com.campusguinness.identity.internal.persistence;
 
 import com.campusguinness.identity.internal.domain.*;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.List;
 
 final class UserPersistenceMapper {
     private UserPersistenceMapper() {}
@@ -48,7 +48,10 @@ final class UserPersistenceMapper {
     }
 
     static User toDomain(UserEntity e) {
-        var memberships = new ArrayList<SchoolMembership>(); // SchoolMembership restoration deferred
+        return toDomain(e, List.of());
+    }
+
+    static User toDomain(UserEntity e, List<SchoolMembership> memberships) {
         return User.reconstitute(new User.Builder()
                 .id(new UserId(e.getId())).username(e.getUsername())
                 .platformRole(e.getPlatformRole()),

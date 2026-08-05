@@ -12,7 +12,8 @@ import java.util.Optional;
  * Adapter that implements {@link AuthenticationAccountQuery} using the existing
  * {@link UserJpaRepository}.
  * <p>
- * Only loads authentication-relevant columns. Does not load SchoolMembership.
+ * Only loads account authentication columns. SchoolMembership roles are exposed
+ * through AuthenticationMembershipQuery and are not wired into Spring Security yet.
  */
 @Component
 class AuthenticationQueryAdapter implements AuthenticationAccountQuery {

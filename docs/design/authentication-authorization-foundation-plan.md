@@ -1,5 +1,15 @@
 # Authentication & Authorization Foundation Plan
 
+> **Stage 3 update (2026-08-06):** `SchoolMembership` is implemented as a `User`
+> aggregate child entity with stable id, `SchoolRole`, `MembershipStatus`,
+> `startedAt`, `endedAt`, and version reconstitution. Writes go through
+> `UserRepository`, which now restores and diffs membership rows and provides
+> `findByIdForUpdate`. `AuthenticationMembershipQuery` can read ACTIVE
+> `STUDENT` and `SCHOOL_ADMIN` memberships for authentication preparation.
+> Spring Security authority mapping is still intentionally disabled, no
+> controller/API was added, `TEACHER` remains historical reconstitution-only,
+> and no Flyway migration was added.
+
 **Task:** `TASK-AUTH-001`
 **Mode:** `READ_ONLY_ARCHITECTURE_AUDIT`
 **Date:** 2026-07-16
