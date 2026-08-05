@@ -2,7 +2,9 @@ package com.campusguinness.school.internal.persistence;
 
 import com.campusguinness.project.application.query.model.QueryPage;
 import com.campusguinness.school.application.query.model.SchoolListResult;
+import com.campusguinness.school.application.query.model.StudentRegistrationSchool;
 import com.campusguinness.school.application.query.port.SchoolQueryPort;
+import com.campusguinness.school.application.query.port.StudentRegistrationSchoolQueryPort;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -14,7 +16,7 @@ import java.util.UUID;
 
 @Component
 @Transactional(readOnly = true)
-class SchoolQueryAdapter implements SchoolQueryPort {
+class SchoolQueryAdapter implements SchoolQueryPort, StudentRegistrationSchoolQueryPort {
 
     private final SchoolJpaRepository jpa;
     SchoolQueryAdapter(SchoolJpaRepository jpa) { this.jpa = jpa; }
@@ -32,5 +34,18 @@ class SchoolQueryAdapter implements SchoolQueryPort {
     @Override
     public boolean isEligibleForMembership(UUID schoolId) {
         return schoolId != null && jpa.existsByIdAndSchoolStatus(schoolId, "NORMAL");
+    }
+
+    @Override
+    public StudentRegistrationSchool findForStudentRegistration(UUID schoolId) {
+        if (schoolId == null) {
+            return new StudentRegistrationSchool(null, false, false);
+        }
+        return jpa.findById(schoolId)
+                .map(school -> new StudentRegistrationSchool(
+                        school.getId(),
+                        true,
+                        "NORMAL".equals(school.getSchoolStatus())))
+                .orElseGet(() -> new StudentRegistrationSchool(schoolId, false, false));
     }
 }
