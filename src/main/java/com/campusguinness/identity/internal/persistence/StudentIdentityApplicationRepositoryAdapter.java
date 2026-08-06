@@ -20,13 +20,26 @@ class StudentIdentityApplicationRepositoryAdapter implements StudentIdentityAppl
     @Override
     @Transactional
     public void save(StudentIdentityApplication application) {
-        jpaRepository.save(StudentIdentityApplicationPersistenceMapper.toEntity(application));
+        var existing = jpaRepository.findById(application.id().value());
+        if (existing.isPresent()) {
+            StudentIdentityApplicationPersistenceMapper.updateEntity(existing.get(), application);
+            jpaRepository.save(existing.get());
+        } else {
+            jpaRepository.save(StudentIdentityApplicationPersistenceMapper.toEntity(application));
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<StudentIdentityApplication> findById(StudentIdentityApplicationId id) {
         return jpaRepository.findById(id.value())
+                .map(StudentIdentityApplicationPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<StudentIdentityApplication> findByIdForUpdate(StudentIdentityApplicationId id) {
+        return jpaRepository.findByIdForUpdate(id.value())
                 .map(StudentIdentityApplicationPersistenceMapper::toDomain);
     }
 }

@@ -5,6 +5,7 @@ import com.campusguinness.identity.application.exception.IdentityApplicationExce
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -44,11 +45,23 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of("ACCESS_DENIED", "Access is denied.", req.getRequestURI()));
     }
 
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiErrorResponse.of("AUTHENTICATION_REQUIRED", "Authentication is required.", req.getRequestURI()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
         if (containsInCauseChain(ex, "uq_users_username")) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ApiErrorResponse.of("USERNAME_ALREADY_EXISTS", "Username already exists.", req.getRequestURI()));
+        }
+        if (containsInCauseChain(ex, "uq_active_membership")
+                || containsInCauseChain(ex, "uq_student_profile_membership")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of("STUDENT_APPROVAL_CONFLICT",
+                            "Student application approval conflict.", req.getRequestURI()));
         }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));
@@ -104,14 +117,21 @@ public class GlobalExceptionHandler {
         return switch (code) {
             case "INVITATION_ACTIVATION_FAILED" -> HttpStatus.UNAUTHORIZED;
             case "INVITATION_EXPIRED" -> HttpStatus.GONE;
-            case "SCHOOL_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "SCHOOL_ADMIN_SCOPE_DENIED" -> HttpStatus.FORBIDDEN;
+            case "SCHOOL_NOT_FOUND",
+                    "STUDENT_APPLICATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "USERNAME_ALREADY_EXISTS",
                     "ACTIVE_INVITATION_ALREADY_EXISTS",
                     "INVITATION_NOT_PENDING",
                     "ACCOUNT_ALREADY_ACTIVATED",
                     "ACCOUNT_NOT_ACTIVATABLE",
                     "SCHOOL_ADMIN_MEMBERSHIP_CONFLICT",
-                    "SCHOOL_NOT_OPEN_FOR_REGISTRATION" -> HttpStatus.CONFLICT;
+                    "SCHOOL_NOT_OPEN_FOR_REGISTRATION",
+                    "STUDENT_APPLICATION_NOT_PENDING",
+                    "APPLICANT_ACCOUNT_NOT_ACTIVATABLE",
+                    "STUDENT_MEMBERSHIP_CONFLICT",
+                    "STUDENT_PROFILE_ALREADY_EXISTS",
+                    "STUDENT_APPROVAL_CONFLICT" -> HttpStatus.CONFLICT;
             case "INVITATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             default -> HttpStatus.BAD_REQUEST;
         };

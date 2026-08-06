@@ -62,11 +62,13 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
      * Entities that are NOT aggregate roots:
      * - SchoolMembershipEntity: internal to User aggregate; may use an internal JPA repository
      *   behind UserRepositoryAdapter, but is not an aggregate-root repository.
+     * - StudentProfileEntity: child table linked to SchoolMembership/User aggregate.
      * - NotificationEntity: infrastructure table, system write
      * - AuditRecordEntity: append-only, interceptor write
      */
     private static final Set<String> NON_AGGREGATE_ROOT_ENTITIES = Set.of(
             "SchoolMembershipEntity",
+            "StudentProfileEntity",
             "NotificationEntity",
             "AuditRecordEntity"
     );
@@ -124,10 +126,10 @@ class AggregateRootRepositoryConsistencyTest extends PostgreSqlIntegrationTestSu
     }
 
     @Test
-    @DisplayName("NotificationEntity and AuditRecordEntity are classified as non-aggregate-root infrastructure entities")
+    @DisplayName("Non-aggregate-root persistence entities are classified")
     void nonAggregateRootEntitiesAreClassifiedCorrectly() {
         assertThat(NON_AGGREGATE_ROOT_ENTITIES)
-                .contains("NotificationEntity", "AuditRecordEntity", "SchoolMembershipEntity");
+                .contains("NotificationEntity", "AuditRecordEntity", "SchoolMembershipEntity", "StudentProfileEntity");
     }
 
     @Test
