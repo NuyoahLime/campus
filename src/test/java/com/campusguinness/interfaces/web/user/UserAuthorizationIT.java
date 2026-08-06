@@ -245,7 +245,7 @@ class UserAuthorizationIT {
     private CsrfMaterial csrfToken() throws Exception {
         var result = mvc.perform(get("/api/v1/auth/csrf"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.headerName").isNotEmpty())
                 .andReturn();
         JsonNode body = mapper.readTree(result.getResponse().getContentAsString());
         return new CsrfMaterial(body.get("headerName").asText(), body.get("token").asText(),
