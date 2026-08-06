@@ -6,6 +6,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,23 +25,44 @@ public final class CampusGuinnessUserDetails implements UserDetails {
     private final String passwordHash;
     private final String accountStatus;
     private final Set<GrantedAuthority> authorities;
+    private final List<AuthenticatedSchoolMembership> activeSchoolMemberships;
 
     public CampusGuinnessUserDetails(
             UUID userId,
             String loginName,
             String passwordHash,
             String accountStatus,
-            Set<GrantedAuthority> authorities) {
+            Set<GrantedAuthority> authorities,
+            List<AuthenticatedSchoolMembership> activeSchoolMemberships) {
         this.userId = userId;
         this.loginName = loginName;
         this.passwordHash = passwordHash;
         this.accountStatus = accountStatus;
         this.authorities = Collections.unmodifiableSet(authorities);
+        this.activeSchoolMemberships = activeSchoolMemberships.stream()
+                .sorted(Comparator
+                        .comparing(AuthenticatedSchoolMembership::schoolId)
+                        .thenComparing(AuthenticatedSchoolMembership::roleInSchool)
+                        .thenComparing(AuthenticatedSchoolMembership::membershipId))
+                .toList();
     }
 
     /** The domain User UUID — the single source of truth for actorId. */
     public UUID getUserId() {
         return userId;
+    }
+
+    public String accountStatus() {
+        return accountStatus;
+    }
+
+    public List<AuthenticatedSchoolMembership> activeSchoolMemberships() {
+        return activeSchoolMemberships;
+    }
+
+    public boolean hasActiveSchoolRole(UUID schoolId, String role) {
+        return activeSchoolMemberships.stream()
+                .anyMatch(m -> m.schoolId().equals(schoolId) && m.roleInSchool().equals(role));
     }
 
     // ── UserDetails contract ──
@@ -61,13 +84,12 @@ public final class CampusGuinnessUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return "NORMAL".equals(accountStatus)
-                || "LOCKED".equals(accountStatus); // LOCKED is still enabled but not non-locked
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return !"LOCKED".equals(accountStatus);
+        return true;
     }
 
     @Override

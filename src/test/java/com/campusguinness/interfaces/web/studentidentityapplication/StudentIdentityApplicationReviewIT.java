@@ -71,6 +71,7 @@ class StudentIdentityApplicationReviewIT {
         insertUser(ordinaryUser, ordinaryUsername, "NORMAL", null, "AdminPass123!");
         insertMembership(UUID.randomUUID(), adminA, schoolA, "SCHOOL_ADMIN");
         insertMembership(UUID.randomUUID(), adminA2, schoolA, "SCHOOL_ADMIN");
+        insertMembership(UUID.randomUUID(), ordinaryUser, schoolA, "STUDENT");
     }
 
     @AfterEach
@@ -132,7 +133,7 @@ class StudentIdentityApplicationReviewIT {
     @Test
     void approveCreatesNormalUserStudentMembershipProfileAndAudit() throws Exception {
         var student = registerStudent(schoolA, "approve");
-        assertLoginFails(student.username(), "SecurePassword123!");
+        assertLoginDenied(student.username(), "SecurePassword123!", 403, "STUDENT_APPROVAL_PENDING");
         var adminSession = login(adminAUsername, "AdminPass123!");
 
         mvc.perform(withCsrf(post(base(schoolA) + "/" + student.applicationId() + "/approve"), adminSession))
@@ -182,7 +183,7 @@ class StudentIdentityApplicationReviewIT {
         assertThat(countMemberships(student.userId(), schoolA, "STUDENT")).isZero();
         assertThat(countStudentProfiles(student.userId())).isZero();
         assertThat(countAudit("STUDENT_APPLICATION_REJECTED", student.applicationId())).isEqualTo(1);
-        assertLoginFails(student.username(), "SecurePassword123!");
+        assertLoginDenied(student.username(), "SecurePassword123!", 403, "STUDENT_APPLICATION_REJECTED");
     }
 
     @Test
@@ -317,13 +318,13 @@ class StudentIdentityApplicationReviewIT {
         return new AuthSession(merge(csrf.cookies(), result.getResponse().getCookies()));
     }
 
-    private void assertLoginFails(String username, String password) throws Exception {
+    private void assertLoginDenied(String username, String password, int status, String code) throws Exception {
         var csrf = csrfToken();
         mvc.perform(withCsrf(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}"), csrf))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"));
+                .andExpect(status().is(status))
+                .andExpect(jsonPath("$.code").value(code));
     }
 
     private MockHttpServletRequestBuilder withCsrf(MockHttpServletRequestBuilder request, AuthSession session)

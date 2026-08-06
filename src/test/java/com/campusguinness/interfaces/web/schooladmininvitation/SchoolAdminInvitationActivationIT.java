@@ -68,6 +68,7 @@ class SchoolAdminInvitationActivationIT {
         insertUser(superAdminId, superAdminUsername, "NORMAL", "SUPER_ADMIN", adminPassword);
         insertUser(ordinaryUserId, ordinaryUsername, "NORMAL", null, adminPassword);
         insertSchool(schoolId);
+        insertMembership(UUID.randomUUID(), ordinaryUserId, schoolId, "STUDENT");
     }
 
     @AfterEach
@@ -311,6 +312,13 @@ class SchoolAdminInvitationActivationIT {
                 ) VALUES (?,?,?,?,?,?, now() + interval '1 day', ?)
                 """,
                 invitationId, userId, schoolId, "SCHOOL_ADMIN", encoder.encode(rawCode), "PENDING", superAdminId);
+    }
+
+    private void insertMembership(UUID id, UUID userId, UUID schoolId, String role) {
+        jdbc.update("""
+                INSERT INTO school_memberships(id, user_id, school_id, role_in_school, status)
+                VALUES (?, ?, ?, ?, 'ACTIVE')
+                """, id, userId, schoolId, role);
     }
 
     private String username(String label) {

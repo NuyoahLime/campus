@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -13,61 +14,56 @@ class CampusGuinnessUserDetailsTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
 
-    @Test void getUserIdReturnsUuid() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "hash", "NORMAL", Set.of());
+    @Test void exposesStablePrincipalFields() {
+        var ud = principal("NORMAL", Set.of(), List.of());
         assertThat(ud.getUserId()).isEqualTo(USER_ID);
+        assertThat(ud.getUsername()).isEqualTo("u");
+        assertThat(ud.getPassword()).isEqualTo("hash");
+        assertThat(ud.accountStatus()).isEqualTo("NORMAL");
     }
 
-    @Test void getUsernameReturnsLoginName() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "testuser", "hash", "NORMAL", Set.of());
-        assertThat(ud.getUsername()).isEqualTo("testuser");
+    @Test void userDetailsStatusMethodsDoNotPerformBusinessStateChecks() {
+        for (String status : List.of("NORMAL", "LOCKED", "DISABLED", "PENDING_ACTIVATION")) {
+            var ud = principal(status, Set.of(), List.of());
+            assertThat(ud.isEnabled()).isTrue();
+            assertThat(ud.isAccountNonLocked()).isTrue();
+            assertThat(ud.isAccountNonExpired()).isTrue();
+            assertThat(ud.isCredentialsNonExpired()).isTrue();
+        }
     }
 
-    @Test void getPasswordReturnsHash() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "$2a$12$abcdef", "NORMAL", Set.of());
-        assertThat(ud.getPassword()).isEqualTo("$2a$12$abcdef");
-    }
-
-    @Test void normalIsEnabledAndNonLocked() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "NORMAL", Set.of());
-        assertThat(ud.isEnabled()).isTrue();
-        assertThat(ud.isAccountNonLocked()).isTrue();
-        assertThat(ud.isAccountNonExpired()).isTrue();
-        assertThat(ud.isCredentialsNonExpired()).isTrue();
-    }
-
-    @Test void lockedIsEnabledButNotNonLocked() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "LOCKED", Set.of());
-        assertThat(ud.isEnabled()).isTrue();
-        assertThat(ud.isAccountNonLocked()).isFalse();
-    }
-
-    @Test void disabledNotEnabled() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "DISABLED", Set.of());
-        assertThat(ud.isEnabled()).isFalse();
-    }
-
-    @Test void pendingActivationNotEnabled() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "PENDING_ACTIVATION", Set.of());
-        assertThat(ud.isEnabled()).isFalse();
-    }
-
-    @Test void authoritiesPreserved() {
+    @Test void authoritiesPreservedAndUnmodifiable() {
         Set<GrantedAuthority> auths = Set.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "NORMAL", auths);
-        assertThat(ud.getAuthorities()).extracting("authority").contains("ROLE_SUPER_ADMIN");
-        assertThat(ud.getAuthorities()).hasSize(1);
+        var ud = principal("NORMAL", auths, List.of());
+        assertThat(ud.getAuthorities()).extracting("authority").containsExactly("ROLE_SUPER_ADMIN");
+        assertThatThrownBy(() -> ((java.util.Collection<?>) ud.getAuthorities()).clear())
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
-    @SuppressWarnings("unchecked")
-    @Test void authoritiesIsUnmodifiable() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "h", "NORMAL", Set.of());
-        assertThatThrownBy(() -> ((java.util.Collection<GrantedAuthority>) ud.getAuthorities()).clear())
+    @Test void schoolMembershipsAreSortedAndUnmodifiable() {
+        UUID schoolA = UUID.randomUUID();
+        UUID schoolB = UUID.randomUUID();
+        var first = new AuthenticatedSchoolMembership(UUID.randomUUID(), schoolB, "SCHOOL_ADMIN");
+        var second = new AuthenticatedSchoolMembership(UUID.randomUUID(), schoolA, "STUDENT");
+        var ud = principal("NORMAL", Set.of(), List.of(first, second));
+
+        assertThat(ud.activeSchoolMemberships()).hasSize(2);
+        assertThat(ud.hasActiveSchoolRole(schoolA, "STUDENT")).isTrue();
+        assertThat(ud.hasActiveSchoolRole(schoolA, "SCHOOL_ADMIN")).isFalse();
+        assertThatThrownBy(() -> ud.activeSchoolMemberships().clear())
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test void toStringExcludesPasswordHash() {
-        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "secret", "NORMAL", Set.of());
+        var ud = new CampusGuinnessUserDetails(USER_ID, "u", "secret", "NORMAL", Set.of(), List.of());
         assertThat(ud.toString()).doesNotContain("secret");
+    }
+
+    private CampusGuinnessUserDetails principal(
+            String status,
+            Set<GrantedAuthority> authorities,
+            List<AuthenticatedSchoolMembership> memberships
+    ) {
+        return new CampusGuinnessUserDetails(USER_ID, "u", "hash", status, authorities, memberships);
     }
 }

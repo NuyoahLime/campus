@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,29 +29,25 @@ class AuthenticationMembershipQueryAdapterTest {
     }
 
     @Test
-    void returnsActiveStudentAndSchoolAdminMemberships() {
+    void returnsActiveMembershipsForPrincipalFiltering() {
         var student = membership(UUID.randomUUID(), "STUDENT");
         var admin = membership(UUID.randomUUID(), "SCHOOL_ADMIN");
-        when(memberships.findAllByUserIdAndStatusAndRoleInSchoolInOrderByStartedAtAscIdAsc(
-                eq(userId), eq("ACTIVE"), eq(List.of("STUDENT", "SCHOOL_ADMIN"))
-        )).thenReturn(List.of(student, admin));
+        var legacyTeacher = membership(UUID.randomUUID(), "TEACHER");
+        when(memberships.findAllByUserIdAndStatusOrderByStartedAtAscIdAsc(userId, "ACTIVE"))
+                .thenReturn(List.of(student, admin, legacyTeacher));
 
         var results = adapter.findActiveByUserId(userId);
 
-        assertThat(results).extracting("membershipId").containsExactly(student.getId(), admin.getId());
-        assertThat(results).extracting("schoolId").containsExactly(student.getSchoolId(), admin.getSchoolId());
-        assertThat(results).extracting("roleInSchool").containsExactly("STUDENT", "SCHOOL_ADMIN");
+        assertThat(results).extracting("membershipId").containsExactly(student.getId(), admin.getId(), legacyTeacher.getId());
+        assertThat(results).extracting("schoolId").containsExactly(student.getSchoolId(), admin.getSchoolId(), legacyTeacher.getSchoolId());
+        assertThat(results).extracting("roleInSchool").containsExactly("STUDENT", "SCHOOL_ADMIN", "TEACHER");
     }
 
     @Test
-    void delegatesFilteringOfEndedTeacherAndOtherUsersToRepositoryQuery() {
+    void delegatesActiveFilteringToRepositoryQuery() {
         adapter.findActiveByUserId(userId);
 
-        verify(memberships).findAllByUserIdAndStatusAndRoleInSchoolInOrderByStartedAtAscIdAsc(
-                userId,
-                "ACTIVE",
-                List.of("STUDENT", "SCHOOL_ADMIN")
-        );
+        verify(memberships).findAllByUserIdAndStatusOrderByStartedAtAscIdAsc(userId, "ACTIVE");
     }
 
     private SchoolMembershipEntity membership(UUID schoolId, String role) {

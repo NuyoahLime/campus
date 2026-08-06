@@ -13,6 +13,8 @@ public interface SchoolMembershipJpaRepository extends JpaRepository<SchoolMembe
 
     List<SchoolMembershipEntity> findAllByUserIdAndStatusOrderByStartedAtAsc(UUID userId, String status);
 
+    List<SchoolMembershipEntity> findAllByUserIdAndStatusOrderByStartedAtAscIdAsc(UUID userId, String status);
+
     Optional<SchoolMembershipEntity> findByUserIdAndSchoolIdAndStatus(
             UUID userId,
             UUID schoolId,

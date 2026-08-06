@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.test.context.ActiveProfiles;
@@ -16,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -55,8 +57,10 @@ class AuthSessionFlowIT {
                 .with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"" + username + "\",\"password\":\"" + rawPassword + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
                 .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.accountStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.authorities[0]").value("ROLE_SUPER_ADMIN"))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 
@@ -74,6 +78,18 @@ class AuthSessionFlowIT {
                 .content("{\"username\":\"noSuchUser\",\"password\":\"pass\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"));
+    }
+
+    @Test void failedLoginDoesNotWriteSecurityContext() throws Exception {
+        var session = new MockHttpSession();
+
+        mvc.perform(post("/api/v1/auth/login")
+                .session(session)
+                .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + username + "\",\"password\":\"wrong\"}"))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(session.getAttribute("SPRING_SECURITY_CONTEXT")).isNull();
     }
 
     @Test void loginWithoutCsrfReturns403() throws Exception {
@@ -100,7 +116,8 @@ class AuthSessionFlowIT {
     @Test void contextRepoDirectSaveVerifiesCorrectBehavior() {
         var request = new MockHttpServletRequest();
         var response = new MockHttpServletResponse();
-        var user = new CampusGuinnessUserDetails(userId, username, encoder.encode(rawPassword), "NORMAL", java.util.Set.of());
+        var user = new CampusGuinnessUserDetails(userId, username, encoder.encode(rawPassword), "NORMAL",
+                java.util.Set.of(), java.util.List.of());
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user, null);
         var ctx = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
         ctx.setAuthentication(auth);
