@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies the JPA mapping context is correctly configured:
  * - EntityManagerFactory starts with PostgreSQL 18.4 Testcontainer.
- * - All 18 entities are scanned and mapped.
+ * - All 19 entities are scanned and mapped.
  * - Hibernate ddl-auto is 'none' (verified via configuration).
  * - Flyway executed all 16 migrations.
  */
@@ -36,12 +36,12 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("All 18 entities are scanned by JPA metamodel")
-    void all18EntitiesAreScanned() {
+    @DisplayName("All 19 entities are scanned by JPA metamodel")
+    void all19EntitiesAreScanned() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         assertThat(entities)
-                .as("Expected 18 JPA entities, found %d", entities.size())
-                .hasSize(18);
+                .as("Expected 19 JPA entities, found %d", entities.size())
+                .hasSize(19);
     }
 
     @Test

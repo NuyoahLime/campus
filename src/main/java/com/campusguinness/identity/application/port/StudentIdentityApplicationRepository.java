@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface StudentIdentityApplicationRepository {
     void save(StudentIdentityApplication application);
     Optional<StudentIdentityApplication> findById(StudentIdentityApplicationId id);
+    Optional<StudentIdentityApplication> findByIdForUpdate(StudentIdentityApplicationId id);
 }

@@ -127,14 +127,14 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Entity count matches known expected count (18)")
+    @DisplayName("Entity count matches known expected count (19)")
     void entityCountIsAsExpected() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(18);
+        assertThat(entities).hasSize(19);
     }
 
     @Test
-    @DisplayName("All 18 entity table names match their @Table annotations")
+    @DisplayName("All 19 entity table names match their @Table annotations")
     void entityTableNamesAreCorrect() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         Set<String> actualTableNames = entities.stream()
@@ -143,7 +143,7 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
 
         Set<String> expectedTables = Set.of(
                 "users", "schools", "school_registrations", "school_memberships",
-                "student_identity_applications", "school_admin_invitations",
+                "student_profiles", "student_identity_applications", "school_admin_invitations",
                 "challenge_projects",
                 "activities", "activity_applications",
                 "score_attempts",

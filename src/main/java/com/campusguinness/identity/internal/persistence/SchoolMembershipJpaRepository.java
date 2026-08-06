@@ -19,6 +19,20 @@ public interface SchoolMembershipJpaRepository extends JpaRepository<SchoolMembe
             String status
     );
 
+    Optional<SchoolMembershipEntity> findByUserIdAndSchoolIdAndStatusAndRoleInSchool(
+            UUID userId,
+            UUID schoolId,
+            String status,
+            String roleInSchool
+    );
+
+    boolean existsByUserIdAndSchoolIdAndStatusAndRoleInSchool(
+            UUID userId,
+            UUID schoolId,
+            String status,
+            String roleInSchool
+    );
+
     List<SchoolMembershipEntity> findAllByUserIdAndStatusAndRoleInSchoolInOrderByStartedAtAscIdAsc(
             UUID userId,
             String status,

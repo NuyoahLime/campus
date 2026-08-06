@@ -28,6 +28,21 @@ final class StudentIdentityApplicationPersistenceMapper {
         return e;
     }
 
+    static void updateEntity(StudentIdentityApplicationEntity e, StudentIdentityApplication domain) {
+        e.setUserId(domain.userId());
+        e.setSchoolId(domain.schoolId());
+        e.setRealName(domain.realName());
+        e.setStudentNumber(domain.studentNumber());
+        e.setGrade(domain.grade());
+        e.setClassName(domain.className());
+        e.setEvidenceFileKey(domain.evidenceFileKey());
+        e.setApplicationStatus(domain.status().name());
+        e.setReviewedBy(domain.reviewedBy());
+        e.setReviewedAt(domain.reviewedAt());
+        e.setRejectionReason(domain.rejectionReason());
+        e.setUpdatedAt(Instant.now());
+    }
+
     static StudentIdentityApplication toDomain(StudentIdentityApplicationEntity e) {
         return StudentIdentityApplication.reconstitute(new StudentIdentityApplication.Builder()
                 .id(new StudentIdentityApplicationId(e.getId()))
