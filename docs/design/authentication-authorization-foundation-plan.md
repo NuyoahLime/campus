@@ -372,9 +372,9 @@ PASSWORD_POLICY                            =
   不得是：用户名、常见密码
 
 LOGIN_FAILURE_POLICY                       =
-  连续失败 5 次 → 锁定账户 15 分钟
+  连续失败 5 次 → 锁定账户 10 分钟
   成功登录 → 重置 login_failures = 0
-  实现：在 login_failures >= 5 后设置 locked_until = now() + 15 分钟
+  实现：在 login_failures >= 5 后设置 locked_until = now() + 10 分钟
   计数字段：UserEntity.loginFailures（需要在认证基础设施中读取/写入）
 
 PASSWORD_CHANGE_SUPPORT                    = YES（需实现）
@@ -1333,7 +1333,7 @@ REENABLE_LOGIN_BEHAVIOR                    = 用户必须重新登录
 CURRENT_PASSWORD_STORAGE                   = users.password_hash varchar(255) NOT NULL（未使用，映射器缺陷）
 SELECTED_PASSWORD_ENCODER                   = BCrypt (strength=12)
 PASSWORD_POLICY                            = 8-72 字符
-LOGIN_FAILURE_POLICY                       = 5 次失败 → 15 分钟锁定
+LOGIN_FAILURE_POLICY                       = 5 次失败 → 10 分钟锁定
 PASSWORD_CHANGE_SUPPORT                    = YES
 PASSWORD_RESET_SUPPORT                     = DEFERRED
 ```

@@ -43,8 +43,8 @@ class LoginBusinessStateResolverTest {
 
     @Test
     void lockedStatusOrFutureLockedUntilIsDenied() {
-        assertDenied(account("LOCKED", null), "ACCOUNT_LOCKED", HttpStatus.LOCKED);
-        assertDenied(account("NORMAL", now.plusSeconds(60)), "ACCOUNT_LOCKED", HttpStatus.LOCKED);
+        assertDenied(account("LOCKED", null), "ACCOUNT_LOCKED", HttpStatus.UNAUTHORIZED);
+        assertDenied(account("NORMAL", now.plusSeconds(60)), "ACCOUNT_LOCKED", HttpStatus.UNAUTHORIZED);
     }
 
     @Test

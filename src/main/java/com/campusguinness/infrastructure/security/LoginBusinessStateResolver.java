@@ -30,7 +30,7 @@ class LoginBusinessStateResolver {
             throw denied("ACCOUNT_DISABLED", "The account is disabled.", HttpStatus.FORBIDDEN);
         }
         if ("LOCKED".equals(status) || (account.lockedUntil() != null && account.lockedUntil().isAfter(now))) {
-            throw denied("ACCOUNT_LOCKED", "The account is locked.", HttpStatus.LOCKED);
+            throw denied("ACCOUNT_LOCKED", "The account is locked.", HttpStatus.UNAUTHORIZED);
         }
         if ("PENDING_ACTIVATION".equals(status)) {
             resolvePendingActivation(account, now);

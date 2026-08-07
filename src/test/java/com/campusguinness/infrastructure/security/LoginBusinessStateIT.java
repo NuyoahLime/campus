@@ -13,10 +13,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -111,8 +113,52 @@ class LoginBusinessStateIT {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"));
         login(username("locked"), PASSWORD)
-                .andExpect(status().isLocked())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+    }
+
+    @Test
+    void temporaryLockWithCorrectPasswordReturns401AndDoesNotAuthenticateSession() throws Exception {
+        UUID userId = createUser("temporary-locked", "NORMAL", null);
+        jdbc.update("UPDATE users SET login_failures = 5, locked_until = now() + INTERVAL '5 minutes' WHERE id = ?",
+                userId);
+
+        var result = login(username("temporary-locked"), PASSWORD)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"))
+                .andReturn();
+
+        assertThat(Arrays.stream(result.getResponse().getCookies()).map(jakarta.servlet.http.Cookie::getName))
+                .doesNotContain("SESSION");
+
+        mvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void platformAndSchoolIdentitiesMustBeUnique() throws Exception {
+        UUID superAdmin = createUser("super-admin", "NORMAL", "SUPER_ADMIN");
+        UUID superAdminSchool = createSchool();
+        createMembership(superAdmin, superAdminSchool, "STUDENT", "ACTIVE");
+
+        UUID unassigned = createUser("unassigned", "NORMAL", null);
+
+        UUID ambiguous = createUser("ambiguous", "NORMAL", null);
+        createMembership(ambiguous, createSchool(), "STUDENT", "ACTIVE");
+        createMembership(ambiguous, createSchool(), "SCHOOL_ADMIN", "ACTIVE");
+
+        login(username("super-admin"), PASSWORD)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("IDENTITY_AMBIGUOUS"));
+
+        login(username("unassigned"), PASSWORD)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("IDENTITY_NOT_ASSIGNED"));
+
+        login(username("ambiguous"), PASSWORD)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("IDENTITY_AMBIGUOUS"));
     }
 
     @Test

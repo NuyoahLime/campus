@@ -11,7 +11,7 @@ import java.util.UUID;
 class LoginCredentialCommandAdapter implements LoginCredentialCommandPort {
 
     private static final int LOCK_THRESHOLD = 5;
-    private static final long LOCK_MINUTES = 15L;
+    private static final long LOCK_MINUTES = 10L;
 
     private final JdbcTemplate jdbc;
 

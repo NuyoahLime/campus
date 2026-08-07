@@ -22,37 +22,58 @@ class CampusPrincipalFactory {
         Set<GrantedAuthority> authorities = new LinkedHashSet<>();
         var schoolMemberships = new java.util.ArrayList<AuthenticatedSchoolMembership>();
 
-        if (account.platformRole() != null) {
-            if ("SUPER_ADMIN".equals(account.platformRole())) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
-            } else {
-                log.warn("Unknown platform_role '{}' for user {}", account.platformRole(), account.userId());
+        if ("SUPER_ADMIN".equals(account.platformRole())) {
+            if (!memberships.isEmpty()) {
+                log.warn("SUPER_ADMIN user {} has {} ACTIVE school memberships",
+                        account.userId(), memberships.size());
+                throw denied("IDENTITY_AMBIGUOUS", "The login identity is ambiguous.");
             }
+            authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+            return new CampusGuinnessUserDetails(
+                    account.userId(),
+                    account.loginName(),
+                    account.passwordHash(),
+                    account.accountStatus(),
+                    authorities,
+                    schoolMemberships
+            );
         }
 
-        for (var membership : memberships) {
-            if ("STUDENT".equals(membership.roleInSchool())) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_STUDENT"));
-                schoolMemberships.add(toAuthenticatedMembership(membership));
-            } else if ("SCHOOL_ADMIN".equals(membership.roleInSchool())) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_SCHOOL_ADMIN"));
-                schoolMemberships.add(toAuthenticatedMembership(membership));
-            } else if ("TEACHER".equals(membership.roleInSchool())) {
-                log.warn("Ignoring legacy TEACHER membership {} for user {}",
-                        membership.membershipId(), account.userId());
-            } else {
-                log.warn("Ignoring unknown school role '{}' on membership {} for user {}",
-                        membership.roleInSchool(), membership.membershipId(), account.userId());
+        if (account.platformRole() != null) {
+            log.warn("Unknown platform_role '{}' for user {}", account.platformRole(), account.userId());
+        }
+
+        if (memberships.isEmpty()) {
+            if (account.platformRole() == null) {
+                throw denied("IDENTITY_NOT_ASSIGNED", "The login identity is not assigned.");
             }
+            throw denied("ACCOUNT_ROLE_NOT_READY", "The account role is not ready.");
+        }
+
+        if (memberships.size() > 1) {
+            log.warn("User {} has {} ACTIVE school memberships", account.userId(), memberships.size());
+            throw denied("IDENTITY_AMBIGUOUS", "The login identity is ambiguous.");
+        }
+
+        var membership = memberships.getFirst();
+        if ("STUDENT".equals(membership.roleInSchool())) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_STUDENT"));
+            schoolMemberships.add(toAuthenticatedMembership(membership));
+        } else if ("SCHOOL_ADMIN".equals(membership.roleInSchool())) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_SCHOOL_ADMIN"));
+            schoolMemberships.add(toAuthenticatedMembership(membership));
+        } else if ("TEACHER".equals(membership.roleInSchool())) {
+            log.warn("Ignoring legacy TEACHER membership {} for user {}",
+                    membership.membershipId(), account.userId());
+        } else {
+            log.warn("Ignoring unknown school role '{}' on membership {} for user {}",
+                    membership.roleInSchool(), membership.membershipId(), account.userId());
         }
 
         if (authorities.isEmpty()) {
             log.warn("Normal user {} has no login authority from platform role or ACTIVE memberships",
                     account.userId());
-            throw new LoginDeniedAuthenticationException(
-                    "ACCOUNT_ROLE_NOT_READY",
-                    "The account role is not ready.",
-                    HttpStatus.FORBIDDEN);
+            throw denied("ACCOUNT_ROLE_NOT_READY", "The account role is not ready.");
         }
 
         return new CampusGuinnessUserDetails(
@@ -63,6 +84,10 @@ class CampusPrincipalFactory {
                 authorities,
                 schoolMemberships
         );
+    }
+
+    private LoginDeniedAuthenticationException denied(String code, String message) {
+        return new LoginDeniedAuthenticationException(code, message, HttpStatus.FORBIDDEN);
     }
 
     private AuthenticatedSchoolMembership toAuthenticatedMembership(AuthenticationMembership membership) {

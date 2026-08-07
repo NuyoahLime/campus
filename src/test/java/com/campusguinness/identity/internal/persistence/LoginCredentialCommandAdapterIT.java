@@ -33,13 +33,27 @@ class LoginCredentialCommandAdapterIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
+    void firstFourFailuresDoNotLock() {
+        for (int i = 0; i < 4; i++) {
+            credentials.recordPasswordFailure(userId);
+        }
+
+        assertThat(loginFailures()).isEqualTo(4);
+        assertThat(lockedUntil()).isNull();
+        assertThat(accountStatus()).isEqualTo("NORMAL");
+    }
+
+    @Test
     void fifthFailureSetsTemporaryLockWithoutChangingBusinessStatus() {
         for (int i = 0; i < 5; i++) {
             credentials.recordPasswordFailure(userId);
         }
 
         assertThat(loginFailures()).isEqualTo(5);
-        assertThat(lockedUntil()).isAfter(Instant.now());
+        assertThat(lockedUntil())
+                .isBetween(
+                        Instant.now().plusSeconds(9 * 60L),
+                        Instant.now().plusSeconds(11 * 60L));
         assertThat(accountStatus()).isEqualTo("NORMAL");
     }
 
