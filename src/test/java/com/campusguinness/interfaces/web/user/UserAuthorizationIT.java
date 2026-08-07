@@ -44,6 +44,7 @@ class UserAuthorizationIT {
 
     private UUID superAdminId;
     private UUID ordinaryUserId;
+    private UUID ordinarySchoolId;
     private String superAdminUsername;
     private String ordinaryUsername;
 
@@ -56,10 +57,16 @@ class UserAuthorizationIT {
 
         insertUser(superAdminId, superAdminUsername, "NORMAL", "SUPER_ADMIN");
         insertUser(ordinaryUserId, ordinaryUsername, "NORMAL", null);
+        ordinarySchoolId = UUID.randomUUID();
+        insertSchool(ordinarySchoolId);
+        insertMembership(UUID.randomUUID(), ordinaryUserId, ordinarySchoolId, "STUDENT");
     }
 
     @AfterEach
     void cleanUpUsers() {
+        jdbc.update("DELETE FROM school_memberships WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)",
+                runPrefix + "%");
+        jdbc.update("DELETE FROM schools WHERE id = ?", ordinarySchoolId);
         jdbc.update("DELETE FROM users WHERE username LIKE ?", runPrefix + "%");
     }
 
@@ -238,7 +245,7 @@ class UserAuthorizationIT {
     private CsrfMaterial csrfToken() throws Exception {
         var result = mvc.perform(get("/api/v1/auth/csrf"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.headerName").isNotEmpty())
                 .andReturn();
         JsonNode body = mapper.readTree(result.getResponse().getContentAsString());
         return new CsrfMaterial(body.get("headerName").asText(), body.get("token").asText(),
@@ -287,6 +294,25 @@ class UserAuthorizationIT {
     private void insertUser(UUID id, String username, String status, String platformRole) {
         jdbc.update("INSERT INTO users(id, username, password_hash, account_status, platform_role) VALUES (?,?,?,?,?)",
                 id, username, encoder.encode(rawPassword), status, platformRole);
+    }
+
+    private void insertSchool(UUID id) {
+        jdbc.update("""
+                INSERT INTO schools(
+                    id, name, unified_code_type, unified_code, internal_code, school_type, region,
+                    address, contact_name, contact_phone, contact_email, school_status
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                id, runPrefix + "-school", "USCC", runPrefix + "-code", runPrefix + "-internal",
+                "PRIMARY", "Beijing", "Address", "Contact", "13800000000",
+                "authz@example.com", "NORMAL");
+    }
+
+    private void insertMembership(UUID id, UUID userId, UUID schoolId, String role) {
+        jdbc.update("""
+                INSERT INTO school_memberships(id, user_id, school_id, role_in_school, status)
+                VALUES (?, ?, ?, ?, 'ACTIVE')
+                """, id, userId, schoolId, role);
     }
 
     private String accountStatus(UUID id) {

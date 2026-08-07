@@ -2,83 +2,39 @@ package com.campusguinness.infrastructure.security;
 
 import com.campusguinness.identity.application.query.AuthenticationAccount;
 import com.campusguinness.identity.application.query.AuthenticationAccountQuery;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import com.campusguinness.identity.application.query.AuthenticationMembershipQuery;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
- * Loads {@link CampusGuinnessUserDetails} from {@link AuthenticationAccountQuery}.
- * <p>
- * Platform role mapping uses a strict whitelist. Unknown platform_role values
- * are rejected with a WARN log and no authority is granted.
- * School-level roles are NOT loaded — deferred to TASK-AUTH-ROLE-MAPPING-001.
+ * Compatibility UserDetailsService. The actual login flow uses
+ * CampusAuthenticationProvider so password verification happens before any
+ * business-state checks.
  */
 @Component
 public class CampusGuinnessUserDetailsService implements UserDetailsService {
 
-    private static final Logger log = LoggerFactory.getLogger(CampusGuinnessUserDetailsService.class);
-
-    /** Known platform roles that map to Spring Security authorities. */
-    private static final Set<String> KNOWN_PLATFORM_ROLES = Set.of("SUPER_ADMIN");
-
     private final AuthenticationAccountQuery accountQuery;
+    private final AuthenticationMembershipQuery membershipQuery;
+    private final CampusPrincipalFactory principalFactory;
 
-    public CampusGuinnessUserDetailsService(AuthenticationAccountQuery accountQuery) {
+    public CampusGuinnessUserDetailsService(
+            AuthenticationAccountQuery accountQuery,
+            AuthenticationMembershipQuery membershipQuery,
+            CampusPrincipalFactory principalFactory
+    ) {
         this.accountQuery = accountQuery;
+        this.membershipQuery = membershipQuery;
+        this.principalFactory = principalFactory;
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        String normalized = normalizeLoginName(username);
-
+        String normalized = username != null ? username.trim() : "";
         AuthenticationAccount account = accountQuery.findByLoginName(normalized)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
-
-        Set<GrantedAuthority> authorities = mapPlatformAuthorities(account);
-
-        return new CampusGuinnessUserDetails(
-                account.userId(),
-                account.loginName(),
-                account.passwordHash(),
-                account.accountStatus(),
-                authorities
-        );
-    }
-
-    /**
-     * Normalize login name: trim whitespace. Future: lowercase if case-insensitive.
-     */
-    private String normalizeLoginName(String raw) {
-        return raw != null ? raw.trim() : "";
-    }
-
-    /**
-     * Map platform_role to GrantedAuthority using strict whitelist.
-     * Unknown values are rejected with a WARN log.
-     */
-    private Set<GrantedAuthority> mapPlatformAuthorities(AuthenticationAccount account) {
-        Set<GrantedAuthority> authorities = new HashSet<>();
-
-        String role = account.platformRole();
-        if (role != null) {
-            if (KNOWN_PLATFORM_ROLES.contains(role)) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
-            } else {
-                log.warn("Unknown platform_role '{}' for user {} — denying platform authority",
-                        role, account.userId());
-            }
-        }
-        // Note: ROLE_USER is not added by default. Add only if explicitly needed.
-
-        return authorities;
+        return principalFactory.create(account, membershipQuery.findActiveByUserId(account.userId()));
     }
 }

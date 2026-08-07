@@ -12,8 +12,6 @@ import java.util.UUID;
 @Component
 class AuthenticationMembershipQueryAdapter implements AuthenticationMembershipQuery {
 
-    private static final List<String> AUTHENTICATION_ROLES = List.of("STUDENT", "SCHOOL_ADMIN");
-
     private final SchoolMembershipJpaRepository memberships;
 
     AuthenticationMembershipQueryAdapter(SchoolMembershipJpaRepository memberships) {
@@ -24,11 +22,7 @@ class AuthenticationMembershipQueryAdapter implements AuthenticationMembershipQu
     @Transactional(readOnly = true)
     public List<AuthenticationMembership> findActiveByUserId(UUID userId) {
         if (userId == null) throw new IllegalArgumentException("userId required");
-        return memberships.findAllByUserIdAndStatusAndRoleInSchoolInOrderByStartedAtAscIdAsc(
-                        userId,
-                        "ACTIVE",
-                        AUTHENTICATION_ROLES
-                ).stream()
+        return memberships.findAllByUserIdAndStatusOrderByStartedAtAscIdAsc(userId, "ACTIVE").stream()
                 .map(e -> new AuthenticationMembership(
                         e.getId(),
                         e.getSchoolId(),

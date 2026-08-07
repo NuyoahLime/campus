@@ -33,7 +33,8 @@ class AuthenticationQueryAdapter implements AuthenticationAccountQuery {
                         e.getUsername(),
                         e.getPasswordHash(),
                         e.getAccountStatus(),
-                        e.getPlatformRole()
+                        e.getPlatformRole(),
+                        e.getLockedUntil()
                 ));
     }
 }

@@ -239,8 +239,8 @@ class StudentRegistrationIT {
         mvc.perform(withCsrf(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"password\":\"SecurePassword123!\"}"), csrf))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("STUDENT_APPROVAL_PENDING"));
 
         mvc.perform(get("/api/v1/auth/me").cookie(csrf.cookies()))
                 .andExpect(status().isUnauthorized())
@@ -259,7 +259,10 @@ class StudentRegistrationIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"password\":\"AdminPass123!\"}"), csrf))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(superAdminId.toString()));
+                .andExpect(jsonPath("$.userId").value(superAdminId.toString()))
+                .andExpect(jsonPath("$.accountStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.authorities[0]").value("ROLE_SUPER_ADMIN"))
+                .andExpect(jsonPath("$.schoolMemberships").isEmpty());
 
         mvc.perform(post("/api/v1/auth/logout").cookie(csrf.cookies()))
                 .andExpect(status().isForbidden());

@@ -115,19 +115,23 @@ class SchoolMembershipPersistenceIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("TEACHER history can be read but is not returned for authentication")
-    void teacherHistoryCanBeReadButNotAuthenticated() {
+    @DisplayName("TEACHER history can be read and active TEACHER is left for principal filtering")
+    void teacherHistoryCanBeReadAndPrincipalFiltersAuthority() {
         insertMembership(UUID.randomUUID(), userId, schoolId, "TEACHER", "ENDED",
                 startedAt, startedAt.plusSeconds(1));
+        UUID activeTeacherSchool = UUID.randomUUID();
+        insertSchool(activeTeacherSchool, "legacy-teacher-school");
+        insertMembership(UUID.randomUUID(), userId, activeTeacherSchool, "TEACHER", "ACTIVE",
+                startedAt.plusSeconds(2), null);
         insertMembership(UUID.randomUUID(), userId, otherSchoolId, "SCHOOL_ADMIN", "ACTIVE",
                 startedAt.plusSeconds(2), null);
 
         var restored = users.findById(new UserId(userId)).orElseThrow();
         var memberships = authenticationMemberships.findActiveByUserId(userId);
 
-        assertThat(restored.memberships()).hasSize(2);
+        assertThat(restored.memberships()).hasSize(3);
         assertThat(restored.memberships()).anyMatch(m -> m.roleInSchool().equals("TEACHER"));
-        assertThat(memberships).extracting("roleInSchool").containsExactly("SCHOOL_ADMIN");
+        assertThat(memberships).extracting("roleInSchool").containsExactlyInAnyOrder("TEACHER", "SCHOOL_ADMIN");
     }
 
     @Test

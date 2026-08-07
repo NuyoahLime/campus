@@ -1,6 +1,7 @@
 package com.campusguinness.identity.application.query;
 
 import java.util.UUID;
+import java.time.Instant;
 
 /**
  * Read-only authentication account model.
@@ -14,5 +15,6 @@ public record AuthenticationAccount(
         String loginName,
         String passwordHash,
         String accountStatus,
-        String platformRole
+        String platformRole,
+        Instant lockedUntil
 ) {}
