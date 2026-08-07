@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+> **阶段 8 当前身份基线覆盖说明**:
+> 本文件中的早期认证授权计划、JWT 方案、`denyAll` 计划、临时 `actorId` 口径、`TEACHER` 或 `REGISTERED_USER` 相关描述，保留为历史证据。
+> 当前有效增量契约以 `docs/decision/current-identity-authorization-baseline-v1.3.md` 为准。
+> 当前基线: `master = 278c85599d2abd9d97a0ab1a3b5f49afd2f207ba`; 阶段 1-7 已完成; Migration = V001-V016; 正式角色 = `SUPER_ADMIN / STUDENT / SCHOOL_ADMIN`; 下一任务 = 阶段 8 授权契约冻结。
+
 ## 1. 项目说明
 
 本仓库是 **Campus Guinness** 后端项目。

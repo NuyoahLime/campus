@@ -1,5 +1,9 @@
 # 接口层规划
 
+> **阶段 8 当前身份基线覆盖说明**:
+> 本文件保留接口层历史规划；其中 `TEMPORARY_EXPLICIT_ACTOR_ID`、`AUTHENTICATED_USER` 粗粒度授权和旧角色分类，均已被当前身份授权基线部分取代。
+> 当前操作者必须来自 `SecurityContext`，端点授权矩阵以 `docs/decision/current-identity-authorization-baseline-v1.3.md` 为准。
+
 > **版本**: v1.0 | **日期**: 2026-07-16 | **状态**: PLANNING_COMPLETED
 
 ---
