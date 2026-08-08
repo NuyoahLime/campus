@@ -1,6 +1,7 @@
 package com.campusguinness.media.application.service;
 
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.media.application.command.RegisterMediaCommand;
 import com.campusguinness.media.application.port.MediaRepository;
 import com.campusguinness.media.internal.domain.*;
@@ -19,9 +20,10 @@ import static org.mockito.Mockito.*;
 class MediaApplicationServiceTest {
     @Mock MediaRepository repo;
     @Mock CurrentActor currentActor;
+    @Mock SchoolResourceAuthorization authorization;
     MediaApplicationService svc;
     UUID actorUserId;
-    @BeforeEach void setUp() { actorUserId=UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); svc = new MediaApplicationService(repo, currentActor); }
+    @BeforeEach void setUp() { actorUserId=UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); svc = new MediaApplicationService(repo, currentActor, authorization); }
 
     @Test void shouldRegister() {
         var r = svc.register(new RegisterMediaCommand(UUID.randomUUID(),UUID.randomUUID(),"k","f","IMAGE","JPG",100,null,null));
@@ -35,6 +37,7 @@ class MediaApplicationServiceTest {
     @Test void shouldApproveInternal() {
         var m = media(); m.submitForInternalReview(); when(repo.findById(any())).thenReturn(Optional.of(m));
         assertThat(svc.approveInternal(m.id().value()).internalStatus()).isEqualTo("INTERNAL_APPROVED");
+        verify(authorization).requireSchoolAdmin(m.schoolId());
         verify(repo).save(any());
     }
     @Test void shouldThrowWhenNotFound() {

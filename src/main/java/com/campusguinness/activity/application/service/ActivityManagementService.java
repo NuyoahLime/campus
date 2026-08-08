@@ -4,7 +4,7 @@ import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.application.result.ActivityResult;
 import com.campusguinness.activity.internal.domain.*;
-import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
@@ -13,15 +13,17 @@ import java.util.UUID;
 @Transactional
 public class ActivityManagementService {
     private final ActivityRepository repository;
-    private final CurrentActor currentActor;
+    private final SchoolResourceAuthorization authorization;
 
-    public ActivityManagementService(ActivityRepository r, CurrentActor currentActor) {
+    public ActivityManagementService(
+            ActivityRepository r,
+            SchoolResourceAuthorization authorization) {
         this.repository = r;
-        this.currentActor = currentActor;
+        this.authorization = authorization;
     }
 
     public ActivityResult create(CreateActivityCommand cmd) {
-        UUID actorUserId = currentActor.requireUserId();
+        UUID actorUserId = authorization.requireSchoolAdmin(cmd.schoolId());
         var act = Activity.create(new Activity.Builder()
                 .id(new ActivityId(UUID.randomUUID())).schoolId(cmd.schoolId())
                 .createdBy(actorUserId).title(cmd.title()).description(cmd.description())
@@ -31,7 +33,7 @@ public class ActivityManagementService {
     }
 
     public ActivityResult publish(UUID id) {
-        var act = find(id); act.publish(); repository.save(act);
+        var act = find(id); authorization.requireSchoolAdmin(act.schoolId()); act.publish(); repository.save(act);
         return new ActivityResult(id, act.executionStatus().name(), act.publicStatus().name());
     }
 
