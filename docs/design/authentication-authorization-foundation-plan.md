@@ -1,5 +1,9 @@
 # Authentication & Authorization Foundation Plan
 
+> **Phase 8 supersession note**:
+> This file is retained as historical authentication and authorization design evidence. Current identity, role mapping, registration, login-state and endpoint authorization contracts are frozen in `docs/decision/current-identity-authorization-baseline-v1.3.md`.
+> Historical `ROLE_TEACHER`, JWT, `TASK-AUTH-FOUNDATION-001`, `denyAll`, and temporary `actorId` plans must not be treated as the next implementation task unless restated by the v1.3 baseline.
+
 > **Stage 3 update (2026-08-06):** `SchoolMembership` is implemented as a `User`
 > aggregate child entity with stable id, `SchoolRole`, `MembershipStatus`,
 > `startedAt`, `endedAt`, and version reconstitution. Writes go through

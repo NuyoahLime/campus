@@ -1,5 +1,9 @@
 # Path A HTTP Exposure Plan — Score Appeal Correction Interface
 
+> **Phase 8 supersession note**:
+> This file is retained as historical exposure-planning evidence. Current identity, role mapping, registration, login-state and endpoint authorization contracts are frozen in `docs/decision/current-identity-authorization-baseline-v1.3.md`.
+> Historical `ROLE_TEACHER`, JWT, `denyAll`, and temporary `actorId` plans must not be treated as current next steps unless restated by the v1.3 baseline.
+
 **Task:** `TASK-SCORE-APPEAL-PATH-A-APPLICATION-EXPOSE-PLAN`
 **Mode:** `READ_ONLY_INTERFACE_SECURITY_AUDIT`
 **Date:** 2026-07-16
