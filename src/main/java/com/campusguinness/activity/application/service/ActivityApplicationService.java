@@ -4,6 +4,7 @@ import com.campusguinness.activity.application.command.SubmitActivityApplication
 import com.campusguinness.activity.application.port.ActivityApplicationRepository;
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.internal.domain.*;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +15,15 @@ import java.util.UUID;
 public class ActivityApplicationService {
     private final ActivityApplicationRepository repository;
     private final CurrentActor currentActor;
+    private final SchoolResourceAuthorization authorization;
 
-    public ActivityApplicationService(ActivityApplicationRepository r, CurrentActor currentActor) {
+    public ActivityApplicationService(
+            ActivityApplicationRepository r,
+            CurrentActor currentActor,
+            SchoolResourceAuthorization authorization) {
         this.repository = r;
         this.currentActor = currentActor;
+        this.authorization = authorization;
     }
 
     public ActivityApplicationResult submit(SubmitActivityApplicationCommand cmd) {
@@ -31,14 +37,12 @@ public class ActivityApplicationService {
     }
 
     public ActivityApplicationResult approve(UUID id, UUID activityId) {
-        UUID actorUserId = currentActor.requireUserId();
-        var app = find(id); app.approve(actorUserId, activityId); repository.save(app);
+        var app = find(id); UUID actorUserId = authorization.requireSchoolAdmin(app.schoolId()); app.approve(actorUserId, activityId); repository.save(app);
         return new ActivityApplicationResult(id, app.status().name(), activityId);
     }
 
     public ActivityApplicationResult reject(UUID id, String reason) {
-        UUID actorUserId = currentActor.requireUserId();
-        var app = find(id); app.reject(actorUserId, reason); repository.save(app);
+        var app = find(id); UUID actorUserId = authorization.requireSchoolAdmin(app.schoolId()); app.reject(actorUserId, reason); repository.save(app);
         return new ActivityApplicationResult(id, app.status().name(), null);
     }
 

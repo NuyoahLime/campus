@@ -3,7 +3,7 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.internal.domain.*;
-import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,29 +21,32 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ActivityManagementServiceTest {
     @Mock ActivityRepository repo;
-    @Mock CurrentActor currentActor;
+    @Mock SchoolResourceAuthorization authorization;
     ActivityManagementService svc;
     UUID actorUserId;
     @BeforeEach void setUp() {
         actorUserId = UUID.randomUUID();
-        lenient().when(currentActor.requireUserId()).thenReturn(actorUserId);
-        svc = new ActivityManagementService(repo, currentActor);
+        lenient().when(authorization.requireSchoolAdmin(any())).thenReturn(actorUserId);
+        svc = new ActivityManagementService(repo, authorization);
     }
 
     @Nested class Create {
         @Test void shouldCreate() {
-            var r = svc.create(new CreateActivityCommand(UUID.randomUUID(), "t", "d", null, null, null));
+            UUID schoolId = UUID.randomUUID();
+            var r = svc.create(new CreateActivityCommand(schoolId, "t", "d", null, null, null));
             assertThat(r.executionStatus()).isEqualTo("DRAFT");
             assertThat(r.publicStatus()).isEqualTo("NOT_SUBMITTED");
             var captor = forClass(Activity.class);
             verify(repo).save(captor.capture());
             assertThat(captor.getValue().createdBy()).isEqualTo(actorUserId);
+            verify(authorization).requireSchoolAdmin(schoolId);
         }
     }
     @Nested class Publish {
         @Test void shouldPublish() {
             var a = draft(); when(repo.findById(any())).thenReturn(Optional.of(a));
             assertThat(svc.publish(a.id().value()).executionStatus()).isEqualTo("PUBLISHED");
+            verify(authorization).requireSchoolAdmin(a.schoolId());
             verify(repo).save(any());
         }
     }

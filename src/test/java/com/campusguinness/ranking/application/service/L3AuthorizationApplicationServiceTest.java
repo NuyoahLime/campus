@@ -1,6 +1,7 @@
 package com.campusguinness.ranking.application.service;
 
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.ranking.application.port.L3AuthorizationRepository;
 import com.campusguinness.ranking.internal.domain.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,11 +19,14 @@ import static org.mockito.Mockito.*;
 class L3AuthorizationApplicationServiceTest {
     @Mock L3AuthorizationRepository repo;
     @Mock CurrentActor currentActor;
+    @Mock SchoolResourceAuthorization authorization;
     L3AuthorizationApplicationService svc;
     UUID actorUserId;
-    @BeforeEach void setUp() { actorUserId=UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); svc = new L3AuthorizationApplicationService(repo, currentActor); }
-    @Test void submit() { var r=svc.submit(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID()); assertThat(r.status()).isEqualTo("PENDING_REVIEW"); verify(repo).save(any()); }
+    @BeforeEach void setUp() { actorUserId=UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); lenient().when(authorization.requireSchoolAdmin(any())).thenReturn(actorUserId); svc = new L3AuthorizationApplicationService(repo, currentActor, authorization); }
+    @Test void submit() { UUID schoolId = UUID.randomUUID(); var r=svc.submit(schoolId,UUID.randomUUID(),UUID.randomUUID()); assertThat(r.status()).isEqualTo("PENDING_REVIEW"); verify(authorization).requireSchoolAdmin(schoolId); verify(repo).save(any()); }
     @Test void approve() { var a=submitted(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.approve(a.id().value(),"ok").status()).isEqualTo("APPROVED"); var captor=forClass(L3Authorization.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().reviewedBy()).isEqualTo(actorUserId); }
+    @Test void withdraw() { var a=draft(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.withdraw(a.id().value(),"duplicate").status()).isEqualTo("WITHDRAWN"); verify(authorization).requireSchoolAdmin(a.schoolId()); verify(repo).save(any()); }
     @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.approve(UUID.randomUUID(),"ok")).isInstanceOf(IllegalArgumentException.class); }
     private L3Authorization submitted() { var a=L3Authorization.create(new L3Authorization.Builder().id(new L3AuthorizationId(UUID.randomUUID())).schoolId(UUID.randomUUID()).projectId(UUID.randomUUID()).ruleVersionId(UUID.randomUUID())); a.submit(); return a; }
+    private L3Authorization draft() { return L3Authorization.create(new L3Authorization.Builder().id(new L3AuthorizationId(UUID.randomUUID())).schoolId(UUID.randomUUID()).projectId(UUID.randomUUID()).ruleVersionId(UUID.randomUUID())); }
 }

@@ -1,6 +1,7 @@
 package com.campusguinness.media.application.service;
 
 import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.media.application.command.RegisterMediaCommand;
 import com.campusguinness.media.application.port.MediaRepository;
 import com.campusguinness.media.application.result.MediaResult;
@@ -14,10 +15,13 @@ import java.util.UUID;
 public class MediaApplicationService {
     private final MediaRepository repository;
     private final CurrentActor currentActor;
+    private final SchoolResourceAuthorization authorization;
 
-    public MediaApplicationService(MediaRepository r, CurrentActor currentActor) {
+    public MediaApplicationService(MediaRepository r, CurrentActor currentActor,
+            SchoolResourceAuthorization authorization) {
         this.repository = r;
         this.currentActor = currentActor;
+        this.authorization = authorization;
     }
 
     public MediaResult register(RegisterMediaCommand cmd) {
@@ -37,7 +41,10 @@ public class MediaApplicationService {
     }
 
     public MediaResult approveInternal(UUID id) {
-        var m = find(id); m.approveInternal(); repository.save(m);
+        var m = find(id);
+        authorization.requireSchoolAdmin(m.schoolId());
+        m.approveInternal();
+        repository.save(m);
         return new MediaResult(id, m.internalStatus().name(), m.publicStatus().name());
     }
 

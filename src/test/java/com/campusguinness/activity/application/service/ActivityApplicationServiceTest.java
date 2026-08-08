@@ -4,6 +4,7 @@ import com.campusguinness.activity.application.command.SubmitActivityApplication
 import com.campusguinness.activity.application.port.ActivityApplicationRepository;
 import com.campusguinness.activity.application.result.ActivityApplicationResult;
 import com.campusguinness.activity.internal.domain.*;
+import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,12 +24,14 @@ import static org.mockito.Mockito.*;
 class ActivityApplicationServiceTest {
     @Mock ActivityApplicationRepository repo;
     @Mock CurrentActor currentActor;
+    @Mock SchoolResourceAuthorization authorization;
     ActivityApplicationService svc;
     UUID actorUserId;
     @BeforeEach void setUp() {
         actorUserId = UUID.randomUUID();
         lenient().when(currentActor.requireUserId()).thenReturn(actorUserId);
-        svc = new ActivityApplicationService(repo, currentActor);
+        lenient().when(authorization.requireSchoolAdmin(any())).thenReturn(actorUserId);
+        svc = new ActivityApplicationService(repo, currentActor, authorization);
     }
 
     @Nested class Submit {
@@ -49,15 +52,17 @@ class ActivityApplicationServiceTest {
             var captor = forClass(ActivityApplication.class);
             verify(repo).save(captor.capture());
             assertThat(captor.getValue().reviewedBy()).isEqualTo(actorUserId);
+            verify(authorization).requireSchoolAdmin(a.schoolId());
         }
     }
     @Nested class Reject {
         @Test void shouldReject() {
-            when(repo.findById(any())).thenReturn(Optional.of(submitted()));
+            var a = submitted(); when(repo.findById(any())).thenReturn(Optional.of(a));
             assertThat(svc.reject(UUID.randomUUID(), "reason").status()).isEqualTo("REJECTED");
             var captor = forClass(ActivityApplication.class);
             verify(repo).save(captor.capture());
             assertThat(captor.getValue().reviewedBy()).isEqualTo(actorUserId);
+            verify(authorization).requireSchoolAdmin(a.schoolId());
         }
     }
     @Nested class Withdraw {
