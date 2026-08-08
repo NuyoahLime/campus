@@ -19,7 +19,8 @@ The current codebase was re-audited from `origin/master` at `278c85599d2abd9d97a
 | REST controllers | 19 | Excludes `GlobalExceptionHandler` because it is `@RestControllerAdvice` |
 | Business controllers with `@PreAuthorize` | 2 | `UserController`, `SchoolAdminInvitationController` |
 | Matrix rows | 58 | 54 controller mappings plus logout, OPTIONS, actuator health and actuator info |
-| Request DTOs with the named client identity fields | 13 | Uses the requested field set: `actorId`, `reviewerId`, `createdBy`, `studentId`, `submitterId`, `applicantId`, `uploaderId` |
+| Declared DTOs with the named client identity fields | 13 | Uses the requested field set: `actorId`, `reviewerId`, `createdBy`, `studentId`, `submitterId`, `applicantId`, `uploaderId`; 12 are HTTP `@RequestBody` DTOs and 1 is an unused legacy declaration |
+| Active HTTP `@RequestBody` DTOs with the named fields | 12 | `ActivateSchoolRequest` is not bound to a controller request body and remains the single `UNUSED` legacy DTO |
 
 `SecurityConfig` currently permits actuator health/info, `OPTIONS /**`, CSRF token fetch, login, student registration, and school-admin activation. It gates `/api/v1/users/**` with `ROLE_SUPER_ADMIN`, requires authentication for the remaining `/api/**`, and denies everything else.
 
@@ -241,7 +242,7 @@ This phase records the contract only. It does not modify `SecurityConfig` or `Sc
 
 ## Client Identity Field Ledger
 
-The following table records the 13 Request DTOs that contain one of the explicitly requested client identity fields: `actorId`, `reviewerId`, `createdBy`, `studentId`, `submitterId`, `applicantId`, `uploaderId`.
+The following table records the 13 declared DTOs that contain one of the explicitly requested client identity fields: `actorId`, `reviewerId`, `createdBy`, `studentId`, `submitterId`, `applicantId`, `uploaderId`. Twelve are active HTTP `@RequestBody` DTOs; `ActivateSchoolRequest` is an unused legacy declaration and is not currently bound to an endpoint.
 
 | # | Request DTO | Field | Classification | Required follow-up |
 | ---: | --- | --- | --- | --- |
