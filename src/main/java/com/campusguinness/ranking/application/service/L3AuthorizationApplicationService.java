@@ -1,5 +1,6 @@
 package com.campusguinness.ranking.application.service;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.ranking.application.port.L3AuthorizationRepository;
 import com.campusguinness.ranking.application.result.L3AuthorizationResult;
 import com.campusguinness.ranking.internal.domain.*;
@@ -11,7 +12,12 @@ import java.util.UUID;
 @Transactional
 public class L3AuthorizationApplicationService {
     private final L3AuthorizationRepository repo;
-    public L3AuthorizationApplicationService(L3AuthorizationRepository r) { this.repo = r; }
+    private final CurrentActor currentActor;
+
+    public L3AuthorizationApplicationService(L3AuthorizationRepository r, CurrentActor currentActor) {
+        this.repo = r;
+        this.currentActor = currentActor;
+    }
 
     public L3AuthorizationResult submit(UUID schoolId, UUID projectId, UUID ruleVersionId) {
         var a = L3Authorization.create(new L3Authorization.Builder()
@@ -20,8 +26,9 @@ public class L3AuthorizationApplicationService {
         a.submit(); repo.save(a);
         return new L3AuthorizationResult(a.id().value(), a.status().name());
     }
-    public L3AuthorizationResult approve(UUID id, UUID reviewerId, String comment) {
-        var a = find(id); a.approve(reviewerId, comment); repo.save(a);
+    public L3AuthorizationResult approve(UUID id, String comment) {
+        UUID actorUserId = currentActor.requireUserId();
+        var a = find(id); a.approve(actorUserId, comment); repo.save(a);
         return new L3AuthorizationResult(id, a.status().name());
     }
     public L3AuthorizationResult withdraw(UUID id, String reason) {

@@ -9,5 +9,4 @@ public record CreateRankingDefinitionRequest(
         @NotBlank String layer,
         @NotBlank @Size(max = 200) String name,
         UUID schoolId,
-        @NotNull UUID projectId,
-        @NotNull UUID createdBy) {}
+        @NotNull UUID projectId) {}

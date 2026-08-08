@@ -22,7 +22,7 @@ public class FeedbackController {
 
     @PostMapping
     public ResponseEntity<FeedbackResponse> submit(@Valid @RequestBody SubmitFeedbackRequest req) {
-        FeedbackResult r = service.submit(req.schoolId(), req.submitterId(), req.feedbackType(), req.content());
+        FeedbackResult r = service.submit(req.schoolId(), req.feedbackType(), req.content());
         return ResponseEntity.created(URI.create("/api/v1/feedbacks/" + r.id()))
                 .body(new FeedbackResponse(r.id(), r.status()));
     }

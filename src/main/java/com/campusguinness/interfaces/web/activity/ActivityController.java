@@ -39,7 +39,7 @@ public class ActivityController {
 
     @PostMapping
     public ResponseEntity<ActivityResponse> create(@Valid @RequestBody CreateActivityRequest req) {
-        var cmd = new CreateActivityCommand(req.schoolId(), req.createdBy(), req.title(),
+        var cmd = new CreateActivityCommand(req.schoolId(), req.title(),
                 req.description(), req.startTime(), req.endTime(), req.location());
         ActivityResult r = service.create(cmd);
         return ResponseEntity.created(URI.create("/api/v1/activities/" + r.id()))

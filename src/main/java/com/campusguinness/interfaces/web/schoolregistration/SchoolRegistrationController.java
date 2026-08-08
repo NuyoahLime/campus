@@ -34,13 +34,13 @@ public class SchoolRegistrationController {
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<SchoolRegistrationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveSchoolRegistrationRequest req) {
-        SchoolRegistrationResult r = service.approve(id, req.reviewerId(), req.comment(), req.schoolId());
+        SchoolRegistrationResult r = service.approve(id, req.comment(), req.schoolId());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 
     @PostMapping("/{id}/reject")
     public ResponseEntity<SchoolRegistrationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectSchoolRegistrationRequest req) {
-        SchoolRegistrationResult r = service.reject(id, req.reviewerId(), req.reason());
+        SchoolRegistrationResult r = service.reject(id, req.reason());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 

@@ -8,7 +8,6 @@ import java.util.UUID;
 public record RegisterMediaRequest(
         @NotNull UUID schoolId,
         @NotNull UUID activityId,
-        @NotNull UUID uploaderId,
         @NotBlank String fileKey,
         @NotBlank String fileName,
         @NotBlank String fileType,

@@ -3,6 +3,7 @@ package com.campusguinness.infrastructure.security;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -41,6 +42,17 @@ class SecurityContextCurrentActorTest {
         var anon = new AnonymousAuthenticationToken("key", "anonymous",
                 List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
         SecurityContextHolder.getContext().setAuthentication(anon);
+
+        assertThatThrownBy(currentActor::requireUserId)
+                .isInstanceOf(org.springframework.security.core.AuthenticationException.class);
+    }
+
+    @Test void throwsWhenAuthenticationIsNotAuthenticated() {
+        UUID userId = UUID.randomUUID();
+        var principal = new CampusGuinnessUserDetails(userId, "u", "h", "NORMAL", Set.of(), List.of());
+        var auth = new TestingAuthenticationToken(principal, null);
+        auth.setAuthenticated(false);
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
         assertThatThrownBy(currentActor::requireUserId)
                 .isInstanceOf(org.springframework.security.core.AuthenticationException.class);

@@ -32,9 +32,9 @@ class L3AuthorizationControllerTest {
     }
     @Test void approveReturns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.approve(eq(id), any(), any())).thenReturn(new L3AuthorizationResult(id, "APPROVED"));
+        when(service.approve(eq(id), any())).thenReturn(new L3AuthorizationResult(id, "APPROVED"));
         mvc.perform(post("/api/v1/l3-authorizations/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest(UUID.randomUUID(), "ok"))))
+                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest("ok"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
     }
     @Test void withdrawReturns200() throws Exception {
@@ -45,9 +45,9 @@ class L3AuthorizationControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
     }
     @Test void notFound() throws Exception {
-        when(service.approve(any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
+        when(service.approve(any(), any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/l3-authorizations/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest(UUID.randomUUID(), "ok"))))
+                .content(mapper.writeValueAsString(new ApproveL3AuthorizationRequest("ok"))))
                 .andExpect(status().isNotFound());
     }
 }

@@ -22,7 +22,7 @@ public class ScoreAppealController {
 
     @PostMapping
     public ResponseEntity<ScoreAppealResponse> submit(@Valid @RequestBody SubmitScoreAppealRequest req) {
-        ScoreAppealResult r = service.submit(req.schoolId(), req.scoreAttemptId(), req.studentId(), req.appealType(), req.appealReason());
+        ScoreAppealResult r = service.submit(req.schoolId(), req.scoreAttemptId(), req.appealType(), req.appealReason());
         return ResponseEntity.created(URI.create("/api/v1/score-appeals/" + r.id()))
                 .body(new ScoreAppealResponse(r.id(), r.status()));
     }

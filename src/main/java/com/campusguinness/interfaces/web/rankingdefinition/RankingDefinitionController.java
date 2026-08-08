@@ -19,7 +19,7 @@ public class RankingDefinitionController {
 
     @PostMapping
     public ResponseEntity<RankingDefinitionResponse> create(@Valid @RequestBody CreateRankingDefinitionRequest req) {
-        var r = service.create(RankingLayer.valueOf(req.layer()), req.name(), req.schoolId(), req.projectId(), req.createdBy());
+        var r = service.create(RankingLayer.valueOf(req.layer()), req.name(), req.schoolId(), req.projectId());
         return ResponseEntity.created(URI.create("/api/v1/ranking-definitions/" + r.id()))
                 .body(new RankingDefinitionResponse(r.id(), r.enabled()));
     }

@@ -2,6 +2,7 @@ package com.campusguinness.appeal.application.service;
 
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,19 +12,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ScoreAppealApplicationServiceTest {
     @Mock ScoreAppealRepository repo;
+    @Mock CurrentActor currentActor;
     ScoreAppealApplicationService svc;
+    UUID actorUserId;
 
-    @BeforeEach void setUp() { svc = new ScoreAppealApplicationService(repo); }
+    @BeforeEach void setUp() { actorUserId=UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); svc = new ScoreAppealApplicationService(repo, currentActor); }
 
     private ScoreAppeal appeal() { return ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID())).schoolId(UUID.randomUUID()).scoreAttemptId(UUID.randomUUID()).studentId(UUID.randomUUID()).appealType("SCORE").appealReason("r")); }
 
     @Nested class Submit {
-        @Test void success() { assertThat(svc.submit(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SCORE","r").status()).isEqualTo("SUBMITTED"); verify(repo).save(any()); }
+        @Test void success() { assertThat(svc.submit(UUID.randomUUID(),UUID.randomUUID(),"SCORE","r").status()).isEqualTo("SUBMITTED"); var captor=forClass(ScoreAppeal.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().studentId()).isEqualTo(actorUserId); }
     }
     @Nested class BeginProcessing {
         @Test void success() { var a=appeal(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.beginProcessing(a.id().value(),UUID.randomUUID()).status()).isEqualTo("PROCESSING"); verify(repo).save(any()); }

@@ -25,7 +25,7 @@ public class L3AuthorizationController {
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<L3AuthorizationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveL3AuthorizationRequest req) {
-        var r = service.approve(id, req.reviewerId(), req.comment());
+        var r = service.approve(id, req.comment());
         return ResponseEntity.ok(new L3AuthorizationResponse(r.id(), r.status()));
     }
 

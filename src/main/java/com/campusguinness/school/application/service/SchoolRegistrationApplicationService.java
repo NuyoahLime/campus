@@ -1,5 +1,6 @@
 package com.campusguinness.school.application.service;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.port.SchoolRegistrationRepository;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
@@ -13,9 +14,11 @@ import java.util.UUID;
 public class SchoolRegistrationApplicationService {
 
     private final SchoolRegistrationRepository repository;
+    private final CurrentActor currentActor;
 
-    public SchoolRegistrationApplicationService(SchoolRegistrationRepository repository) {
+    public SchoolRegistrationApplicationService(SchoolRegistrationRepository repository, CurrentActor currentActor) {
         this.repository = repository;
+        this.currentActor = currentActor;
     }
 
     public SchoolRegistrationResult submit(SubmitSchoolRegistrationCommand cmd) {
@@ -25,16 +28,18 @@ public class SchoolRegistrationApplicationService {
         return new SchoolRegistrationResult(reg.id().value(), cmd.schoolName(), reg.status().name(), null);
     }
 
-    public SchoolRegistrationResult approve(UUID registrationId, UUID reviewerId, String comment, UUID schoolId) {
+    public SchoolRegistrationResult approve(UUID registrationId, String comment, UUID schoolId) {
+        UUID actorUserId = currentActor.requireUserId();
         var reg = find(registrationId);
-        reg.approve(reviewerId, comment, schoolId);
+        reg.approve(actorUserId, comment, schoolId);
         repository.save(reg);
         return new SchoolRegistrationResult(reg.id().value(), reg.schoolName(), reg.status().name(), schoolId);
     }
 
-    public SchoolRegistrationResult reject(UUID registrationId, UUID reviewerId, String reason) {
+    public SchoolRegistrationResult reject(UUID registrationId, String reason) {
+        UUID actorUserId = currentActor.requireUserId();
         var reg = find(registrationId);
-        reg.reject(reviewerId, reason);
+        reg.reject(actorUserId, reason);
         repository.save(reg);
         return new SchoolRegistrationResult(reg.id().value(), reg.schoolName(), reg.status().name(), null);
     }
