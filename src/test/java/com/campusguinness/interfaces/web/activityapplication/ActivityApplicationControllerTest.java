@@ -29,24 +29,24 @@ class ActivityApplicationControllerTest {
             UUID id = UUID.randomUUID();
             when(service.submit(any())).thenReturn(new ActivityApplicationResult(id, "SUBMITTED", null));
             mvc.perform(post("/api/v1/activity-applications").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new SubmitActivityApplicationRequest(UUID.randomUUID(), UUID.randomUUID(), "t", "d"))))
+                    .content(mapper.writeValueAsString(new SubmitActivityApplicationRequest(UUID.randomUUID(), "t", "d"))))
                     .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED"));
         }
     }
     @Nested class Approve {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID(), aid = UUID.randomUUID();
-            when(service.approve(any(), any(), any())).thenReturn(new ActivityApplicationResult(id, "APPROVED", aid));
+            when(service.approve(any(), any())).thenReturn(new ActivityApplicationResult(id, "APPROVED", aid));
             mvc.perform(post("/api/v1/activity-applications/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(UUID.randomUUID(), aid))))
+                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(aid))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.createdActivityId").value(aid.toString()));
         }
     }
     @Nested class Errors {
         @Test void notFound() throws Exception {
-            when(service.approve(any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
+            when(service.approve(any(), any())).thenThrow(new IllegalArgumentException("not found"));
             mvc.perform(post("/api/v1/activity-applications/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(UUID.randomUUID(), UUID.randomUUID()))))
+                    .content(mapper.writeValueAsString(new ApproveActivityApplicationRequest(UUID.randomUUID()))))
                     .andExpect(status().isNotFound());
         }
     }

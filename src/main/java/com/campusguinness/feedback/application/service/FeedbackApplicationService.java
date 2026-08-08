@@ -3,6 +3,7 @@ package com.campusguinness.feedback.application.service;
 import com.campusguinness.feedback.application.port.FeedbackRepository;
 import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
@@ -11,11 +12,17 @@ import java.util.UUID;
 @Transactional
 public class FeedbackApplicationService {
     private final FeedbackRepository repo;
-    public FeedbackApplicationService(FeedbackRepository r) { this.repo = r; }
+    private final CurrentActor currentActor;
 
-    public FeedbackResult submit(UUID schoolId, UUID submitterId, String feedbackType, String content) {
+    public FeedbackApplicationService(FeedbackRepository r, CurrentActor currentActor) {
+        this.repo = r;
+        this.currentActor = currentActor;
+    }
+
+    public FeedbackResult submit(UUID schoolId, String feedbackType, String content) {
+        UUID actorUserId = currentActor.requireUserId();
         var f = Feedback.create(new Feedback.Builder().id(new FeedbackId(UUID.randomUUID()))
-                .schoolId(schoolId).submitterId(submitterId).feedbackType(feedbackType).content(content));
+                .schoolId(schoolId).submitterId(actorUserId).feedbackType(feedbackType).content(content));
         repo.save(f);
         return new FeedbackResult(f.id().value(), f.status().name());
     }

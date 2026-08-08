@@ -1,5 +1,6 @@
 package com.campusguinness.media.application.service;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.media.application.command.RegisterMediaCommand;
 import com.campusguinness.media.application.port.MediaRepository;
 import com.campusguinness.media.internal.domain.*;
@@ -11,17 +12,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MediaApplicationServiceTest {
     @Mock MediaRepository repo;
+    @Mock CurrentActor currentActor;
     MediaApplicationService svc;
-    @BeforeEach void setUp() { svc = new MediaApplicationService(repo); }
+    UUID actorUserId;
+    @BeforeEach void setUp() { actorUserId=UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); svc = new MediaApplicationService(repo, currentActor); }
 
     @Test void shouldRegister() {
-        var r = svc.register(new RegisterMediaCommand(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"k","f","IMAGE","JPG",100,null,null));
-        assertThat(r.internalStatus()).isEqualTo("DRAFT"); verify(repo).save(any());
+        var r = svc.register(new RegisterMediaCommand(UUID.randomUUID(),UUID.randomUUID(),"k","f","IMAGE","JPG",100,null,null));
+        assertThat(r.internalStatus()).isEqualTo("DRAFT"); var captor=forClass(Media.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().uploaderId()).isEqualTo(actorUserId);
     }
     @Test void shouldSubmitForInternalReview() {
         var m = media(); when(repo.findById(any())).thenReturn(Optional.of(m));

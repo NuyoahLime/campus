@@ -23,7 +23,7 @@ public class ActivityApplicationController {
 
     @PostMapping
     public ResponseEntity<ActivityApplicationResponse> submit(@Valid @RequestBody SubmitActivityApplicationRequest req) {
-        var cmd = new SubmitActivityApplicationCommand(req.schoolId(), req.applicantId(), req.title(), req.description());
+        var cmd = new SubmitActivityApplicationCommand(req.schoolId(), req.title(), req.description());
         ActivityApplicationResult r = service.submit(cmd);
         return ResponseEntity.created(URI.create("/api/v1/activity-applications/" + r.id()))
                 .body(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
@@ -31,13 +31,13 @@ public class ActivityApplicationController {
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<ActivityApplicationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveActivityApplicationRequest req) {
-        ActivityApplicationResult r = service.approve(id, req.reviewerId(), req.activityId());
+        ActivityApplicationResult r = service.approve(id, req.activityId());
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 
     @PostMapping("/{id}/reject")
     public ResponseEntity<ActivityApplicationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectActivityApplicationRequest req) {
-        ActivityApplicationResult r = service.reject(id, req.reviewerId(), req.reason());
+        ActivityApplicationResult r = service.reject(id, req.reason());
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 

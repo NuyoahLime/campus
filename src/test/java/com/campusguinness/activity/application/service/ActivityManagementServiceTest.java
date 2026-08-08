@@ -3,6 +3,7 @@ package com.campusguinness.activity.application.service;
 import com.campusguinness.activity.application.command.CreateActivityCommand;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -14,20 +15,29 @@ import java.util.Optional;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ActivityManagementServiceTest {
     @Mock ActivityRepository repo;
+    @Mock CurrentActor currentActor;
     ActivityManagementService svc;
-    @BeforeEach void setUp() { svc = new ActivityManagementService(repo); }
+    UUID actorUserId;
+    @BeforeEach void setUp() {
+        actorUserId = UUID.randomUUID();
+        lenient().when(currentActor.requireUserId()).thenReturn(actorUserId);
+        svc = new ActivityManagementService(repo, currentActor);
+    }
 
     @Nested class Create {
         @Test void shouldCreate() {
-            var r = svc.create(new CreateActivityCommand(UUID.randomUUID(), UUID.randomUUID(), "t", "d", null, null, null));
+            var r = svc.create(new CreateActivityCommand(UUID.randomUUID(), "t", "d", null, null, null));
             assertThat(r.executionStatus()).isEqualTo("DRAFT");
             assertThat(r.publicStatus()).isEqualTo("NOT_SUBMITTED");
-            verify(repo).save(any());
+            var captor = forClass(Activity.class);
+            verify(repo).save(captor.capture());
+            assertThat(captor.getValue().createdBy()).isEqualTo(actorUserId);
         }
     }
     @Nested class Publish {

@@ -29,7 +29,7 @@ class MediaControllerTest {
             UUID id = UUID.randomUUID();
             when(service.register(any())).thenReturn(new MediaResult(id, "DRAFT", "NOT_SUBMITTED"));
             mvc.perform(post("/api/v1/media").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new RegisterMediaRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"key","f.jpg","IMAGE","JPG",100,null,null))))
+                    .content(mapper.writeValueAsString(new RegisterMediaRequest(UUID.randomUUID(),UUID.randomUUID(),"key","f.jpg","IMAGE","JPG",100,null,null))))
                     .andExpect(status().isCreated()).andExpect(jsonPath("$.internalStatus").value("DRAFT"));
         }
     }

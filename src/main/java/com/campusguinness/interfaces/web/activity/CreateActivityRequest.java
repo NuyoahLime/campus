@@ -8,7 +8,6 @@ import java.util.UUID;
 
 public record CreateActivityRequest(
         @NotNull UUID schoolId,
-        @NotNull UUID createdBy,
         @NotBlank @Size(max = 200) String title,
         String description,
         Instant startTime,

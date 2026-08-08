@@ -23,7 +23,7 @@ public class MediaController {
 
     @PostMapping
     public ResponseEntity<MediaResponse> register(@Valid @RequestBody RegisterMediaRequest req) {
-        var cmd = new RegisterMediaCommand(req.schoolId(), req.activityId(), req.uploaderId(),
+        var cmd = new RegisterMediaCommand(req.schoolId(), req.activityId(),
                 req.fileKey(), req.fileName(), req.fileType(), req.fileFormat(),
                 req.fileSizeBytes(), req.checksum(), req.description());
         MediaResult r = service.register(cmd);

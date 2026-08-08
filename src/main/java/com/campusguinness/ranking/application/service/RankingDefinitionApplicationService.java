@@ -1,5 +1,6 @@
 package com.campusguinness.ranking.application.service;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.ranking.application.port.RankingDefinitionRepository;
 import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.internal.domain.*;
@@ -11,12 +12,18 @@ import java.util.UUID;
 @Transactional
 public class RankingDefinitionApplicationService {
     private final RankingDefinitionRepository repo;
-    public RankingDefinitionApplicationService(RankingDefinitionRepository r) { this.repo = r; }
+    private final CurrentActor currentActor;
 
-    public RankingDefinitionResult create(RankingLayer layer, String name, UUID schoolId, UUID projectId, UUID createdBy) {
+    public RankingDefinitionApplicationService(RankingDefinitionRepository r, CurrentActor currentActor) {
+        this.repo = r;
+        this.currentActor = currentActor;
+    }
+
+    public RankingDefinitionResult create(RankingLayer layer, String name, UUID schoolId, UUID projectId) {
+        UUID actorUserId = currentActor.requireUserId();
         var r = RankingDefinition.create(new RankingDefinition.Builder()
                 .id(new RankingDefinitionId(UUID.randomUUID())).layer(layer).name(name)
-                .schoolId(schoolId).projectId(projectId).createdBy(createdBy));
+                .schoolId(schoolId).projectId(projectId).createdBy(actorUserId));
         repo.save(r);
         return new RankingDefinitionResult(r.id().value(), r.isEnabled());
     }

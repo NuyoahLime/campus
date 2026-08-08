@@ -26,9 +26,9 @@ class FeedbackControllerTest {
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
+        when(service.submit(any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),UUID.randomUUID(),"GENERAL","test content"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test content"))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
     @Test void beginProcessingReturns200() throws Exception {
@@ -66,9 +66,9 @@ class FeedbackControllerTest {
     }
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
+        when(service.submit(any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),UUID.randomUUID(),"GENERAL","test"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test"))))
                 .andExpect(jsonPath("$.submitterId").doesNotExist()).andExpect(jsonPath("$.content").doesNotExist());
     }
 }

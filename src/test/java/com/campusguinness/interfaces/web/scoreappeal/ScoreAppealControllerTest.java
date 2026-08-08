@@ -27,9 +27,9 @@ class ScoreAppealControllerTest {
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
+        when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/score-appeals").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
+                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED")).andExpect(jsonPath("$.id").exists());
     }
     @Test void beginProcessingReturns200() throws Exception {
@@ -68,9 +68,9 @@ class ScoreAppealControllerTest {
     }
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
+        when(service.submit(any(), any(), anyString(), anyString())).thenReturn(new ScoreAppealResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/score-appeals").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
+                .content(mapper.writeValueAsString(new SubmitScoreAppealRequest(UUID.randomUUID(),UUID.randomUUID(),"SCORE","reason"))))
                 .andExpect(jsonPath("$.handlerId").doesNotExist()).andExpect(jsonPath("$.studentId").doesNotExist());
     }
 }

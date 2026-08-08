@@ -1,5 +1,6 @@
 package com.campusguinness.school.application.service;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.port.SchoolRegistrationRepository;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -22,9 +24,15 @@ import static org.mockito.Mockito.*;
 class SchoolRegistrationApplicationServiceTest {
 
     @Mock private SchoolRegistrationRepository repository;
+    @Mock private CurrentActor currentActor;
     private SchoolRegistrationApplicationService service;
+    private UUID actorUserId;
 
-    @BeforeEach void setUp() { service = new SchoolRegistrationApplicationService(repository); }
+    @BeforeEach void setUp() {
+        actorUserId = UUID.randomUUID();
+        lenient().when(currentActor.requireUserId()).thenReturn(actorUserId);
+        service = new SchoolRegistrationApplicationService(repository, currentActor);
+    }
 
     private SubmitSchoolRegistrationCommand validCmd() {
         return new SubmitSchoolRegistrationCommand("测试学校","USCC","1234567890","PRIMARY",
@@ -45,13 +53,15 @@ class SchoolRegistrationApplicationServiceTest {
     class Approve {
         @Test @DisplayName("approves and sets createdSchoolId")
         void shouldApprove() {
-            UUID id = UUID.randomUUID(), reviewerId = UUID.randomUUID(), schoolId = UUID.randomUUID();
+            UUID id = UUID.randomUUID(), schoolId = UUID.randomUUID();
             var reg = submittedReg(id);
             when(repository.findById(any())).thenReturn(Optional.of(reg));
-            var r = service.approve(id, reviewerId, "ok", schoolId);
+            var r = service.approve(id, "ok", schoolId);
             assertThat(r.status()).isEqualTo("APPROVED");
             assertThat(r.createdSchoolId()).isEqualTo(schoolId);
-            verify(repository).save(any(SchoolRegistration.class));
+            var captor = forClass(SchoolRegistration.class);
+            verify(repository).save(captor.capture());
+            assertThat(captor.getValue().reviewedBy()).isEqualTo(actorUserId);
         }
     }
 
@@ -61,9 +71,11 @@ class SchoolRegistrationApplicationServiceTest {
         void shouldReject() {
             UUID id = UUID.randomUUID();
             when(repository.findById(any())).thenReturn(Optional.of(submittedReg(id)));
-            var r = service.reject(id, UUID.randomUUID(), "incomplete");
+            var r = service.reject(id, "incomplete");
             assertThat(r.status()).isEqualTo("REJECTED");
-            verify(repository).save(any(SchoolRegistration.class));
+            var captor = forClass(SchoolRegistration.class);
+            verify(repository).save(captor.capture());
+            assertThat(captor.getValue().reviewedBy()).isEqualTo(actorUserId);
         }
     }
 
@@ -84,7 +96,7 @@ class SchoolRegistrationApplicationServiceTest {
         @Test @DisplayName("throws when not found")
         void shouldThrowWhenNotFound() {
             when(repository.findById(any())).thenReturn(Optional.empty());
-            assertThatThrownBy(() -> service.approve(UUID.randomUUID(), UUID.randomUUID(), "ok", UUID.randomUUID()))
+            assertThatThrownBy(() -> service.approve(UUID.randomUUID(), "ok", UUID.randomUUID()))
                     .isInstanceOf(IllegalArgumentException.class);
             verify(repository, never()).save(any());
         }

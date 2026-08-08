@@ -1,5 +1,6 @@
 package com.campusguinness.media.application.service;
 
+import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.media.application.command.RegisterMediaCommand;
 import com.campusguinness.media.application.port.MediaRepository;
 import com.campusguinness.media.application.result.MediaResult;
@@ -12,11 +13,17 @@ import java.util.UUID;
 @Transactional
 public class MediaApplicationService {
     private final MediaRepository repository;
-    public MediaApplicationService(MediaRepository r) { this.repository = r; }
+    private final CurrentActor currentActor;
+
+    public MediaApplicationService(MediaRepository r, CurrentActor currentActor) {
+        this.repository = r;
+        this.currentActor = currentActor;
+    }
 
     public MediaResult register(RegisterMediaCommand cmd) {
+        UUID actorUserId = currentActor.requireUserId();
         var m = Media.create(new Media.Builder().id(new MediaId(UUID.randomUUID()))
-                .schoolId(cmd.schoolId()).activityId(cmd.activityId()).uploaderId(cmd.uploaderId())
+                .schoolId(cmd.schoolId()).activityId(cmd.activityId()).uploaderId(actorUserId)
                 .fileKey(cmd.fileKey()).fileName(cmd.fileName()).fileType(cmd.fileType())
                 .fileFormat(cmd.fileFormat()).fileSizeBytes(cmd.fileSizeBytes())
                 .checksum(cmd.checksum()).description(cmd.description()));

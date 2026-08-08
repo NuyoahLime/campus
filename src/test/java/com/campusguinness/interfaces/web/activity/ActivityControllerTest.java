@@ -32,7 +32,7 @@ class ActivityControllerTest {
             UUID id = UUID.randomUUID();
             when(service.create(any())).thenReturn(new ActivityResult(id, "DRAFT", "NOT_SUBMITTED"));
             mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new CreateActivityRequest(UUID.randomUUID(), UUID.randomUUID(), "t", "d", null, null, null))))
+                    .content(mapper.writeValueAsString(new CreateActivityRequest(UUID.randomUUID(), "t", "d", null, null, null))))
                     .andExpect(status().isCreated()).andExpect(jsonPath("$.executionStatus").value("DRAFT"));
         }
     }

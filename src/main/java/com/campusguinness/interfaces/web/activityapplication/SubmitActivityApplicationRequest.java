@@ -7,6 +7,5 @@ import java.util.UUID;
 
 public record SubmitActivityApplicationRequest(
         @NotNull UUID schoolId,
-        @NotNull UUID applicantId,
         @NotBlank @Size(max = 200) String title,
         String description) {}

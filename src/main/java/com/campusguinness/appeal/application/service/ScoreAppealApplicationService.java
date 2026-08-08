@@ -3,6 +3,7 @@ package com.campusguinness.appeal.application.service;
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.internal.domain.*;
+import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
@@ -11,11 +12,17 @@ import java.util.UUID;
 @Transactional
 public class ScoreAppealApplicationService {
     private final ScoreAppealRepository repo;
-    public ScoreAppealApplicationService(ScoreAppealRepository r) { this.repo = r; }
+    private final CurrentActor currentActor;
 
-    public ScoreAppealResult submit(UUID schoolId, UUID scoreAttemptId, UUID studentId, String appealType, String appealReason) {
+    public ScoreAppealApplicationService(ScoreAppealRepository r, CurrentActor currentActor) {
+        this.repo = r;
+        this.currentActor = currentActor;
+    }
+
+    public ScoreAppealResult submit(UUID schoolId, UUID scoreAttemptId, String appealType, String appealReason) {
+        UUID actorUserId = currentActor.requireUserId();
         var a = ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID()))
-                .schoolId(schoolId).scoreAttemptId(scoreAttemptId).studentId(studentId)
+                .schoolId(schoolId).scoreAttemptId(scoreAttemptId).studentId(actorUserId)
                 .appealType(appealType).appealReason(appealReason));
         repo.save(a);
         return result(a);
