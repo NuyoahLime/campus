@@ -95,10 +95,6 @@ class AuthorizationEndpointMatrixIT {
 
     private void assertAnonymous(Row row) throws Exception {
         int status = mvc.perform(builder(row)).andReturn().getResponse().getStatus();
-        if (row.number() == 6) {
-            assertThat(status).as(row + " anonymous").isEqualTo(204);
-            return;
-        }
         if (row.allowed().allowsAnonymous()) {
             assertThat(status).as(row + " anonymous").isNotIn(401, 403);
         } else {
@@ -213,7 +209,7 @@ class AuthorizationEndpointMatrixIT {
                 row(25, "POST", "/api/v1/school-registrations", Allowed.PUBLIC, body),
                 row(26, "POST", "/api/v1/school-registrations/" + id + "/approve", Allowed.SUPER_ADMIN, schoolRegistrationApprove),
                 row(27, "POST", "/api/v1/school-registrations/" + id + "/reject", Allowed.SUPER_ADMIN, reason),
-                row(28, "POST", "/api/v1/school-registrations/" + id + "/withdraw", Allowed.NONE),
+                row(28, "POST", "/api/v1/school-registrations/" + id + "/withdraw", Allowed.DEFERRED_DENY),
                 row(29, "GET", "/api/v1/challenge-projects", Allowed.PUBLIC),
                 row(30, "POST", "/api/v1/challenge-projects", Allowed.SUPER_ADMIN, challengeCreate),
                 row(31, "GET", "/api/v1/challenge-projects/" + id, Allowed.PUBLIC),
@@ -221,12 +217,12 @@ class AuthorizationEndpointMatrixIT {
                 row(33, "GET", "/api/v1/activities", Allowed.PUBLIC),
                 row(34, "POST", "/api/v1/activities", Allowed.SCHOOL_ADMIN, activityCreate),
                 row(35, "POST", "/api/v1/activities/" + id + "/publish", Allowed.SCHOOL_ADMIN),
-                row(36, "POST", "/api/v1/activity-applications", Allowed.NONE, activityCreate),
+                row(36, "POST", "/api/v1/activity-applications", Allowed.DEFERRED_DENY, activityCreate),
                 row(37, "POST", "/api/v1/activity-applications/" + id + "/approve", Allowed.SCHOOL_ADMIN, activityApprove),
                 row(38, "POST", "/api/v1/activity-applications/" + id + "/reject", Allowed.SCHOOL_ADMIN, reason),
-                row(39, "POST", "/api/v1/activity-applications/" + id + "/withdraw", Allowed.NONE),
+                row(39, "POST", "/api/v1/activity-applications/" + id + "/withdraw", Allowed.DEFERRED_DENY),
                 row(40, "POST", "/api/v1/activity-results/" + id + "/publish", Allowed.SCHOOL_ADMIN),
-                row(41, "POST", "/api/v1/score-attempts", Allowed.NONE, scoreAttemptSubmit()),
+                row(41, "POST", "/api/v1/score-attempts", Allowed.DEFERRED_DENY, scoreAttemptSubmit()),
                 row(42, "POST", "/api/v1/score-appeals", Allowed.STUDENT, scoreAppealSubmit),
                 row(43, "POST", "/api/v1/score-appeals/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
                 row(44, "POST", "/api/v1/score-appeals/" + id + "/reject", Allowed.SCHOOL_ADMIN, "{\"resolution\":\"phase11\"}"),
@@ -237,8 +233,8 @@ class AuthorizationEndpointMatrixIT {
                 row(49, "POST", "/api/v1/l3-authorizations", Allowed.SCHOOL_ADMIN, l3Create),
                 row(50, "POST", "/api/v1/l3-authorizations/" + id + "/approve", Allowed.SUPER_ADMIN, body),
                 row(51, "POST", "/api/v1/l3-authorizations/" + id + "/withdraw", Allowed.SCHOOL_ADMIN, reason),
-                row(52, "POST", "/api/v1/media", Allowed.NONE, mediaRegister()),
-                row(53, "POST", "/api/v1/media/" + id + "/internal-review", Allowed.NONE),
+                row(52, "POST", "/api/v1/media", Allowed.DEFERRED_DENY, mediaRegister()),
+                row(53, "POST", "/api/v1/media/" + id + "/internal-review", Allowed.DEFERRED_DENY),
                 row(54, "POST", "/api/v1/media/" + id + "/internal-approve", Allowed.SCHOOL_ADMIN),
                 row(55, "POST", "/api/v1/feedbacks", Allowed.STUDENT, feedbackSubmit),
                 row(56, "POST", "/api/v1/feedbacks/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
@@ -321,6 +317,7 @@ class AuthorizationEndpointMatrixIT {
 
     private enum Allowed {
         NONE,
+        DEFERRED_DENY,
         PUBLIC,
         AUTHENTICATED,
         STUDENT,
@@ -337,7 +334,7 @@ class AuthorizationEndpointMatrixIT {
                 case STUDENT -> role == Role.STUDENT;
                 case SCHOOL_ADMIN -> role == Role.SCHOOL_ADMIN;
                 case SUPER_ADMIN -> role == Role.SUPER_ADMIN;
-                case NONE -> false;
+                case NONE, DEFERRED_DENY -> false;
             };
         }
     }

@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import jakarta.servlet.http.Cookie;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,6 +108,57 @@ class AuthSessionFlowIT {
         mvc.perform(post("/api/v1/auth/logout")).andExpect(status().isForbidden());
     }
 
+    @Test void anonymousLogoutWithCsrfReturns401() throws Exception {
+        mvc.perform(post("/api/v1/auth/logout").with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test void anonymousLogoutDoesNotCreateSession() throws Exception {
+        var result = mvc.perform(post("/api/v1/auth/logout").with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @Test void authenticatedLogoutWithoutCsrfReturns403() throws Exception {
+        var login = login();
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(login.cookies()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test void authenticatedLogoutWithCsrfReturns204() throws Exception {
+        var login = login();
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(login.cookies()).with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test void authenticatedLogoutInvalidatesSession() throws Exception {
+        var login = login();
+
+        mvc.perform(get("/api/v1/auth/me").cookie(login.cookies()))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(login.cookies()).with(csrf()))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("SESSION", 0))
+                .andExpect(cookie().maxAge("XSRF-TOKEN", 0));
+    }
+
+    @Test void loggedOutSessionCannotAccessMe() throws Exception {
+        var login = login();
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(login.cookies()).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/v1/auth/me").cookie(login.cookies()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
     @Test void securityFoundationRegression() throws Exception {
         mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/schools")).andExpect(status().isOk());
@@ -129,5 +181,21 @@ class AuthSessionFlowIT {
         Assertions.assertNotNull(session);
         Assertions.assertNotNull(session.getAttribute("SPRING_SECURITY_CONTEXT"),
                 "SPRING_SECURITY_CONTEXT must be saved to session by SecurityContextRepository");
+    }
+
+    private AuthSession login() throws Exception {
+        var result = mvc.perform(post("/api/v1/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"" + rawPassword + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return new AuthSession(result.getResponse().getCookies());
+    }
+
+    private record AuthSession(Cookie[] cookies) {
+        public Cookie[] cookies() {
+            return cookies.clone();
+        }
     }
 }

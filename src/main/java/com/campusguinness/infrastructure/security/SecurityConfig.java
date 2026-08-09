@@ -4,9 +4,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
@@ -16,6 +18,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -27,6 +30,18 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private static final RequestMatcher AUTHENTICATED_LOGOUT_REQUEST_MATCHER = request -> {
+        if (!HttpMethod.POST.matches(request.getMethod())
+                || !"/api/v1/auth/logout".equals(request.getRequestURI())) {
+            return false;
+        }
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null
+                && auth.isAuthenticated()
+                && !(auth instanceof AnonymousAuthenticationToken)
+                && auth.getPrincipal() instanceof CampusGuinnessUserDetails;
+    };
 
     private final SecurityCorsProperties corsProps;
 
@@ -75,6 +90,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/student/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/school-admin/activate").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/schools").permitAll()
@@ -140,6 +156,7 @@ public class SecurityConfig {
                 .anyRequest().denyAll())
             .logout(logout -> logout
                 .logoutUrl("/api/v1/auth/logout")
+                .logoutRequestMatcher(AUTHENTICATED_LOGOUT_REQUEST_MATCHER)
                 .logoutSuccessHandler((req, res, auth) -> res.setStatus(HttpStatus.NO_CONTENT.value()))
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
