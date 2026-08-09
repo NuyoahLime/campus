@@ -15,4 +15,7 @@ public interface StudentIdentityApplicationJpaRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from StudentIdentityApplicationEntity a where a.id = :id")
     Optional<StudentIdentityApplicationEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<StudentIdentityApplicationEntity> findFirstByUserIdOrderByCreatedAtDescIdDesc(UUID userId);
 }

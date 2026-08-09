@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class StudentIdentityApplicationRepositoryAdapter implements StudentIdentityApplicationRepository {
@@ -40,6 +41,13 @@ class StudentIdentityApplicationRepositoryAdapter implements StudentIdentityAppl
     @Transactional
     public Optional<StudentIdentityApplication> findByIdForUpdate(StudentIdentityApplicationId id) {
         return jpaRepository.findByIdForUpdate(id.value())
+                .map(StudentIdentityApplicationPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<StudentIdentityApplication> findLatestByUserIdForUpdate(UUID userId) {
+        return jpaRepository.findFirstByUserIdOrderByCreatedAtDescIdDesc(userId)
                 .map(StudentIdentityApplicationPersistenceMapper::toDomain);
     }
 }

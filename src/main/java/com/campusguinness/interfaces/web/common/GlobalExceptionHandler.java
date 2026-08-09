@@ -115,6 +115,9 @@ public class GlobalExceptionHandler {
 
     private HttpStatus statusFor(String code) {
         return switch (code) {
+            case "AUTHENTICATION_FAILED" -> HttpStatus.UNAUTHORIZED;
+            case "ACCOUNT_LOCKED" -> HttpStatus.UNAUTHORIZED;
+            case "ACCOUNT_DISABLED" -> HttpStatus.FORBIDDEN;
             case "INVITATION_ACTIVATION_FAILED" -> HttpStatus.UNAUTHORIZED;
             case "INVITATION_EXPIRED" -> HttpStatus.GONE;
             case "SCHOOL_ADMIN_SCOPE_DENIED",
@@ -129,6 +132,7 @@ public class GlobalExceptionHandler {
                     "SCHOOL_ADMIN_MEMBERSHIP_CONFLICT",
                     "SCHOOL_NOT_OPEN_FOR_REGISTRATION",
                     "STUDENT_APPLICATION_NOT_PENDING",
+                    "STUDENT_APPLICATION_NOT_RESUBMITTABLE",
                     "APPLICANT_ACCOUNT_NOT_ACTIVATABLE",
                     "STUDENT_MEMBERSHIP_CONFLICT",
                     "STUDENT_PROFILE_ALREADY_EXISTS",
