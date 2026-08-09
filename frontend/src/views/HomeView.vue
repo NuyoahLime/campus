@@ -45,7 +45,7 @@ async function handleLogout() {
     <header class="topbar">
       <div class="topbar-brand">
         <span class="brand-mark brand-mark-small" aria-hidden="true">G</span>
-        <span>校园吉尼斯</span>
+        <span>校园吉尼斯挑战赛 <span class="topbar-brand-subtitle">资源管理平台</span></span>
       </div>
       <div class="topbar-user" v-if="user">
         <span>{{ user.username }}</span>
@@ -57,27 +57,54 @@ async function handleLogout() {
     </header>
 
     <section class="home-panel" v-if="user">
-      <p class="eyebrow">登录成功</p>
-      <h1>当前身份</h1>
-
-      <dl class="identity-list">
-        <div>
-          <dt>用户名</dt>
-          <dd>{{ user.username }}</dd>
-        </div>
-        <div>
-          <dt>账号状态</dt>
-          <dd>{{ user.accountStatus }}</dd>
-        </div>
-        <div>
-          <dt>身份</dt>
-          <dd>
+      <div class="identity-hero">
+        <div class="identity-hero-copy">
+          <p class="eyebrow">当前会话身份</p>
+          <h1>{{ user.username }}</h1>
+          <div class="identity-hero-meta">
             <span v-for="role in roles" :key="role" class="role-badge">{{ role }}</span>
-          </dd>
+            <span class="status-pill">{{ user.accountStatus }}</span>
+          </div>
         </div>
-        <div>
-          <dt>学校</dt>
-          <dd v-if="user.schoolMemberships.length" class="membership-list">
+        <div class="identity-hero-art" aria-hidden="true">
+          <span class="identity-avatar">{{ user.username.slice(0, 1).toUpperCase() }}</span>
+        </div>
+      </div>
+
+      <div class="identity-grid">
+        <section class="identity-card" aria-labelledby="identity-details-title">
+          <div class="identity-card-heading">
+            <h2 id="identity-details-title">身份信息</h2>
+            <span class="trust-icon" aria-hidden="true">✓</span>
+          </div>
+          <dl class="identity-list">
+            <div>
+              <dt>用户 ID</dt>
+              <dd>{{ user.userId }}</dd>
+            </div>
+            <div>
+              <dt>用户名</dt>
+              <dd>{{ user.username }}</dd>
+            </div>
+            <div>
+              <dt>账号状态</dt>
+              <dd>{{ user.accountStatus }}</dd>
+            </div>
+            <div>
+              <dt>平台角色</dt>
+              <dd class="membership-list">
+                <span v-for="role in roles" :key="role" class="role-badge">{{ role }}</span>
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="identity-card" aria-labelledby="membership-title">
+          <div class="identity-card-heading">
+            <h2 id="membership-title">学校身份</h2>
+            <span class="trust-icon" aria-hidden="true">◆</span>
+          </div>
+          <div v-if="user.schoolMemberships.length" class="membership-list membership-list-panel">
             <span
               v-for="membership in user.schoolMemberships"
               :key="membership.membershipId"
@@ -85,17 +112,17 @@ async function handleLogout() {
             >
               {{ membershipLabel(membership) }}
             </span>
-          </dd>
-          <dd v-else class="muted">无学校身份</dd>
-        </div>
-      </dl>
+          </div>
+          <p v-else class="muted membership-empty">当前账号暂无学校身份</p>
+        </section>
+      </div>
 
       <p v-if="logoutError" class="message message-error" role="status">
         {{ logoutError }}
       </p>
 
       <details class="debug-panel">
-        <summary>JSON debug</summary>
+        <summary>查看会话 JSON</summary>
         <pre>{{ JSON.stringify(user, null, 2) }}</pre>
       </details>
     </section>

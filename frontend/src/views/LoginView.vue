@@ -55,18 +55,31 @@ async function submit() {
 <template>
   <main class="auth-page">
     <section class="brand-panel" aria-label="校园吉尼斯品牌介绍">
-      <div class="brand-mark" aria-hidden="true">G</div>
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true">G</span>
+        <span>校园吉尼斯挑战赛</span>
+      </div>
       <p class="eyebrow">Campus Guinness</p>
-      <h1>校园吉尼斯</h1>
+      <h1>
+        <span class="headline-blue">挑战自我</span>
+        <span class="headline-orange">突破极限</span>
+      </h1>
       <p class="brand-copy">
-        发现校园记录，挑战校园极限，记录属于每个人的高光时刻。
+        记录每一次挑战，成就每一个梦想。
       </p>
+      <div class="brand-visual" aria-hidden="true">
+        <span class="trophy">★</span>
+        <span class="runner runner-secondary"></span>
+        <span class="runner runner-main"></span>
+        <span class="runner runner-third"></span>
+      </div>
     </section>
 
     <section class="login-card" aria-labelledby="login-title">
       <div>
-        <p class="eyebrow">欢迎回来</p>
-        <h2 id="login-title">登录校园吉尼斯</h2>
+        <p class="eyebrow">校园吉尼斯挑战赛资源管理平台</p>
+        <h2 id="login-title">用户登录</h2>
+        <p class="login-subtitle">欢迎登录校园吉尼斯挑战赛资源管理平台</p>
       </div>
 
       <form class="form-stack" @submit.prevent="submit">
@@ -75,6 +88,7 @@ async function submit() {
           <input
             v-model="username"
             autocomplete="username"
+            placeholder="请输入账号"
             :disabled="submitting"
             required
           />
@@ -87,6 +101,7 @@ async function submit() {
               v-model="password"
               :type="showPassword ? 'text' : 'password'"
               autocomplete="current-password"
+              placeholder="请输入密码"
               :disabled="submitting"
               required
             />
@@ -110,6 +125,26 @@ async function submit() {
           {{ submitting ? '登录中...' : '登录' }}
         </button>
       </form>
+      <p class="security-note">安全登录 · 保护账号安全</p>
+    </section>
+
+    <section class="trust-row" aria-label="平台保障">
+      <div class="trust-item">
+        <span class="trust-icon" aria-hidden="true">✓</span>
+        <span><strong>安全可靠</strong>多重保障机制</span>
+      </div>
+      <div class="trust-item">
+        <span class="trust-icon" aria-hidden="true">◆</span>
+        <span><strong>数据准确</strong>实时记录统计</span>
+      </div>
+      <div class="trust-item">
+        <span class="trust-icon" aria-hidden="true">★</span>
+        <span><strong>公平公正</strong>规则透明公开</span>
+      </div>
+      <div class="trust-item">
+        <span class="trust-icon" aria-hidden="true">→</span>
+        <span><strong>高效便捷</strong>操作简单快捷</span>
+      </div>
     </section>
   </main>
 </template>

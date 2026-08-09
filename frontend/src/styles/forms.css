@@ -9,27 +9,32 @@
   gap: 8px;
   color: var(--text-secondary);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .field input {
   width: 100%;
-  height: 46px;
+  height: 50px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0 13px;
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
   color: var(--text-primary);
   background: #ffffff;
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
+.field input::placeholder {
+  color: #a2afbf;
+}
+
 .field input:focus {
   border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(23, 105, 232, 0.1);
 }
 
 .field input:disabled {
   color: var(--text-muted);
-  background: #f3f4f6;
+  background: #f3f6fa;
 }
 
 .password-field {
@@ -41,9 +46,8 @@
 .primary-button,
 .secondary-button,
 .ghost-button {
-  border: 0;
-  border-radius: 12px;
-  font-weight: 600;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
   cursor: pointer;
   transition: background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease;
 }
@@ -51,27 +55,36 @@
 .primary-button {
   display: inline-flex;
   width: 100%;
-  height: 46px;
+  min-height: 50px;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  border: 1px solid var(--brand-primary);
   color: #ffffff;
   background: var(--brand-primary);
 }
 
 .primary-button:hover:not(:disabled) {
   background: var(--brand-primary-hover);
+  transform: translateY(-1px);
 }
 
 .secondary-button {
   border: 1px solid var(--border);
-  padding: 8px 12px;
+  padding: 9px 13px;
   color: var(--text-primary);
   background: #ffffff;
 }
 
+.secondary-button:hover:not(:disabled),
+.ghost-button:hover:not(:disabled) {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: var(--brand-soft);
+}
+
 .ghost-button {
-  min-width: 58px;
+  min-width: 62px;
   border: 1px solid var(--border);
   padding: 0 12px;
   color: var(--text-secondary);
@@ -87,16 +100,16 @@
 
 .message {
   margin: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 11px 12px;
   font-size: 14px;
   line-height: 1.5;
 }
 
 .message-error {
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  background: #fef2f2;
+  border: 1px solid #f8c8cc;
+  color: #a72f3c;
+  background: #fff1f2;
 }
 
 .spinner {
