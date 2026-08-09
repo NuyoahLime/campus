@@ -6,6 +6,7 @@ import com.campusguinness.school.application.service.SchoolRegistrationApplicati
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -33,18 +34,21 @@ public class SchoolRegistrationController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveSchoolRegistrationRequest req) {
         SchoolRegistrationResult r = service.approve(id, req.comment(), req.schoolId());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectSchoolRegistrationRequest req) {
         SchoolRegistrationResult r = service.reject(id, req.reason());
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 
     @PostMapping("/{id}/withdraw")
+    @PreAuthorize("denyAll()")
     public ResponseEntity<SchoolRegistrationResponse> withdraw(@PathVariable UUID id) {
         SchoolRegistrationResult r = service.withdraw(id);
         return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));

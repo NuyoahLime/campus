@@ -197,10 +197,10 @@ class StudentIdentityApplicationReviewIT {
         var ordinarySession = login(ordinaryUsername, "AdminPass123!");
         mvc.perform(get(base(schoolA)).cookie(ordinarySession.cookies()))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("SCHOOL_ADMIN_SCOPE_DENIED"));
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
         mvc.perform(withCsrf(post(base(schoolA) + "/" + student.applicationId() + "/approve"), ordinarySession))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("SCHOOL_ADMIN_SCOPE_DENIED"));
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
         mvc.perform(withCsrf(post(base(schoolA) + "/" + student.applicationId() + "/reject")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"no\"}"), ordinarySession))

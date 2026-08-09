@@ -10,6 +10,7 @@ import com.campusguinness.interfaces.web.common.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/schools/{schoolId}/student-identity-applications")
+@PreAuthorize("hasRole('SCHOOL_ADMIN')")
 public class StudentIdentityApplicationReviewController {
 
     private final StudentIdentityApplicationReviewService reviewService;

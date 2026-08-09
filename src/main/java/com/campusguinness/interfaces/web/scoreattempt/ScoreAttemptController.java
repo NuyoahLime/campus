@@ -5,6 +5,7 @@ import com.campusguinness.score.application.service.ScoreAttemptApplicationServi
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -20,6 +21,7 @@ public class ScoreAttemptController {
     }
 
     @PostMapping
+    @PreAuthorize("denyAll()")
     public ResponseEntity<ScoreAttemptResponse> submit(@Valid @RequestBody SubmitScoreRequest req) {
         ScoreAttemptResult r = service.submit(ScoreAttemptWebMapper.toCommand(req));
         return ResponseEntity.created(URI.create("/api/v1/score-attempts/" + r.id()))

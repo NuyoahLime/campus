@@ -4,6 +4,7 @@ import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -19,6 +20,7 @@ public class ActivityResultController {
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ActivityResultResponse> publish(@PathVariable UUID id) {
         ActivityResultResult r = service.publishInternal(id);
         return ResponseEntity.ok(new ActivityResultResponse(r.id(), r.internalStatus(), r.publicStatus()));

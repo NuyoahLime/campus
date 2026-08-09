@@ -45,15 +45,21 @@ class SecurityFoundationTest {
         mvc.perform(get("/api/v1/auth/csrf").secure(true))
                 .andExpect(status().isOk()); // CSRF endpoint is public
 
-        mvc.perform(get("/api/v1/schools"))
+        mvc.perform(get("/api/v1/schools/" + java.util.UUID.randomUUID()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
     @Test void unauthenticatedNo302() throws Exception {
-        mvc.perform(get("/api/v1/schools"))
+        mvc.perform(get("/api/v1/schools/" + java.util.UUID.randomUUID()))
                 .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("Location"));
+    }
+
+    @Test void schoolListIsAnonymousPublicContract() throws Exception {
+        mvc.perform(get("/api/v1/schools"))
+                .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Location"));
     }
 

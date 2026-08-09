@@ -8,6 +8,7 @@ import com.campusguinness.project.application.service.ChallengeProjectApplicatio
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -38,6 +39,7 @@ public class ChallengeProjectController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ChallengeProjectResponse> create(@Valid @RequestBody CreateChallengeProjectRequest req) {
         var cmd = new CreateChallengeProjectCommand(
                 req.name(), req.category(), req.scoreStorageType(), req.scoreIndicatorType(),
@@ -56,6 +58,7 @@ public class ChallengeProjectController {
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ChallengeProjectResponse> publish(@PathVariable UUID id) {
         ChallengeProjectResult result = service.publish(id);
         return ResponseEntity.ok(new ChallengeProjectResponse(result.id(), result.name(), result.status()));

@@ -5,6 +5,7 @@ import com.campusguinness.ranking.application.service.L3AuthorizationApplication
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -17,6 +18,7 @@ public class L3AuthorizationController {
     public L3AuthorizationController(L3AuthorizationApplicationService s) { this.service = s; }
 
     @PostMapping
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<L3AuthorizationResponse> submit(@Valid @RequestBody CreateL3AuthorizationRequest req) {
         var r = service.submit(req.schoolId(), req.projectId(), req.ruleVersionId());
         return ResponseEntity.created(URI.create("/api/v1/l3-authorizations/" + r.id()))
@@ -24,12 +26,14 @@ public class L3AuthorizationController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<L3AuthorizationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveL3AuthorizationRequest req) {
         var r = service.approve(id, req.comment());
         return ResponseEntity.ok(new L3AuthorizationResponse(r.id(), r.status()));
     }
 
     @PostMapping("/{id}/withdraw")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<L3AuthorizationResponse> withdraw(@PathVariable UUID id, @Valid @RequestBody WithdrawL3AuthorizationRequest req) {
         var r = service.withdraw(id, req.reason());
         return ResponseEntity.ok(new L3AuthorizationResponse(r.id(), r.status()));

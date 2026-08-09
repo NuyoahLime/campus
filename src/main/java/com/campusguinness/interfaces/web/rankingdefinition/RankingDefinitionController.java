@@ -6,6 +6,7 @@ import com.campusguinness.ranking.internal.domain.RankingLayer;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -18,6 +19,7 @@ public class RankingDefinitionController {
     public RankingDefinitionController(RankingDefinitionApplicationService s) { this.service = s; }
 
     @PostMapping
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<RankingDefinitionResponse> create(@Valid @RequestBody CreateRankingDefinitionRequest req) {
         var r = service.create(RankingLayer.valueOf(req.layer()), req.name(), req.schoolId(), req.projectId());
         return ResponseEntity.created(URI.create("/api/v1/ranking-definitions/" + r.id()))
@@ -25,12 +27,14 @@ public class RankingDefinitionController {
     }
 
     @PostMapping("/{id}/enable")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<RankingDefinitionResponse> enable(@PathVariable UUID id) {
         var r = service.enable(id);
         return ResponseEntity.ok(new RankingDefinitionResponse(r.id(), r.enabled()));
     }
 
     @PostMapping("/{id}/disable")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<RankingDefinitionResponse> disable(@PathVariable UUID id) {
         var r = service.disable(id);
         return ResponseEntity.ok(new RankingDefinitionResponse(r.id(), r.enabled()));
