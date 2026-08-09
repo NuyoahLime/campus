@@ -2,6 +2,7 @@ package com.campusguinness.interfaces.web.auth;
 
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.identity.application.result.StudentRegistrationResult;
+import com.campusguinness.identity.application.service.StudentIdentityApplicationResubmissionService;
 import com.campusguinness.identity.application.service.StudentRegistrationApplicationService;
 import com.campusguinness.identity.internal.domain.AccountStatus;
 import com.campusguinness.identity.internal.domain.StudentIdentityApplicationStatus;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StudentRegistrationControllerTest {
 
     StudentRegistrationApplicationService service;
+    StudentIdentityApplicationResubmissionService resubmissionService;
     MockMvc mvc;
     ObjectMapper mapper;
     UUID schoolId;
@@ -39,10 +41,11 @@ class StudentRegistrationControllerTest {
     @BeforeEach
     void setUp() {
         service = mock(StudentRegistrationApplicationService.class);
+        resubmissionService = mock(StudentIdentityApplicationResubmissionService.class);
         var validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         mvc = MockMvcBuilders
-                .standaloneSetup(new StudentRegistrationController(service))
+                .standaloneSetup(new StudentRegistrationController(service, resubmissionService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -73,6 +76,31 @@ class StudentRegistrationControllerTest {
                 .andExpect(jsonPath("$.confirmPassword").doesNotExist())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.platformRole").doesNotExist());
+    }
+
+    @Test
+    void validResubmissionRequestReturns201NoStoreAndNoPasswordFields() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID applicationId = UUID.randomUUID();
+        when(resubmissionService.resubmit(any())).thenReturn(new StudentRegistrationResult(
+                userId, applicationId, "student_001", schoolId,
+                AccountStatus.PENDING_ACTIVATION, StudentIdentityApplicationStatus.PENDING,
+                Instant.parse("2026-08-06T00:00:00Z")));
+
+        mvc.perform(post("/api/v1/auth/student/resubmit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(validResubmissionBody())))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Cache-Control", containsString("no-store")))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.applicationId").value(applicationId.toString()))
+                .andExpect(jsonPath("$.username").value("student_001"))
+                .andExpect(jsonPath("$.schoolId").value(schoolId.toString()))
+                .andExpect(jsonPath("$.accountStatus").value("PENDING_ACTIVATION"))
+                .andExpect(jsonPath("$.applicationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.userIdSubmittedByClient").doesNotExist());
     }
 
     @Test
@@ -167,6 +195,18 @@ class StudentRegistrationControllerTest {
                 "studentNumber", "20260001",
                 "grade", "Grade 10",
                 "className", "Class 1",
+                "proofFileKeys", List.of()
+        ));
+    }
+
+    private Map<String, Object> validResubmissionBody() {
+        return new java.util.LinkedHashMap<>(Map.of(
+                "username", "student_001",
+                "password", "SecurePassword123!",
+                "realName", "Zhang San",
+                "studentNumber", "20260002",
+                "grade", "Grade 11",
+                "className", "Class 2",
                 "proofFileKeys", List.of()
         ));
     }
