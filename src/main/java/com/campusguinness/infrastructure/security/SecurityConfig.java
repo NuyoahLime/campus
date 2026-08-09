@@ -77,6 +77,61 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/student/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/school-admin/activate").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/schools").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/school-registrations").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/challenge-projects").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/challenge-projects/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/activities").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                        "/api/v1/schools/*/student-identity-applications",
+                        "/api/v1/schools/*/student-identity-applications/*"
+                ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/v1/schools/*/student-identity-applications/*/approve",
+                        "/api/v1/schools/*/student-identity-applications/*/reject",
+                        "/api/v1/activities",
+                        "/api/v1/activities/*/publish",
+                        "/api/v1/activity-applications/*/approve",
+                        "/api/v1/activity-applications/*/reject",
+                        "/api/v1/activity-results/*/publish",
+                        "/api/v1/score-appeals/*/begin-processing",
+                        "/api/v1/score-appeals/*/reject",
+                        "/api/v1/ranking-definitions",
+                        "/api/v1/ranking-definitions/*/enable",
+                        "/api/v1/ranking-definitions/*/disable",
+                        "/api/v1/l3-authorizations",
+                        "/api/v1/l3-authorizations/*/withdraw",
+                        "/api/v1/media/*/internal-approve",
+                        "/api/v1/feedbacks/*/begin-processing",
+                        "/api/v1/feedbacks/*/resolve"
+                ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/v1/schools/*/activate",
+                        "/api/v1/schools/*/disable",
+                        "/api/v1/school-registrations/*/approve",
+                        "/api/v1/school-registrations/*/reject",
+                        "/api/v1/challenge-projects",
+                        "/api/v1/challenge-projects/*/publish",
+                        "/api/v1/school-admin-invitations",
+                        "/api/v1/school-admin-invitations/*/revoke",
+                        "/api/v1/school-admin-invitations/*/regenerate",
+                        "/api/v1/l3-authorizations/*/approve"
+                ).hasRole("SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/schools/*").hasRole("SUPER_ADMIN")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/v1/score-appeals",
+                        "/api/v1/score-appeals/*/withdraw",
+                        "/api/v1/feedbacks",
+                        "/api/v1/feedbacks/*/close"
+                ).hasRole("STUDENT")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/v1/school-registrations/*/withdraw",
+                        "/api/v1/activity-applications",
+                        "/api/v1/activity-applications/*/withdraw",
+                        "/api/v1/score-attempts",
+                        "/api/v1/media",
+                        "/api/v1/media/*/internal-review"
+                ).denyAll()
                 .requestMatchers(
                         "/api/v1/users",
                         "/api/v1/users/**"

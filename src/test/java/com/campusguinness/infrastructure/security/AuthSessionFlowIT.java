@@ -109,7 +109,7 @@ class AuthSessionFlowIT {
 
     @Test void securityFoundationRegression() throws Exception {
         mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/schools")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/schools")).andExpect(status().isOk());
     }
 
     // CLAIM-01 evidence: SecurityContext is correctly saved to session

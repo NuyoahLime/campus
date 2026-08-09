@@ -6,6 +6,7 @@ import com.campusguinness.activity.application.service.ActivityApplicationServic
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -22,6 +23,7 @@ public class ActivityApplicationController {
     }
 
     @PostMapping
+    @PreAuthorize("denyAll()")
     public ResponseEntity<ActivityApplicationResponse> submit(@Valid @RequestBody SubmitActivityApplicationRequest req) {
         var cmd = new SubmitActivityApplicationCommand(req.schoolId(), req.title(), req.description());
         ActivityApplicationResult r = service.submit(cmd);
@@ -30,18 +32,21 @@ public class ActivityApplicationController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ActivityApplicationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveActivityApplicationRequest req) {
         ActivityApplicationResult r = service.approve(id, req.activityId());
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ActivityApplicationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectActivityApplicationRequest req) {
         ActivityApplicationResult r = service.reject(id, req.reason());
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));
     }
 
     @PostMapping("/{id}/withdraw")
+    @PreAuthorize("denyAll()")
     public ResponseEntity<ActivityApplicationResponse> withdraw(@PathVariable UUID id) {
         ActivityApplicationResult r = service.withdraw(id);
         return ResponseEntity.ok(new ActivityApplicationResponse(r.id(), r.status(), r.createdActivityId()));

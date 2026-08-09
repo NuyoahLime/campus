@@ -6,6 +6,7 @@ import com.campusguinness.media.application.service.MediaApplicationService;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -22,6 +23,7 @@ public class MediaController {
     }
 
     @PostMapping
+    @PreAuthorize("denyAll()")
     public ResponseEntity<MediaResponse> register(@Valid @RequestBody RegisterMediaRequest req) {
         var cmd = new RegisterMediaCommand(req.schoolId(), req.activityId(),
                 req.fileKey(), req.fileName(), req.fileType(), req.fileFormat(),
@@ -32,12 +34,14 @@ public class MediaController {
     }
 
     @PostMapping("/{id}/internal-review")
+    @PreAuthorize("denyAll()")
     public ResponseEntity<MediaResponse> submitForInternalReview(@PathVariable UUID id) {
         MediaResult r = service.submitForInternalReview(id);
         return ResponseEntity.ok(new MediaResponse(r.id(), r.internalStatus(), r.publicStatus(), null));
     }
 
     @PostMapping("/{id}/internal-approve")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<MediaResponse> approveInternal(@PathVariable UUID id) {
         MediaResult r = service.approveInternal(id);
         return ResponseEntity.ok(new MediaResponse(r.id(), r.internalStatus(), r.publicStatus(), null));

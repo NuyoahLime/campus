@@ -8,6 +8,7 @@ import com.campusguinness.interfaces.web.common.PageResponse;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -38,6 +39,7 @@ public class ActivityController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ActivityResponse> create(@Valid @RequestBody CreateActivityRequest req) {
         var cmd = new CreateActivityCommand(req.schoolId(), req.title(),
                 req.description(), req.startTime(), req.endTime(), req.location());
@@ -47,6 +49,7 @@ public class ActivityController {
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ActivityResponse> publish(@PathVariable UUID id) {
         ActivityResult r = service.publish(id);
         return ResponseEntity.ok(new ActivityResponse(r.id(), r.executionStatus(), r.publicStatus()));
