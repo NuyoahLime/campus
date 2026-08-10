@@ -695,6 +695,30 @@ summary:focus-visible {
   }
 }
 
+@media (max-height: 820px) and (min-width: 761px) {
+  .auth-page {
+    padding-top: 34px;
+    padding-bottom: 78px;
+  }
+
+  .brand-panel {
+    min-height: 500px;
+  }
+
+  .brand-panel h1 {
+    font-size: 48px;
+  }
+
+  .brand-visual {
+    height: 168px;
+    margin-top: 32px;
+  }
+
+  .trust-row {
+    bottom: 12px;
+  }
+}
+
 @media (max-width: 760px) {
   .auth-page {
     display: block;
@@ -745,6 +769,55 @@ summary:focus-visible {
 }
 
 @media (max-width: 520px) {
+  .auth-page {
+    padding: 22px 20px 30px;
+  }
+
+  .brand-lockup {
+    gap: 10px;
+    font-size: 16px;
+  }
+
+  .brand-panel .eyebrow {
+    margin-top: 16px;
+  }
+
+  .brand-panel h1 {
+    margin-top: 12px;
+    font-size: 36px;
+  }
+
+  .brand-copy {
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .brand-visual {
+    display: none;
+  }
+
+  .login-card {
+    padding: 24px 20px;
+  }
+
+  .login-card h2 {
+    font-size: 26px;
+  }
+
+  .form-stack {
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  .security-note {
+    margin-top: 16px;
+  }
+
+  .trust-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
   .topbar,
   .topbar-user {
     align-items: flex-start;
