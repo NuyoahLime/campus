@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import HomeView from '../views/HomeView.vue';
 import LoginView from '../views/LoginView.vue';
+import StudentApplicationRejectedView from '../views/StudentApplicationRejectedView.vue';
+import StudentApplicationResubmitView from '../views/StudentApplicationResubmitView.vue';
 import StudentRegistrationView from '../views/StudentRegistrationView.vue';
 
 const router = createRouter({
@@ -22,6 +24,18 @@ const router = createRouter({
       path: '/register',
       name: 'student-register',
       component: StudentRegistrationView,
+      meta: { guestOnly: true }
+    },
+    {
+      path: '/student/application/rejected',
+      name: 'student-application-rejected',
+      component: StudentApplicationRejectedView,
+      meta: { guestOnly: true }
+    },
+    {
+      path: '/student/application/resubmit',
+      name: 'student-application-resubmit',
+      component: StudentApplicationResubmitView,
       meta: { guestOnly: true }
     }
   ]
