@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import HomeView from '../views/HomeView.vue';
 import LoginView from '../views/LoginView.vue';
+import SchoolAdminActivationView from '../views/SchoolAdminActivationView.vue';
 import StudentApplicationRejectedView from '../views/StudentApplicationRejectedView.vue';
 import StudentApplicationResubmitView from '../views/StudentApplicationResubmitView.vue';
 import StudentRegistrationView from '../views/StudentRegistrationView.vue';
@@ -24,6 +25,12 @@ const router = createRouter({
       path: '/register',
       name: 'student-register',
       component: StudentRegistrationView,
+      meta: { guestOnly: true }
+    },
+    {
+      path: '/school-admin/activate',
+      name: 'school-admin-activate',
+      component: SchoolAdminActivationView,
       meta: { guestOnly: true }
     },
     {
