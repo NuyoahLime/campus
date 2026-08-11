@@ -126,6 +126,10 @@ async function submit() {
         </button>
       </form>
       <p class="security-note">安全登录 · 保护账号安全</p>
+      <p class="auth-switch">
+        还没有账号？
+        <RouterLink to="/register">学生注册</RouterLink>
+      </p>
     </section>
 
     <section class="trust-row" aria-label="平台保障">
