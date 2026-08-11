@@ -26,6 +26,16 @@ export interface StudentRegistrationRequest {
   proofFileKeys: string[];
 }
 
+export interface StudentResubmissionRequest {
+  username: string;
+  password: string;
+  realName: string;
+  studentNumber: string;
+  grade: string;
+  className: string;
+  proofFileKeys: string[];
+}
+
 export interface StudentRegistrationResponse {
   userId: string;
   applicationId: string;

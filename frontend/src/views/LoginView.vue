@@ -35,6 +35,10 @@ function friendlyError(error: unknown): string {
   return '登录失败，请稍后重试';
 }
 
+function isRejectedStudent(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'STUDENT_APPLICATION_REJECTED';
+}
+
 async function submit() {
   if (submitting.value) return;
   errorMessage.value = '';
@@ -47,6 +51,14 @@ async function submit() {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
     await router.push(redirect);
   } catch (error) {
+    if (isRejectedStudent(error)) {
+      const trimmedUsername = username.value.trim();
+      await router.push({
+        name: 'student-application-rejected',
+        query: trimmedUsername ? { username: trimmedUsername } : undefined
+      });
+      return;
+    }
     errorMessage.value = friendlyError(error);
   }
 }
