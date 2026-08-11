@@ -17,6 +17,13 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface SchoolAdminActivationRequest {
+  username: string;
+  invitationCode: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export interface CsrfTokenResponse {
   headerName: string;
   parameterName: string;

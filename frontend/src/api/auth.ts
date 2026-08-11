@@ -1,5 +1,5 @@
 import { apiRequest } from './http';
-import type { CurrentUser, LoginRequest } from '../types/auth';
+import type { CurrentUser, LoginRequest, SchoolAdminActivationRequest } from '../types/auth';
 
 export async function login(request: LoginRequest): Promise<CurrentUser> {
   return apiRequest<CurrentUser>('/auth/login', {
@@ -15,5 +15,12 @@ export async function getMe(): Promise<CurrentUser> {
 export async function logout(): Promise<void> {
   await apiRequest<null>('/auth/logout', {
     method: 'POST'
+  });
+}
+
+export async function activateSchoolAdmin(request: SchoolAdminActivationRequest): Promise<void> {
+  await apiRequest<null>('/auth/school-admin/activate', {
+    method: 'POST',
+    body: JSON.stringify(request)
   });
 }

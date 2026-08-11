@@ -134,6 +134,12 @@
   line-height: 1.4;
 }
 
+.field-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .form-section {
   margin: 0;
   border: 0;
@@ -177,6 +183,17 @@
 
 .auth-switch a:hover {
   text-decoration: underline;
+}
+
+.admin-activation-switch {
+  margin-top: 10px;
+}
+
+.activation-status-action {
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .registration-page {

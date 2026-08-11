@@ -8,10 +8,11 @@ const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 
-const username = ref('');
+const username = ref(typeof route.query.username === 'string' ? route.query.username : '');
 const password = ref('');
 const showPassword = ref(false);
 const errorMessage = ref('');
+const activationRequired = ref(false);
 
 const submitting = computed(() => auth.loading);
 
@@ -39,9 +40,25 @@ function isRejectedStudent(error: unknown): boolean {
   return error instanceof ApiError && error.code === 'STUDENT_APPLICATION_REJECTED';
 }
 
+function isSchoolAdminActivationError(error: unknown): boolean {
+  return error instanceof ApiError && (
+    error.code === 'SCHOOL_ADMIN_ACTIVATION_PENDING'
+    || error.code === 'SCHOOL_ADMIN_ACTIVATION_REQUIRED'
+  );
+}
+
+function activationRoute() {
+  const trimmedUsername = username.value.trim();
+  return {
+    name: 'school-admin-activate',
+    query: trimmedUsername ? { username: trimmedUsername } : undefined
+  };
+}
+
 async function submit() {
   if (submitting.value) return;
   errorMessage.value = '';
+  activationRequired.value = false;
 
   try {
     await auth.login({
@@ -57,6 +74,13 @@ async function submit() {
         name: 'student-application-rejected',
         query: trimmedUsername ? { username: trimmedUsername } : undefined
       });
+      return;
+    }
+    if (isSchoolAdminActivationError(error)) {
+      activationRequired.value = true;
+      errorMessage.value = error instanceof ApiError && error.code === 'SCHOOL_ADMIN_ACTIVATION_PENDING'
+        ? '学校管理员账号尚未激活，请先完成邀请码激活。'
+        : '学校管理员账号需要完成邀请码激活。';
       return;
     }
     errorMessage.value = friendlyError(error);
@@ -132,6 +156,14 @@ async function submit() {
           {{ errorMessage }}
         </p>
 
+        <RouterLink
+          v-if="activationRequired"
+          class="secondary-button activation-status-action"
+          :to="activationRoute()"
+        >
+          前往激活
+        </RouterLink>
+
         <button class="primary-button" type="submit" :disabled="submitting">
           <span v-if="submitting" class="spinner" aria-hidden="true"></span>
           {{ submitting ? '登录中...' : '登录' }}
@@ -141,6 +173,10 @@ async function submit() {
       <p class="auth-switch">
         还没有账号？
         <RouterLink to="/register">学生注册</RouterLink>
+      </p>
+      <p class="auth-switch admin-activation-switch">
+        已有学校管理员邀请码？
+        <RouterLink :to="activationRoute()">激活账号</RouterLink>
       </p>
     </section>
 
