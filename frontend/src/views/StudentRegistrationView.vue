@@ -251,7 +251,7 @@ onMounted(loadSchools);
           </p>
         </div>
 
-        <form class="form-stack registration-form" @submit.prevent="submit">
+        <form class="form-stack registration-form" novalidate @submit.prevent="submit">
           <fieldset class="form-section">
             <legend>账号信息</legend>
             <label class="field">
