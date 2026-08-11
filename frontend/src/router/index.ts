@@ -5,6 +5,7 @@ import LoginView from '../views/LoginView.vue';
 import SchoolAdminActivationView from '../views/SchoolAdminActivationView.vue';
 import StudentApplicationRejectedView from '../views/StudentApplicationRejectedView.vue';
 import StudentApplicationResubmitView from '../views/StudentApplicationResubmitView.vue';
+import StudentIdentityReviewView from '../views/StudentIdentityReviewView.vue';
 import StudentRegistrationView from '../views/StudentRegistrationView.vue';
 
 const router = createRouter({
@@ -44,6 +45,12 @@ const router = createRouter({
       name: 'student-application-resubmit',
       component: StudentApplicationResubmitView,
       meta: { guestOnly: true }
+    },
+    {
+      path: '/school-admin/student-applications',
+      name: 'student-identity-review',
+      component: StudentIdentityReviewView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     }
   ]
 });
@@ -56,6 +63,13 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } };
+  }
+
+  const requiredAuthority = typeof to.meta.requiredAuthority === 'string'
+    ? to.meta.requiredAuthority
+    : null;
+  if (requiredAuthority && !auth.currentUser?.authorities.includes(requiredAuthority)) {
+    return { name: 'home' };
   }
 
   if (to.name === 'login' && auth.isAuthenticated) {

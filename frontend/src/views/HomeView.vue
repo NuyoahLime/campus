@@ -20,6 +20,10 @@ const roles = computed(() =>
   (user.value?.authorities ?? []).map((authority) => roleLabels[authority] ?? authority)
 );
 
+const canReviewStudents = computed(() =>
+  user.value?.authorities.includes('ROLE_SCHOOL_ADMIN') ?? false
+);
+
 function membershipLabel(membership: AuthenticatedSchoolMembership): string {
   const role = membership.roleInSchool === 'STUDENT'
     ? '学生'
@@ -116,6 +120,17 @@ async function handleLogout() {
           <p v-else class="muted membership-empty">当前账号暂无学校身份</p>
         </section>
       </div>
+
+      <section v-if="canReviewStudents" class="home-actions" aria-labelledby="home-actions-title">
+        <div>
+          <p class="eyebrow">学校管理</p>
+          <h2 id="home-actions-title">学生身份审核</h2>
+          <p>查看并处理本校学生提交的身份申请。</p>
+        </div>
+        <RouterLink class="review-entry-link" to="/school-admin/student-applications">
+          进入审核
+        </RouterLink>
+      </section>
 
       <p v-if="logoutError" class="message message-error" role="status">
         {{ logoutError }}
