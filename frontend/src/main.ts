@@ -6,6 +6,7 @@ import { useAuthStore } from './stores/auth';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/forms.css';
+import './styles/workspace.css';
 
 const app = createApp(App);
 const pinia = createPinia();

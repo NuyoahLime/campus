@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { ApiError } from '../api/http';
+import { roleHomeLocation } from '../router/roleHome';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -65,8 +66,7 @@ async function submit() {
       username: username.value.trim(),
       password: password.value
     });
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
-    await router.push(redirect);
+    await router.push(roleHomeLocation(auth.currentUser));
   } catch (error) {
     if (isRejectedStudent(error)) {
       const trimmedUsername = username.value.trim();
