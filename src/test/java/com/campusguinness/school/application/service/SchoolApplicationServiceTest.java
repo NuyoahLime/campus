@@ -1,5 +1,7 @@
 package com.campusguinness.school.application.service;
 
+import com.campusguinness.identity.application.exception.IdentityApplicationException;
+import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.school.application.port.SchoolRepository;
 import com.campusguinness.school.application.result.SchoolResult;
 import com.campusguinness.school.internal.domain.*;
@@ -21,9 +23,10 @@ import static org.mockito.Mockito.*;
 class SchoolApplicationServiceTest {
 
     @Mock private SchoolRepository repository;
+    @Mock private PlatformGovernanceAuthorization authorization;
     private SchoolApplicationService service;
 
-    @BeforeEach void setUp() { service = new SchoolApplicationService(repository); }
+    @BeforeEach void setUp() { service = new SchoolApplicationService(repository, authorization); }
 
     @Nested @DisplayName("Create")
     class Create {
@@ -67,6 +70,17 @@ class SchoolApplicationServiceTest {
                     .isInstanceOf(IllegalArgumentException.class);
             verify(repository, never()).save(any());
         }
+    }
+
+    @Test
+    void rejectsDirectInvocationWithoutPlatformGovernanceAuthority() {
+        when(authorization.requireSuperAdmin()).thenThrow(
+                new IdentityApplicationException("PLATFORM_GOVERNANCE_DENIED", "denied"));
+
+        assertThatThrownBy(() -> service.findById(UUID.randomUUID()))
+                .isInstanceOf(IdentityApplicationException.class);
+
+        verifyNoInteractions(repository);
     }
 
     private School pendingSchool(UUID id) {

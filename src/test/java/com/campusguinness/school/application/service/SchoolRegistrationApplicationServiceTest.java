@@ -1,6 +1,7 @@
 package com.campusguinness.school.application.service;
 
-import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.exception.IdentityApplicationException;
+import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.port.SchoolRegistrationRepository;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
@@ -24,14 +25,14 @@ import static org.mockito.Mockito.*;
 class SchoolRegistrationApplicationServiceTest {
 
     @Mock private SchoolRegistrationRepository repository;
-    @Mock private CurrentActor currentActor;
+    @Mock private PlatformGovernanceAuthorization authorization;
     private SchoolRegistrationApplicationService service;
     private UUID actorUserId;
 
     @BeforeEach void setUp() {
         actorUserId = UUID.randomUUID();
-        lenient().when(currentActor.requireUserId()).thenReturn(actorUserId);
-        service = new SchoolRegistrationApplicationService(repository, currentActor);
+        lenient().when(authorization.requireSuperAdmin()).thenReturn(actorUserId);
+        service = new SchoolRegistrationApplicationService(repository, authorization);
     }
 
     private SubmitSchoolRegistrationCommand validCmd() {
@@ -100,6 +101,17 @@ class SchoolRegistrationApplicationServiceTest {
                     .isInstanceOf(IllegalArgumentException.class);
             verify(repository, never()).save(any());
         }
+    }
+
+    @Test
+    void rejectsDirectReviewWithoutPlatformGovernanceAuthority() {
+        when(authorization.requireSuperAdmin()).thenThrow(
+                new IdentityApplicationException("PLATFORM_GOVERNANCE_DENIED", "denied"));
+
+        assertThatThrownBy(() -> service.reject(UUID.randomUUID(), "reason"))
+                .isInstanceOf(IdentityApplicationException.class);
+
+        verifyNoInteractions(repository);
     }
 
     private SchoolRegistration submittedReg(UUID id) {

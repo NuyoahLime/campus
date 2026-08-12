@@ -15,7 +15,6 @@ import com.campusguinness.identity.internal.domain.SchoolAdminInvitationId;
 import com.campusguinness.identity.internal.domain.SchoolAdminInvitationStatus;
 import com.campusguinness.identity.internal.domain.User;
 import com.campusguinness.identity.internal.domain.UserId;
-import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.school.application.query.port.SchoolQueryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +35,7 @@ public class SchoolAdminInvitationManagementService {
     private final UserAccountProvisioningPort provisioning;
     private final SchoolAdminInvitationRepository invitations;
     private final SchoolQueryPort schools;
-    private final CurrentActor currentActor;
+    private final PlatformGovernanceAuthorization authorization;
     private final PlaceholderCredentialGenerator placeholderCredentials;
     private final PasswordHasher passwordHasher;
     private final InvitationCodeGenerator invitationCodes;
@@ -47,7 +46,7 @@ public class SchoolAdminInvitationManagementService {
             UserAccountProvisioningPort provisioning,
             SchoolAdminInvitationRepository invitations,
             SchoolQueryPort schools,
-            CurrentActor currentActor,
+            PlatformGovernanceAuthorization authorization,
             PlaceholderCredentialGenerator placeholderCredentials,
             PasswordHasher passwordHasher,
             InvitationCodeGenerator invitationCodes,
@@ -57,7 +56,7 @@ public class SchoolAdminInvitationManagementService {
         this.provisioning = provisioning;
         this.invitations = invitations;
         this.schools = schools;
-        this.currentActor = currentActor;
+        this.authorization = authorization;
         this.placeholderCredentials = placeholderCredentials;
         this.passwordHasher = passwordHasher;
         this.invitationCodes = invitationCodes;
@@ -65,10 +64,10 @@ public class SchoolAdminInvitationManagementService {
     }
 
     public SchoolAdminInvitationResult create(String username, UUID schoolId, Instant requestedExpiresAt) {
+        UUID actorId = authorization.requireSuperAdmin();
         String normalized = normalizeUsername(username);
         Instant now = Instant.now();
         Instant expiresAt = resolveExpiresAt(requestedExpiresAt, now);
-        UUID actorId = currentActor.requireUserId();
 
         if (users.existsByUsername(normalized)) {
             throw error("USERNAME_ALREADY_EXISTS", "Username already exists.");
@@ -96,6 +95,7 @@ public class SchoolAdminInvitationManagementService {
     }
 
     public void revoke(UUID invitationId) {
+        authorization.requireSuperAdmin();
         var probe = invitations.findById(new SchoolAdminInvitationId(requireInvitationId(invitationId)))
                 .orElseThrow(() -> error("INVITATION_NOT_FOUND", "Invitation not found."));
         users.findByIdForUpdate(new UserId(probe.userId()))
@@ -110,6 +110,7 @@ public class SchoolAdminInvitationManagementService {
     }
 
     public SchoolAdminInvitationResult regenerate(UUID invitationId) {
+        UUID actorId = authorization.requireSuperAdmin();
         var probe = invitations.findById(new SchoolAdminInvitationId(requireInvitationId(invitationId)))
                 .orElseThrow(() -> error("INVITATION_NOT_FOUND", "Invitation not found."));
         var user = users.findByIdForUpdate(new UserId(probe.userId()))
@@ -134,7 +135,7 @@ public class SchoolAdminInvitationManagementService {
                 .schoolId(invitation.schoolId())
                 .invitationCodeHash(invitationCodeHasher.hash(rawCode))
                 .expiresAt(resolveExpiresAt(null, Instant.now()))
-                .createdBy(currentActor.requireUserId()));
+                .createdBy(actorId));
         invitations.save(replacement);
 
         return SchoolAdminInvitationResult.withRawCode(user.username(), replacement, rawCode);

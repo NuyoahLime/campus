@@ -35,6 +35,8 @@ public interface SchoolMembershipJpaRepository extends JpaRepository<SchoolMembe
             String roleInSchool
     );
 
+    boolean existsByUserIdAndStatus(UUID userId, String status);
+
     List<SchoolMembershipEntity> findAllByUserIdAndStatusAndRoleInSchoolInOrderByStartedAtAscIdAsc(
             UUID userId,
             String status,

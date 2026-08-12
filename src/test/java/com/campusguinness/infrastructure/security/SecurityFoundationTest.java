@@ -1,5 +1,7 @@
 package com.campusguinness.infrastructure.security;
 
+import com.campusguinness.identity.application.result.UserResult;
+import com.campusguinness.identity.application.service.UserApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -8,8 +10,13 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -21,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityFoundationTest {
 
     @Autowired MockMvc mvc;
+    @MockitoBean UserApplicationService users;
 
     // ── Public endpoints ──
 
@@ -77,6 +85,9 @@ class SecurityFoundationTest {
 
     @Test @WithMockUser(roles = "SUPER_ADMIN")
     void postWithCsrfReachesController() throws Exception {
+        when(users.create(eq("testuser"), eq("password123")))
+                .thenReturn(new UserResult(UUID.randomUUID(), "testuser", "PENDING_ACTIVATION"));
+
         mvc.perform(post("/api/v1/users")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)

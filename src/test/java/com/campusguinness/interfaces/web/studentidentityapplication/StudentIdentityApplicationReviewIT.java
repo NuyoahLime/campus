@@ -50,9 +50,11 @@ class StudentIdentityApplicationReviewIT {
     private UUID adminA;
     private UUID adminA2;
     private UUID ordinaryUser;
+    private UUID superAdmin;
     private String adminAUsername;
     private String adminA2Username;
     private String ordinaryUsername;
+    private String superAdminUsername;
 
     @BeforeEach
     void setUp() {
@@ -61,14 +63,17 @@ class StudentIdentityApplicationReviewIT {
         adminA = UUID.randomUUID();
         adminA2 = UUID.randomUUID();
         ordinaryUser = UUID.randomUUID();
+        superAdmin = UUID.randomUUID();
         adminAUsername = username("admin-a");
         adminA2Username = username("admin-a2");
         ordinaryUsername = username("ordinary");
+        superAdminUsername = username("super-admin");
         insertSchool(schoolA, "A");
         insertSchool(schoolB, "B");
         insertUser(adminA, adminAUsername, "NORMAL", null, "AdminPass123!");
         insertUser(adminA2, adminA2Username, "NORMAL", null, "AdminPass123!");
         insertUser(ordinaryUser, ordinaryUsername, "NORMAL", null, "AdminPass123!");
+        insertUser(superAdmin, superAdminUsername, "NORMAL", "SUPER_ADMIN", "AdminPass123!");
         insertMembership(UUID.randomUUID(), adminA, schoolA, "SCHOOL_ADMIN");
         insertMembership(UUID.randomUUID(), adminA2, schoolA, "SCHOOL_ADMIN");
         insertMembership(UUID.randomUUID(), ordinaryUser, schoolA, "STUDENT");
@@ -128,6 +133,52 @@ class StudentIdentityApplicationReviewIT {
         mvc.perform(get(base(schoolA) + "/" + studentB.applicationId()).cookie(adminSession.cookies()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("STUDENT_APPLICATION_NOT_FOUND"));
+    }
+
+    @Test
+    void schoolAdminCannotReadApproveOrRejectOtherSchoolApplication() throws Exception {
+        var studentB = registerStudent(schoolB, "cross-school");
+        var adminSession = login(adminAUsername, "AdminPass123!");
+
+        mvc.perform(get(base(schoolB) + "/" + studentB.applicationId()).cookie(adminSession.cookies()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        mvc.perform(withCsrf(post(base(schoolB) + "/" + studentB.applicationId() + "/approve"), adminSession))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        mvc.perform(withCsrf(post(base(schoolB) + "/" + studentB.applicationId() + "/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"cross-school rejection\"}"), adminSession))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        assertThat(applicationStatus(studentB.applicationId())).isEqualTo("PENDING");
+        assertThat(applicationReviewerOrNull(studentB.applicationId())).isNull();
+    }
+
+    @Test
+    void forgedReviewIdentityFieldsDoNotOverrideAuthenticatedReviewer() throws Exception {
+        var student = registerStudent(schoolA, "spoofed-reviewer");
+        var adminSession = login(adminAUsername, "AdminPass123!");
+        UUID spoofedReviewerId = UUID.randomUUID();
+
+        mvc.perform(withCsrf(post(base(schoolA) + "/" + student.applicationId() + "/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reviewerId": "%s",
+                                  "actorId": "%s",
+                                  "studentId": "%s",
+                                  "reason": "identity fields are ignored"
+                                }
+                                """.formatted(spoofedReviewerId, UUID.randomUUID(), UUID.randomUUID())), adminSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applicationStatus").value("REJECTED"));
+
+        assertThat(applicationReviewer(student.applicationId())).isEqualTo(adminA);
+        assertThat(applicationReviewer(student.applicationId())).isNotEqualTo(spoofedReviewerId);
     }
 
     @Test
@@ -205,6 +256,14 @@ class StudentIdentityApplicationReviewIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"no\"}"), ordinarySession))
                 .andExpect(status().isForbidden());
+
+        var superAdminSession = login(superAdminUsername, "AdminPass123!");
+        mvc.perform(get(base(schoolA)).cookie(superAdminSession.cookies()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mvc.perform(withCsrf(post(base(schoolA) + "/" + student.applicationId() + "/approve"), superAdminSession))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         var adminSession = login(adminAUsername, "AdminPass123!");
         mvc.perform(post(base(schoolA) + "/" + student.applicationId() + "/approve").cookie(adminSession.cookies()))
@@ -416,6 +475,11 @@ class StudentIdentityApplicationReviewIT {
     private UUID applicationReviewer(UUID applicationId) {
         return jdbc.queryForObject("SELECT reviewed_by FROM student_identity_applications WHERE id = ?",
                 UUID.class, applicationId);
+    }
+
+    private UUID applicationReviewerOrNull(UUID applicationId) {
+        return jdbc.queryForObject("SELECT reviewed_by FROM student_identity_applications WHERE id = ?",
+                (rs, rowNum) -> rs.getObject(1, UUID.class), applicationId);
     }
 
     private boolean applicationReviewedAtPresent(UUID applicationId) {
