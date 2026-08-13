@@ -1,6 +1,6 @@
 package com.campusguinness.school.application.service;
 
-import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.school.application.command.SubmitSchoolRegistrationCommand;
 import com.campusguinness.school.application.port.SchoolRegistrationRepository;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
@@ -14,11 +14,14 @@ import java.util.UUID;
 public class SchoolRegistrationApplicationService {
 
     private final SchoolRegistrationRepository repository;
-    private final CurrentActor currentActor;
+    private final PlatformGovernanceAuthorization authorization;
 
-    public SchoolRegistrationApplicationService(SchoolRegistrationRepository repository, CurrentActor currentActor) {
+    public SchoolRegistrationApplicationService(
+            SchoolRegistrationRepository repository,
+            PlatformGovernanceAuthorization authorization
+    ) {
         this.repository = repository;
-        this.currentActor = currentActor;
+        this.authorization = authorization;
     }
 
     public SchoolRegistrationResult submit(SubmitSchoolRegistrationCommand cmd) {
@@ -29,7 +32,7 @@ public class SchoolRegistrationApplicationService {
     }
 
     public SchoolRegistrationResult approve(UUID registrationId, String comment, UUID schoolId) {
-        UUID actorUserId = currentActor.requireUserId();
+        UUID actorUserId = authorization.requireSuperAdmin();
         var reg = find(registrationId);
         reg.approve(actorUserId, comment, schoolId);
         repository.save(reg);
@@ -37,7 +40,7 @@ public class SchoolRegistrationApplicationService {
     }
 
     public SchoolRegistrationResult reject(UUID registrationId, String reason) {
-        UUID actorUserId = currentActor.requireUserId();
+        UUID actorUserId = authorization.requireSuperAdmin();
         var reg = find(registrationId);
         reg.reject(actorUserId, reason);
         repository.save(reg);

@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByUsername(String username);
     boolean existsByUsername(String username);
+    boolean existsByIdAndAccountStatusAndPlatformRole(UUID id, String accountStatus, String platformRole);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserEntity u where u.id = :id")

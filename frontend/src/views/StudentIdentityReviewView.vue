@@ -266,7 +266,7 @@ onMounted(() => {
 <template>
   <main class="shell-page review-page">
     <header class="topbar">
-      <RouterLink class="topbar-brand topbar-brand-link" to="/">
+      <RouterLink class="topbar-brand topbar-brand-link" to="/school-admin">
         <span class="brand-mark brand-mark-small" aria-hidden="true">G</span>
         <span>校园吉尼斯挑战赛 <span class="topbar-brand-subtitle">学生身份审核</span></span>
       </RouterLink>
@@ -286,7 +286,7 @@ onMounted(() => {
           <h1 id="review-page-title">学生身份审核</h1>
           <p>审核本校学生提交的身份申请。</p>
         </div>
-        <RouterLink class="secondary-button back-home-link" to="/">返回首页</RouterLink>
+        <RouterLink class="secondary-button back-home-link" to="/school-admin">返回工作台</RouterLink>
       </div>
 
       <p v-if="logoutError" class="message message-error" role="status">{{ logoutError }}</p>

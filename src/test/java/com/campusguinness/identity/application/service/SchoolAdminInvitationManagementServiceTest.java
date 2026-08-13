@@ -14,7 +14,6 @@ import com.campusguinness.identity.internal.domain.SchoolAdminInvitationId;
 import com.campusguinness.identity.internal.domain.SchoolAdminInvitationStatus;
 import com.campusguinness.identity.internal.domain.User;
 import com.campusguinness.identity.internal.domain.UserId;
-import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.school.application.query.port.SchoolQueryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +40,7 @@ class SchoolAdminInvitationManagementServiceTest {
     @Mock UserAccountProvisioningPort provisioning;
     @Mock SchoolAdminInvitationRepository invitations;
     @Mock SchoolQueryPort schools;
-    @Mock CurrentActor currentActor;
+    @Mock PlatformGovernanceAuthorization authorization;
     @Mock PlaceholderCredentialGenerator placeholderCredentials;
     @Mock PasswordHasher passwordHasher;
     @Mock InvitationCodeGenerator invitationCodes;
@@ -50,7 +50,7 @@ class SchoolAdminInvitationManagementServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SchoolAdminInvitationManagementService(users, provisioning, invitations, schools, currentActor,
+        service = new SchoolAdminInvitationManagementService(users, provisioning, invitations, schools, authorization,
                 placeholderCredentials, passwordHasher, invitationCodes, invitationCodeHasher);
     }
 
@@ -58,7 +58,7 @@ class SchoolAdminInvitationManagementServiceTest {
     void createPreCreatesPendingUserAndReturnsRawInvitationCodeOnce() {
         UUID schoolId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
-        when(currentActor.requireUserId()).thenReturn(actorId);
+        when(authorization.requireSuperAdmin()).thenReturn(actorId);
         when(schools.isEligibleForMembership(schoolId)).thenReturn(true);
         when(placeholderCredentials.generate()).thenReturn("placeholder-raw");
         when(passwordHasher.hash("placeholder-raw")).thenReturn("placeholder-hash");
@@ -84,7 +84,7 @@ class SchoolAdminInvitationManagementServiceTest {
     @Test
     void duplicateUsernameFailsWithStableCode() {
         when(users.existsByUsername("taken")).thenReturn(true);
-        when(currentActor.requireUserId()).thenReturn(UUID.randomUUID());
+        when(authorization.requireSuperAdmin()).thenReturn(UUID.randomUUID());
 
         assertThatThrownBy(() -> service.create("taken", UUID.randomUUID(), null))
                 .isInstanceOf(IdentityApplicationException.class)
@@ -111,7 +111,7 @@ class SchoolAdminInvitationManagementServiceTest {
         when(invitations.findByIdForUpdate(new SchoolAdminInvitationId(invitationId))).thenReturn(Optional.of(invitation));
         when(invitationCodes.generate()).thenReturn("new-code");
         when(invitationCodeHasher.hash("new-code")).thenReturn("new-hash");
-        when(currentActor.requireUserId()).thenReturn(actorId);
+        when(authorization.requireSuperAdmin()).thenReturn(actorId);
 
         var result = service.regenerate(invitationId);
 
@@ -121,5 +121,16 @@ class SchoolAdminInvitationManagementServiceTest {
         verify(invitations).save(org.mockito.ArgumentMatchers.argThat(next ->
                 next.userId().equals(userId) && next.status() == SchoolAdminInvitationStatus.PENDING
                         && next.invitationCodeHash().equals("new-hash")));
+    }
+
+    @Test
+    void rejectsDirectManagementWithoutPlatformGovernanceAuthority() {
+        when(authorization.requireSuperAdmin()).thenThrow(
+                new IdentityApplicationException("PLATFORM_GOVERNANCE_DENIED", "denied"));
+
+        assertThatThrownBy(() -> service.revoke(UUID.randomUUID()))
+                .isInstanceOf(IdentityApplicationException.class);
+
+        verifyNoInteractions(users, provisioning, invitations, schools);
     }
 }

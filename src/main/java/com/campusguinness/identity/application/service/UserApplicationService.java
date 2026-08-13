@@ -19,11 +19,18 @@ public class UserApplicationService {
     private final UserRepository repo;
     private final UserAccountProvisioningPort provisioning;
     private final PasswordHasher hasher;
+    private final PlatformGovernanceAuthorization authorization;
 
-    public UserApplicationService(UserRepository repo, UserAccountProvisioningPort provisioning, PasswordHasher hasher) {
+    public UserApplicationService(
+            UserRepository repo,
+            UserAccountProvisioningPort provisioning,
+            PasswordHasher hasher,
+            PlatformGovernanceAuthorization authorization
+    ) {
         this.repo = repo;
         this.provisioning = provisioning;
         this.hasher = hasher;
+        this.authorization = authorization;
     }
 
     /**
@@ -31,6 +38,7 @@ public class UserApplicationService {
      * The user is created in PENDING_ACTIVATION state with platformRole=null.
      */
     public UserResult create(String username, String rawPassword) {
+        authorization.requireSuperAdmin();
         String normalized = username != null ? username.trim() : "";
         if (normalized.isEmpty()) throw new IllegalArgumentException("username must not be blank");
         PasswordPolicy.validate(rawPassword);
@@ -46,9 +54,29 @@ public class UserApplicationService {
         return result(saved);
     }
 
-    public UserResult activate(UUID id) { var u=find(id); u.activate(); repo.save(u); return result(u); }
-    public UserResult disable(UUID id) { var u=find(id); u.disable(); repo.save(u); return result(u); }
-    public UserResult reEnable(UUID id) { var u=find(id); u.reEnable(); repo.save(u); return result(u); }
+    public UserResult activate(UUID id) {
+        authorization.requireSuperAdmin();
+        var user = find(id);
+        user.activate();
+        repo.save(user);
+        return result(user);
+    }
+
+    public UserResult disable(UUID id) {
+        authorization.requireSuperAdmin();
+        var user = find(id);
+        user.disable();
+        repo.save(user);
+        return result(user);
+    }
+
+    public UserResult reEnable(UUID id) {
+        authorization.requireSuperAdmin();
+        var user = find(id);
+        user.reEnable();
+        repo.save(user);
+        return result(user);
+    }
 
     private User find(UUID id) { return repo.findById(new UserId(id)).orElseThrow(()->new IllegalArgumentException("User not found: "+id)); }
     private UserResult result(User u) { return new UserResult(u.id().value(), u.username(), u.status().name()); }

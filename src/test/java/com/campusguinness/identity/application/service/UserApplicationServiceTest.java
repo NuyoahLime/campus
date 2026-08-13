@@ -1,6 +1,7 @@
 package com.campusguinness.identity.application.service;
 
 import com.campusguinness.identity.application.exception.InvalidPasswordException;
+import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.identity.application.exception.UsernameAlreadyExistsException;
 import com.campusguinness.identity.application.port.PasswordHasher;
 import com.campusguinness.identity.application.port.UserAccountProvisioningPort;
@@ -26,10 +27,11 @@ class UserApplicationServiceTest {
     @Mock UserRepository repo;
     @Mock UserAccountProvisioningPort provisioning;
     @Mock PasswordHasher hasher;
+    @Mock PlatformGovernanceAuthorization authorization;
     UserApplicationService svc;
 
     @BeforeEach void setUp() {
-        svc = new UserApplicationService(repo, provisioning, hasher);
+        svc = new UserApplicationService(repo, provisioning, hasher, authorization);
     }
 
     private User user() { return User.create(new User.Builder().id(new UserId(UUID.randomUUID())).username("u")); }
@@ -132,4 +134,15 @@ class UserApplicationServiceTest {
     @Nested class Activate { @Test void success() { var u=user(); when(repo.findById(any())).thenReturn(Optional.of(u)); assertThat(svc.activate(u.id().value()).status()).isEqualTo("NORMAL"); verify(repo).save(any()); } @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.activate(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); } }
     @Nested class Disable { @Test void success() { var u=user(); u.activate(); when(repo.findById(any())).thenReturn(Optional.of(u)); assertThat(svc.disable(u.id().value()).status()).isEqualTo("DISABLED"); verify(repo).save(any()); } }
     @Nested class ReEnable { @Test void success() { var u=user(); u.activate(); u.disable(); when(repo.findById(any())).thenReturn(Optional.of(u)); assertThat(svc.reEnable(u.id().value()).status()).isEqualTo("NORMAL"); verify(repo).save(any()); } }
+
+    @Test
+    void rejectsDirectInvocationWithoutPlatformGovernanceAuthority() {
+        when(authorization.requireSuperAdmin()).thenThrow(
+                new IdentityApplicationException("PLATFORM_GOVERNANCE_DENIED", "denied"));
+
+        assertThatThrownBy(() -> svc.activate(UUID.randomUUID()))
+                .isInstanceOf(IdentityApplicationException.class);
+
+        verifyNoInteractions(repo, provisioning, hasher);
+    }
 }
