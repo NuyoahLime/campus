@@ -4,14 +4,17 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import type { WorkspaceNavigationItem } from '../types/workspace';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   roleLabel: string;
   workspaceTitle: string;
   pageTitle: string;
   description: string;
   homePath: string;
   navigation: WorkspaceNavigationItem[];
-}>();
+  showIdentity?: boolean;
+}>(), {
+  showIdentity: true
+});
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -100,7 +103,11 @@ async function handleLogout() {
           {{ logoutError }}
         </p>
 
-        <section v-if="user" class="workspace-identity" aria-labelledby="workspace-identity-title">
+        <section
+          v-if="user && props.showIdentity !== false"
+          class="workspace-identity"
+          aria-labelledby="workspace-identity-title"
+        >
           <div class="workspace-section-heading">
             <div>
               <p>SESSION IDENTITY</p>

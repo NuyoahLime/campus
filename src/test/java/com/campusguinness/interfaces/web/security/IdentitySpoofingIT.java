@@ -8,6 +8,7 @@ import com.campusguinness.interfaces.web.feedback.FeedbackController;
 import com.campusguinness.interfaces.web.schoolregistration.SchoolRegistrationController;
 import com.campusguinness.interfaces.web.scoreappeal.ScoreAppealController;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
+import com.campusguinness.school.application.query.SchoolRegistrationQueryService;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,7 @@ class IdentitySpoofingIT {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService scoreAppeals;
     @MockitoBean SchoolRegistrationApplicationService schoolRegistrations;
+    @MockitoBean SchoolRegistrationQueryService schoolRegistrationQueries;
     @MockitoBean FeedbackApplicationService feedbacks;
 
     @Test

@@ -2,6 +2,7 @@ package com.campusguinness.interfaces.web.common;
 
 import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
+import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,6 +38,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleIdentityApplication(IdentityApplicationException ex, HttpServletRequest req) {
         return ResponseEntity.status(statusFor(ex.code()))
                 .body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(SchoolRegistrationNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleSchoolRegistrationNotFound(
+            SchoolRegistrationNotFoundException ex,
+            HttpServletRequest req
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of(
+                        "SCHOOL_REGISTRATION_NOT_FOUND",
+                        ex.getMessage(),
+                        req.getRequestURI()
+                ));
     }
 
     @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
