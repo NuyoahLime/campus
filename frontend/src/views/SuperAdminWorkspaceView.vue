@@ -4,7 +4,7 @@ import type { WorkspaceNavigationItem } from '../types/workspace';
 
 const navigation: WorkspaceNavigationItem[] = [
   { label: '工作台概览', to: '/super-admin' },
-  { label: '学校治理', disabled: true },
+  { label: '学校治理', to: '/super-admin/school-registrations' },
   { label: '学校管理员', disabled: true },
   { label: '挑战项目', disabled: true },
   { label: '平台运营', disabled: true }

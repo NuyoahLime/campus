@@ -11,6 +11,8 @@ import StudentIdentityReviewView from '../views/StudentIdentityReviewView.vue';
 import StudentRegistrationView from '../views/StudentRegistrationView.vue';
 import StudentWorkspaceView from '../views/StudentWorkspaceView.vue';
 import SuperAdminWorkspaceView from '../views/SuperAdminWorkspaceView.vue';
+import SuperAdminSchoolRegistrationDetailView from '../views/SuperAdminSchoolRegistrationDetailView.vue';
+import SuperAdminSchoolRegistrationListView from '../views/SuperAdminSchoolRegistrationListView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -59,6 +61,18 @@ const router = createRouter({
       path: '/super-admin',
       name: 'super-admin-workspace',
       component: SuperAdminWorkspaceView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/school-registrations',
+      name: 'super-admin-school-registrations',
+      component: SuperAdminSchoolRegistrationListView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/school-registrations/:id',
+      name: 'super-admin-school-registration-detail',
+      component: SuperAdminSchoolRegistrationDetailView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
     },
     {
