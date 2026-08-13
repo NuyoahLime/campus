@@ -3,6 +3,7 @@ package com.campusguinness.school.internal.domain;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -34,8 +35,12 @@ public final class SchoolRegistration {
     private RegistrationStatus status;
     private UUID createdSchoolId;
     private UUID reviewedBy;
+    private Instant reviewedAt;
     private String reviewComment;
     private String rejectReason;
+    private final Instant createdAt;
+    private final Instant updatedAt;
+    private final int version;
     private final List<Object> domainEvents;
 
     private SchoolRegistration(Builder b) {
@@ -54,8 +59,12 @@ public final class SchoolRegistration {
         this.status = b.status != null ? b.status : RegistrationStatus.DRAFT;
         this.createdSchoolId = b.createdSchoolId;
         this.reviewedBy = b.reviewedBy;
+        this.reviewedAt = b.reviewedAt;
         this.reviewComment = b.reviewComment;
         this.rejectReason = b.rejectReason;
+        this.createdAt = b.createdAt;
+        this.updatedAt = b.updatedAt;
+        this.version = b.version;
         this.domainEvents = new ArrayList<>();
     }
 
@@ -102,8 +111,9 @@ public final class SchoolRegistration {
             throw new InvalidRegistrationStateTransitionException(status, "request supplement");
         }
         this.status = RegistrationStatus.NEED_SUPPLEMENT;
-        this.reviewedBy = reviewerId;
-        this.reviewComment = comment;
+        recordReview(reviewerId);
+        this.reviewComment = requireText(comment, "comment");
+        this.rejectReason = null;
         domainEvents.add(new SchoolRegistrationSupplementRequested(id));
     }
 
@@ -114,8 +124,9 @@ public final class SchoolRegistration {
         }
         if (schoolId == null) throw new IllegalArgumentException("schoolId required for approval");
         this.status = RegistrationStatus.APPROVED;
-        this.reviewedBy = reviewerId;
-        this.reviewComment = comment;
+        recordReview(reviewerId);
+        this.reviewComment = normalize(comment);
+        this.rejectReason = null;
         this.createdSchoolId = schoolId;
         domainEvents.add(new SchoolRegistrationApproved(id));
     }
@@ -126,8 +137,9 @@ public final class SchoolRegistration {
             throw new InvalidRegistrationStateTransitionException(status, "reject");
         }
         this.status = RegistrationStatus.REJECTED;
-        this.reviewedBy = reviewerId;
-        this.rejectReason = reason;
+        recordReview(reviewerId);
+        this.reviewComment = null;
+        this.rejectReason = requireText(reason, "reason");
         domainEvents.add(new SchoolRegistrationRejected(id));
     }
 
@@ -168,8 +180,12 @@ public final class SchoolRegistration {
     public RegistrationStatus status() { return status; }
     public UUID createdSchoolId() { return createdSchoolId; }
     public UUID reviewedBy() { return reviewedBy; }
+    public Instant reviewedAt() { return reviewedAt; }
     public String reviewComment() { return reviewComment; }
     public String rejectReason() { return rejectReason; }
+    public Instant createdAt() { return createdAt; }
+    public Instant updatedAt() { return updatedAt; }
+    public int version() { return version; }
 
     public List<Object> domainEvents() { return Collections.unmodifiableList(domainEvents); }
 
@@ -180,7 +196,9 @@ public final class SchoolRegistration {
         private String contactName, contactPhone, contactEmail, description, evidenceFileKey;
         RegistrationStatus status;
         UUID createdSchoolId, reviewedBy;
+        Instant reviewedAt, createdAt, updatedAt;
         String reviewComment, rejectReason;
+        int version;
 
         public Builder id(SchoolRegistrationId v) { this.id = v; return this; }
         public Builder schoolName(String v) { this.schoolName = v; return this; }
@@ -197,7 +215,29 @@ public final class SchoolRegistration {
         public Builder status(RegistrationStatus v) { this.status = v; return this; }
         public Builder createdSchoolId(UUID v) { this.createdSchoolId = v; return this; }
         public Builder reviewedBy(UUID v) { this.reviewedBy = v; return this; }
+        public Builder reviewedAt(Instant v) { this.reviewedAt = v; return this; }
         public Builder reviewComment(String v) { this.reviewComment = v; return this; }
         public Builder rejectReason(String v) { this.rejectReason = v; return this; }
+        public Builder createdAt(Instant v) { this.createdAt = v; return this; }
+        public Builder updatedAt(Instant v) { this.updatedAt = v; return this; }
+        public Builder version(int v) { this.version = v; return this; }
+    }
+
+    private void recordReview(UUID reviewerId) {
+        if (reviewerId == null) throw new IllegalArgumentException("reviewerId required");
+        this.reviewedBy = reviewerId;
+        this.reviewedAt = Instant.now();
+    }
+
+    private static String requireText(String value, String field) {
+        String normalized = normalize(value);
+        if (normalized == null) throw new IllegalArgumentException(field + " required");
+        return normalized;
+    }
+
+    private static String normalize(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

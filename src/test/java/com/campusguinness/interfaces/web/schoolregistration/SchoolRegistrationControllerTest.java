@@ -7,6 +7,7 @@ import com.campusguinness.school.application.query.model.SchoolRegistrationDetai
 import com.campusguinness.school.application.query.model.SchoolRegistrationListResult;
 import com.campusguinness.project.application.query.model.QueryPage;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
+import com.campusguinness.school.application.service.SchoolRegistrationReviewApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SchoolRegistrationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean SchoolRegistrationApplicationService service;
+    @MockitoBean SchoolRegistrationReviewApplicationService reviewService;
     @MockitoBean SchoolRegistrationQueryService queryService;
     @Autowired ObjectMapper mapper;
 
@@ -107,19 +109,62 @@ class SchoolRegistrationControllerTest {
     @Nested class Approve {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID(), sid = UUID.randomUUID();
-            when(service.approve(eq(id), any(), eq(sid))).thenReturn(new SchoolRegistrationResult(id, "t", "APPROVED", sid));
+            when(reviewService.approve(eq(id), any())).thenReturn(new SchoolRegistrationResult(id, "t", "APPROVED", sid));
             mvc.perform(post("/api/v1/school-registrations/" + id + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok", sid))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("APPROVED"))
+                    .andExpect(jsonPath("$.createdSchoolId").value(sid.toString()));
+        }
+
+        @Test void rejectsOversizedComment() throws Exception {
+            UUID id = UUID.randomUUID();
+            mvc.perform(post("/api/v1/school-registrations/" + id + "/approve")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(
+                                    new ApproveSchoolRegistrationRequest("x".repeat(2001)))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+    }
+    @Nested class RequestSupplement {
+        @Test void shouldReturn200() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(reviewService.requestSupplement(eq(id), any()))
+                    .thenReturn(new SchoolRegistrationResult(id, "t", "NEED_SUPPLEMENT", null));
+            mvc.perform(post("/api/v1/school-registrations/" + id + "/request-supplement")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(
+                                    new RequestSchoolRegistrationSupplementRequest("need license"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("NEED_SUPPLEMENT"));
+        }
+
+
+        @Test void rejectsBlankComment() throws Exception {
+            mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/request-supplement")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"comment\":\"   \"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
     }
     @Nested class Reject {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.reject(eq(id), any())).thenReturn(new SchoolRegistrationResult(id, "t", "REJECTED", null));
+            when(reviewService.reject(eq(id), any())).thenReturn(new SchoolRegistrationResult(id, "t", "REJECTED", null));
             mvc.perform(post("/api/v1/school-registrations/" + id + "/reject").contentType(MediaType.APPLICATION_JSON)
                     .content(mapper.writeValueAsString(new RejectSchoolRegistrationRequest("reason"))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+        }
+
+
+        @Test void rejectsBlankReason() throws Exception {
+            mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/reject")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"   \"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
     }
     @Nested class Withdraw {
@@ -132,9 +177,9 @@ class SchoolRegistrationControllerTest {
     }
     @Nested class Errors {
         @Test void notFound() throws Exception {
-            when(service.approve(any(), any(), any())).thenThrow(new IllegalArgumentException("not found"));
+            when(reviewService.approve(any(), any())).thenThrow(new IllegalArgumentException("not found"));
             mvc.perform(post("/api/v1/school-registrations/" + UUID.randomUUID() + "/approve").contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok", UUID.randomUUID()))))
+                    .content(mapper.writeValueAsString(new ApproveSchoolRegistrationRequest("ok"))))
                     .andExpect(status().isNotFound());
         }
     }

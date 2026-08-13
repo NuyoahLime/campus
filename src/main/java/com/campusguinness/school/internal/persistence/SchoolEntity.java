@@ -11,7 +11,7 @@ public class SchoolEntity {
     @Id @Column(name = "id", nullable = false, updatable = false) private UUID id;
     @Column(name = "name", nullable = false, length = 200) private String name;
     @Column(name = "unified_code_type", nullable = false, length = 32) private String unifiedCodeType;
-    @Column(name = "unified_code", nullable = false, length = 64) private String unifiedCode;
+    @Column(name = "unified_code", length = 64) private String unifiedCode;
     @Column(name = "internal_code", nullable = false, length = 32, unique = true) private String internalCode;
     @Column(name = "school_type", nullable = false, length = 32) private String schoolType;
     @Column(name = "region", nullable = false, length = 128) private String region;

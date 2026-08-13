@@ -637,6 +637,122 @@
   word-break: break-word;
 }
 
+.registration-review-message {
+  margin: 16px 0 0;
+}
+
+.registration-review-panel,
+.registration-review-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid #dce3eb;
+  border-radius: 8px;
+  padding: 18px 20px;
+  background: #ffffff;
+}
+
+.registration-review-panel h2,
+.registration-review-panel p,
+.registration-review-notice p {
+  margin: 0;
+}
+
+.registration-review-panel h2 {
+  font-size: 17px;
+}
+
+.registration-review-panel p,
+.registration-review-notice p {
+  margin-top: 5px;
+  color: #637084;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.registration-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.registration-danger-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #c53a48;
+  border-radius: 6px;
+  padding: 0 16px;
+  color: #ffffff;
+  background: #c53a48;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.registration-danger-button:hover:not(:disabled) {
+  border-color: #ac2f3b;
+  background: #ac2f3b;
+}
+
+.registration-review-notice {
+  align-items: flex-start;
+  justify-content: flex-start;
+  border-color: #efd9ac;
+  background: #fff9eb;
+}
+
+.registration-review-approved {
+  border-color: #bce4d2;
+  background: #effaf5;
+}
+
+.registration-review-modal {
+  max-height: min(760px, calc(100vh - 48px));
+  overflow-y: auto;
+}
+
+.registration-confirmation-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 18px 0 0;
+  border: 1px solid #e2e7ed;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.registration-confirmation-list > div {
+  min-width: 0;
+  border-right: 1px solid #e2e7ed;
+  border-bottom: 1px solid #e2e7ed;
+  padding: 12px 14px;
+}
+
+.registration-confirmation-list > div:nth-child(2n) { border-right: 0; }
+.registration-confirmation-list > div:nth-last-child(-n + 2) { border-bottom: 0; }
+.registration-confirmation-list dt { color: #718096; font-size: 12px; }
+.registration-confirmation-list dd {
+  margin: 5px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.registration-dialog-error {
+  display: block;
+  margin-top: 10px;
+}
+
+.registration-review-actions button:disabled,
+.registration-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -859,4 +975,36 @@
   .registration-detail-grid > div:last-child {
     border-bottom: 0;
   }
+
+  .registration-review-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .registration-review-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .registration-review-actions button,
+  .registration-review-modal .modal-actions button {
+    width: 100%;
+  }
+
+  .registration-review-modal {
+    max-height: calc(100vh - 24px);
+  }
+
+  .registration-confirmation-list {
+    grid-template-columns: 1fr;
+  }
+
+  .registration-confirmation-list > div,
+  .registration-confirmation-list > div:nth-child(2n),
+  .registration-confirmation-list > div:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid #e2e7ed;
+  }
+
+  .registration-confirmation-list > div:last-child { border-bottom: 0; }
 }

@@ -10,6 +10,7 @@ import com.campusguinness.interfaces.web.scoreappeal.ScoreAppealController;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
 import com.campusguinness.school.application.query.SchoolRegistrationQueryService;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
+import com.campusguinness.school.application.service.SchoolRegistrationReviewApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,6 +36,7 @@ class IdentitySpoofingIT {
     @Autowired MockMvc mvc;
     @MockitoBean ScoreAppealApplicationService scoreAppeals;
     @MockitoBean SchoolRegistrationApplicationService schoolRegistrations;
+    @MockitoBean SchoolRegistrationReviewApplicationService schoolRegistrationReviews;
     @MockitoBean SchoolRegistrationQueryService schoolRegistrationQueries;
     @MockitoBean FeedbackApplicationService feedbacks;
 
@@ -66,10 +68,10 @@ class IdentitySpoofingIT {
     @Test
     void schoolAdminCannotApproveSchoolRegistrationAsAnotherReviewerThroughRequestReviewerId() throws Exception {
         UUID registrationId = UUID.randomUUID();
-        UUID schoolId = UUID.randomUUID();
         UUID spoofedReviewerId = UUID.randomUUID();
-        when(schoolRegistrations.approve(eq(registrationId), eq("ok"), eq(schoolId)))
-                .thenReturn(new SchoolRegistrationResult(registrationId, "school", "APPROVED", schoolId));
+        UUID createdSchoolId = UUID.randomUUID();
+        when(schoolRegistrationReviews.approve(eq(registrationId), eq("ok")))
+                .thenReturn(new SchoolRegistrationResult(registrationId, "school", "APPROVED", createdSchoolId));
 
         mvc.perform(post("/api/v1/school-registrations/{id}/approve", registrationId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,10 +81,10 @@ class IdentitySpoofingIT {
                                   "comment": "ok",
                                   "schoolId": "%s"
                                 }
-                                """.formatted(spoofedReviewerId, schoolId)))
+                                """.formatted(spoofedReviewerId, UUID.randomUUID())))
                 .andExpect(status().isOk());
 
-        verify(schoolRegistrations).approve(registrationId, "ok", schoolId);
+        verify(schoolRegistrationReviews).approve(registrationId, "ok");
     }
 
     @Test
