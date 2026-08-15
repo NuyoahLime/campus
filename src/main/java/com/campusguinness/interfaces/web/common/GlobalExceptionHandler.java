@@ -3,9 +3,12 @@ package com.campusguinness.interfaces.web.common;
 import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
+import com.campusguinness.school.application.exception.SchoolRegistrationReviewException;
+import com.campusguinness.school.internal.persistence.SchoolRegistrationConcurrentReviewException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.access.AccessDeniedException;
@@ -53,6 +56,44 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(SchoolRegistrationReviewException.class)
+    public ResponseEntity<ApiErrorResponse> handleSchoolRegistrationReview(
+            SchoolRegistrationReviewException ex,
+            HttpServletRequest req
+    ) {
+        HttpStatus status = "SCHOOL_REGISTRATION_NOT_FOUND".equals(ex.code())
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.CONFLICT;
+        return ResponseEntity.status(status)
+                .body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(SchoolRegistrationConcurrentReviewException.class)
+    public ResponseEntity<ApiErrorResponse> handleConcurrentSchoolRegistrationReview(
+            SchoolRegistrationConcurrentReviewException ex,
+            HttpServletRequest req
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        "SCHOOL_REGISTRATION_REVIEW_CONFLICT",
+                        ex.getMessage(),
+                        req.getRequestURI()
+                ));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiErrorResponse> handleOptimisticSchoolRegistrationReview(
+            ObjectOptimisticLockingFailureException ex,
+            HttpServletRequest req
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        "SCHOOL_REGISTRATION_REVIEW_CONFLICT",
+                        "School registration was updated by another reviewer.",
+                        req.getRequestURI()
+                ));
+    }
+
     @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(RuntimeException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -76,6 +117,14 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ApiErrorResponse.of("STUDENT_APPROVAL_CONFLICT",
                             "Student application approval conflict.", req.getRequestURI()));
+        }
+        if (containsInCauseChain(ex, "uq_schools_unified_code")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of(
+                            "SCHOOL_UNIFIED_CODE_CONFLICT",
+                            "A school with the same unified code already exists.",
+                            req.getRequestURI()
+                    ));
         }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));

@@ -7,4 +7,5 @@ import java.util.Optional;
 public interface SchoolRepository {
     void save(School school);
     Optional<School> findById(SchoolId id);
+    boolean existsByUnifiedCode(String unifiedCodeType, String unifiedCode);
 }

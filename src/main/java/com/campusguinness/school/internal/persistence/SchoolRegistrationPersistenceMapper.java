@@ -23,11 +23,22 @@ final class SchoolRegistrationPersistenceMapper {
         e.setRegistrationStatus(domain.status().name());
         e.setCreatedSchoolId(domain.createdSchoolId());
         e.setReviewedBy(domain.reviewedBy());
+        e.setReviewedAt(domain.reviewedAt());
         e.setReviewComment(domain.reviewComment());
         e.setRejectReason(domain.rejectReason());
         e.setCreatedAt(Instant.now());
         e.setUpdatedAt(Instant.now());
         return e;
+    }
+
+    static void updateEntity(SchoolRegistrationEntity e, SchoolRegistration domain) {
+        e.setRegistrationStatus(domain.status().name());
+        e.setCreatedSchoolId(domain.createdSchoolId());
+        e.setReviewedBy(domain.reviewedBy());
+        e.setReviewedAt(domain.reviewedAt());
+        e.setReviewComment(domain.reviewComment());
+        e.setRejectReason(domain.rejectReason());
+        e.setUpdatedAt(Instant.now());
     }
 
     static SchoolRegistration toDomain(SchoolRegistrationEntity e) {
@@ -42,7 +53,11 @@ final class SchoolRegistrationPersistenceMapper {
                 .status(RegistrationStatus.valueOf(e.getRegistrationStatus()))
                 .createdSchoolId(e.getCreatedSchoolId())
                 .reviewedBy(e.getReviewedBy())
+                .reviewedAt(e.getReviewedAt())
                 .reviewComment(e.getReviewComment())
-                .rejectReason(e.getRejectReason()));
+                .rejectReason(e.getRejectReason())
+                .createdAt(e.getCreatedAt())
+                .updatedAt(e.getUpdatedAt())
+                .version(e.getVersion()));
     }
 }

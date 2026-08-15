@@ -30,4 +30,10 @@ class SchoolRepositoryAdapter implements SchoolRepository {
         return jpaRepository.findById(id.value())
                 .map(SchoolPersistenceMapper::toDomain);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByUnifiedCode(String unifiedCodeType, String unifiedCode) {
+        return jpaRepository.existsByUnifiedCodeTypeAndUnifiedCode(unifiedCodeType, unifiedCode);
+    }
 }

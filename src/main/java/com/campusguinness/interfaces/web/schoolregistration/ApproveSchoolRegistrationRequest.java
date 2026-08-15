@@ -1,8 +1,7 @@
 package com.campusguinness.interfaces.web.schoolregistration;
 
-import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
+import jakarta.validation.constraints.Size;
 
 public record ApproveSchoolRegistrationRequest(
-        String comment,
-        @NotNull UUID schoolId) {}
+        @Size(max = 2000) String comment
+) {}

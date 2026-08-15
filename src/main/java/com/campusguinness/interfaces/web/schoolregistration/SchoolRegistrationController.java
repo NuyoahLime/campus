@@ -6,6 +6,7 @@ import com.campusguinness.school.application.query.model.SchoolRegistrationDetai
 import com.campusguinness.school.application.query.model.SchoolRegistrationListResult;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
+import com.campusguinness.school.application.service.SchoolRegistrationReviewApplicationService;
 
 import com.campusguinness.interfaces.web.common.PageResponse;
 import jakarta.validation.Valid;
@@ -22,13 +23,16 @@ import java.util.UUID;
 public class SchoolRegistrationController {
 
     private final SchoolRegistrationApplicationService service;
+    private final SchoolRegistrationReviewApplicationService reviewService;
     private final SchoolRegistrationQueryService queryService;
 
     public SchoolRegistrationController(
             SchoolRegistrationApplicationService service,
+            SchoolRegistrationReviewApplicationService reviewService,
             SchoolRegistrationQueryService queryService
     ) {
         this.service = service;
+        this.reviewService = reviewService;
         this.queryService = queryService;
     }
 
@@ -65,18 +69,25 @@ public class SchoolRegistrationController {
                 .body(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
     }
 
+    @PostMapping("/{id}/request-supplement")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<SchoolRegistrationResponse> requestSupplement(
+            @PathVariable UUID id,
+            @Valid @RequestBody RequestSchoolRegistrationSupplementRequest req
+    ) {
+        return reviewResponse(reviewService.requestSupplement(id, req.comment()));
+    }
+
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> approve(@PathVariable UUID id, @Valid @RequestBody ApproveSchoolRegistrationRequest req) {
-        SchoolRegistrationResult r = service.approve(id, req.comment(), req.schoolId());
-        return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
+        return reviewResponse(reviewService.approve(id, req.comment()));
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<SchoolRegistrationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectSchoolRegistrationRequest req) {
-        SchoolRegistrationResult r = service.reject(id, req.reason());
-        return ResponseEntity.ok(new SchoolRegistrationResponse(r.id(), r.schoolName(), r.status(), r.createdSchoolId()));
+        return reviewResponse(reviewService.reject(id, req.reason()));
     }
 
     @PostMapping("/{id}/withdraw")
@@ -101,5 +112,11 @@ public class SchoolRegistrationController {
                 result.status(), result.createdSchoolId(), result.reviewedBy(), result.reviewedAt(),
                 result.reviewComment(), result.rejectReason(), result.createdAt(), result.updatedAt()
         );
+    }
+
+    private ResponseEntity<SchoolRegistrationResponse> reviewResponse(SchoolRegistrationResult result) {
+        return ResponseEntity.ok(new SchoolRegistrationResponse(
+                result.id(), result.schoolName(), result.status(), result.createdSchoolId()
+        ));
     }
 }

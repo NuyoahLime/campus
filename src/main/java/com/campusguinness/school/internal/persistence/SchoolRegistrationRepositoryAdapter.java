@@ -21,7 +21,16 @@ class SchoolRegistrationRepositoryAdapter implements SchoolRegistrationRepositor
     @Override
     @Transactional
     public void save(SchoolRegistration registration) {
-        jpaRepository.save(SchoolRegistrationPersistenceMapper.toEntity(registration));
+        var existing = jpaRepository.findById(registration.id().value());
+        if (existing.isPresent()) {
+            if (existing.get().getVersion() != registration.version()) {
+                throw new SchoolRegistrationConcurrentReviewException();
+            }
+            SchoolRegistrationPersistenceMapper.updateEntity(existing.get(), registration);
+            jpaRepository.save(existing.get());
+        } else {
+            jpaRepository.save(SchoolRegistrationPersistenceMapper.toEntity(registration));
+        }
     }
 
     @Override

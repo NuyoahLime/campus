@@ -8,4 +8,5 @@ public interface SchoolJpaRepository extends JpaRepository<SchoolEntity, UUID> {
     Optional<SchoolEntity> findByInternalCode(String internalCode);
     org.springframework.data.domain.Page<SchoolEntity> findBySchoolStatus(String status, org.springframework.data.domain.Pageable pageable);
     boolean existsByIdAndSchoolStatus(UUID id, String schoolStatus);
+    boolean existsByUnifiedCodeTypeAndUnifiedCode(String unifiedCodeType, String unifiedCode);
 }

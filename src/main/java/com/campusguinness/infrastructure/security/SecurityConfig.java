@@ -125,6 +125,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/schools/*/activate",
                         "/api/v1/schools/*/disable",
+                        "/api/v1/school-registrations/*/request-supplement",
                         "/api/v1/school-registrations/*/approve",
                         "/api/v1/school-registrations/*/reject",
                         "/api/v1/challenge-projects",
