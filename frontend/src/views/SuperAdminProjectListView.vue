@@ -6,6 +6,11 @@ import { ApiError } from '../api/http';
 import { listGovernanceProjects } from '../api/challengeProjects';
 import { superAdminNavigation as navigation } from '../router/superAdminNavigation';
 import type { GovernanceProjectListItem, ProjectPage, ProjectStatus } from '../types/challengeProject';
+import {
+  labelForCategory,
+  labelForProjectStatus,
+  labelForScoreStorageType
+} from '../utils/challengeProjectLabels';
 
 const items = ref<GovernanceProjectListItem[]>([]);
 const result = ref<ProjectPage<GovernanceProjectListItem> | null>(null);
@@ -15,10 +20,6 @@ const search = ref('');
 const loading = ref(true);
 const error = ref('');
 const page = ref(0);
-
-function statusLabel(value: ProjectStatus) {
-  return value === 'DRAFT' ? '草稿' : value === 'PUBLISHED' ? '已上架' : '已下架';
-}
 
 async function load() {
   loading.value = true;
@@ -53,7 +54,7 @@ onMounted(() => void load());
       <div v-if="loading" class="project-state">正在加载项目...</div>
       <div v-else-if="error" class="project-state project-state-error"><strong>{{ error }}</strong><button class="secondary-button" type="button" @click="load">重新加载</button></div>
       <div v-else-if="items.length === 0" class="project-state"><strong>暂无项目</strong><p>可以创建一个新的草稿项目。</p></div>
-      <div v-else class="project-admin-table-wrap"><table class="project-admin-table"><thead><tr><th>项目名称</th><th>分类</th><th>状态</th><th>成绩类型</th><th>规则版本</th><th>更新时间</th><th></th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td><strong>{{ item.name }}</strong></td><td>{{ item.category }}</td><td><span class="project-status" :data-status="item.status">{{ statusLabel(item.status) }}</span></td><td>{{ item.scoreStorageType }}</td><td>{{ item.currentRuleVersionNumber ? `V${item.currentRuleVersionNumber}` : '未发布' }}</td><td>{{ new Date(item.updatedAt).toLocaleString() }}</td><td><RouterLink class="registration-detail-link" :to="`/super-admin/projects/${item.id}`">查看详情</RouterLink></td></tr></tbody></table></div>
+      <div v-else class="project-admin-table-wrap"><table class="project-admin-table"><thead><tr><th>项目名称</th><th>分类</th><th>状态</th><th>成绩类型</th><th>规则版本</th><th>更新时间</th><th></th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td><strong>{{ item.name }}</strong></td><td>{{ labelForCategory(item.category) }}</td><td><span class="project-status" :data-status="item.status">{{ labelForProjectStatus(item.status) }}</span></td><td>{{ labelForScoreStorageType(item.scoreStorageType) }}</td><td>{{ item.currentRuleVersionNumber ? `V${item.currentRuleVersionNumber}` : '未发布' }}</td><td>{{ new Date(item.updatedAt).toLocaleString() }}</td><td><RouterLink class="registration-detail-link" :to="`/super-admin/projects/${item.id}`">查看详情</RouterLink></td></tr></tbody></table></div>
       <div v-if="result && result.totalPages > 1" class="project-pagination"><button class="secondary-button" :disabled="page === 0 || loading" @click="changePage(page - 1)">上一页</button><span>{{ page + 1 }} / {{ result.totalPages }}</span><button class="secondary-button" :disabled="!result.hasNext || loading" @click="changePage(page + 1)">下一页</button></div>
     </section>
   </WorkspaceShell>

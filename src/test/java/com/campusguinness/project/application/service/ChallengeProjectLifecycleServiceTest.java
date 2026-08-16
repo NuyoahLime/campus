@@ -1,5 +1,6 @@
 package com.campusguinness.project.application.service;
 
+import com.campusguinness.audit.application.port.AuditRecordCommand;
 import com.campusguinness.audit.application.port.AuditRecordCommandPort;
 import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.project.application.command.UpdateChallengeProjectCommand;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,7 +58,7 @@ class ChallengeProjectLifecycleServiceTest {
         when(projects.findById(project.id())).thenReturn(Optional.of(project));
         when(ruleVersions.nextVersionNumber(project.id().value())).thenReturn(1);
 
-        service.publish(project.id().value(), "Initial public release");
+        service.publish(project.id().value(), "  Initial public release  ");
 
         var snapshot = ArgumentCaptor.forClass(ProjectRuleVersionSnapshot.class);
         verify(ruleVersions).save(snapshot.capture());
@@ -65,6 +67,10 @@ class ChallengeProjectLifecycleServiceTest {
         assertThat(snapshot.getValue().scoreConfig().allowTie()).isFalse();
         assertThat(project.status()).isEqualTo(ProjectStatus.PUBLISHED);
         assertThat(project.currentRuleVersionId()).isEqualTo(snapshot.getValue().id());
+
+        var auditRecord = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(audit).record(auditRecord.capture());
+        assertThat(auditRecord.getValue().detail()).contains("\"reason\":\"Initial public release\"");
     }
 
     @Test
@@ -100,6 +106,28 @@ class ChallengeProjectLifecycleServiceTest {
         verify(ruleVersions, never()).save(any());
         assertThat(project.status()).isEqualTo(ProjectStatus.PUBLISHED);
         assertThat(project.currentRuleVersionId()).isEqualTo(currentVersion);
+    }
+
+    @Test
+    void archiveRequiresAndPersistsNormalizedReason() {
+        ChallengeProject project = draft();
+        project.publish();
+        when(projects.findById(project.id())).thenReturn(Optional.of(project));
+
+        service.archive(project.id().value(), "  Scheduled maintenance  ");
+
+        var auditRecord = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(audit).record(auditRecord.capture());
+        assertThat(auditRecord.getValue().action()).isEqualTo("PROJECT_ARCHIVE");
+        assertThat(auditRecord.getValue().detail()).contains("\"reason\":\"Scheduled maintenance\"");
+        assertThat(project.status()).isEqualTo(ProjectStatus.ARCHIVED);
+    }
+
+    @Test
+    void republishRejectsBlankReason() {
+        assertThatThrownBy(() -> service.publish(UUID.randomUUID(), " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("between 2 and 500");
     }
 
     private ChallengeProject draft() {

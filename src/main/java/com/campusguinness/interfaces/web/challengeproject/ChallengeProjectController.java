@@ -104,10 +104,8 @@ public class ChallengeProjectController {
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ChallengeProjectResponse> publish(
-            @PathVariable UUID id, @RequestBody(required = false) @Valid LifecycleReasonRequest req) {
-        ChallengeProjectResult result = req == null
-                ? service.publish(id)
-                : service.publish(id, req.reason());
+            @PathVariable UUID id, @RequestBody @Valid LifecycleReasonRequest req) {
+        ChallengeProjectResult result = service.publish(id, req.reason());
         return ResponseEntity.ok(new ChallengeProjectResponse(result.id(), result.name(), result.status()));
     }
 

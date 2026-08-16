@@ -112,7 +112,7 @@ class ChallengeProjectApplicationServiceTest {
                     "desc");
             when(repository.findById(any())).thenReturn(Optional.of(project));
 
-            ChallengeProjectResult result = service.publish(id);
+            ChallengeProjectResult result = service.publish(id, "Published for test");
 
             assertThat(result.status()).isEqualTo("PUBLISHED");
             verify(repository).save(any(ChallengeProject.class));

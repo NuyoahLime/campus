@@ -72,10 +72,43 @@ class ChallengeProjectControllerTest {
     @Nested class Publish {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.publish(id)).thenReturn(new ChallengeProjectResult(id, "test", "PUBLISHED"));
-            mvc.perform(post("/api/v1/challenge-projects/" + id + "/publish"))
+            when(service.publish(id, "Initial release"))
+                    .thenReturn(new ChallengeProjectResult(id, "test", "PUBLISHED"));
+            mvc.perform(post("/api/v1/challenge-projects/" + id + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Initial release\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("PUBLISHED"));
+        }
+
+        @Test void shouldRejectMissingBody() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test void shouldRejectBlankReason() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\" \"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test void shouldRejectEmptyObject() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test void shouldRejectReasonOutsideLengthBounds() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"x\"}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"" + "x".repeat(501) + "\"}"))
+                    .andExpect(status().isBadRequest());
         }
     }
 

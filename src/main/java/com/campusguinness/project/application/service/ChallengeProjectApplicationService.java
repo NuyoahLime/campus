@@ -78,10 +78,6 @@ public class ChallengeProjectApplicationService {
                 .orElseThrow(() -> new ChallengeProjectNotFoundException("ChallengeProject not found: " + id));
     }
 
-    public ChallengeProjectResult publish(UUID id) {
-        return publish(id, "Project published.");
-    }
-
     public ChallengeProjectResult publish(UUID id, String reason) {
         UUID actorId = requireGovernance();
         String normalizedReason = normalizeReason(reason);
