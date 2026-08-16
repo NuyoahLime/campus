@@ -10,17 +10,9 @@ import {
   requestSchoolRegistrationSupplement
 } from '../api/schoolRegistrations';
 import type { SchoolRegistrationDetail, SchoolRegistrationStatus } from '../types/schoolRegistration';
-import type { WorkspaceNavigationItem } from '../types/workspace';
+import { superAdminNavigation as navigation } from '../router/superAdminNavigation';
 
 const REVIEW_TEXT_MAX_LENGTH = 2000;
-
-const navigation: WorkspaceNavigationItem[] = [
-  { label: '工作台概览', to: '/super-admin' },
-  { label: '学校治理', to: '/super-admin/school-registrations' },
-  { label: '学校管理员', disabled: true },
-  { label: '挑战项目', disabled: true },
-  { label: '平台运营', disabled: true }
-];
 
 const statusLabels: Record<SchoolRegistrationStatus, string> = {
   DRAFT: '草稿',

@@ -1,6 +1,8 @@
 package com.campusguinness.interfaces.web.school;
 
 import com.campusguinness.school.application.query.SchoolQueryService;
+import com.campusguinness.school.application.query.SchoolAdminGovernanceQueryService;
+import com.campusguinness.school.application.query.model.SchoolGovernanceDetailResult;
 import com.campusguinness.school.application.result.SchoolResult;
 import com.campusguinness.school.application.service.SchoolApplicationService;
 import com.campusguinness.school.internal.domain.*;
@@ -28,21 +30,31 @@ class SchoolControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean SchoolApplicationService service;
     @MockitoBean SchoolQueryService queryService;
+    @MockitoBean SchoolAdminGovernanceQueryService governanceQueryService;
     @Autowired ObjectMapper mapper;
 
     @Nested class Get {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            var school = School.create(new School.Builder().id(new SchoolId(id)).name("test").unifiedCodeType("USCC").unifiedCode("123").internalCode("INT-001").schoolType("PRIMARY").region("Beijing").address("addr").contactName("n").contactPhone("p").contactEmail("e"));
-            when(service.findById(id)).thenReturn(school);
+            when(governanceQueryService.schoolDetail(id)).thenReturn(new SchoolGovernanceDetailResult(
+                    id, "test", "PENDING_ENABLE", "INT-001", "USCC", "123", "PRIMARY",
+                    "Beijing", "addr", "n", "p", "e", 0, java.time.Instant.now(), java.time.Instant.now()
+            ));
             mvc.perform(get("/api/v1/schools/" + id))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("PENDING_ENABLE"));
+                    .andExpect(jsonPath("$.status").value("PENDING_ENABLE"))
+                    .andExpect(jsonPath("$.internalCode").value("INT-001"))
+                    .andExpect(jsonPath("$.normalActiveSchoolAdminCount").value(0));
         }
         @Test void shouldReturn404() throws Exception {
-            when(service.findById(any())).thenThrow(new IllegalArgumentException("School not found"));
+            when(governanceQueryService.schoolDetail(any())).thenThrow(
+                    new com.campusguinness.identity.application.exception.IdentityApplicationException(
+                            "SCHOOL_NOT_FOUND", "School not found."
+                    )
+            );
             mvc.perform(get("/api/v1/schools/" + UUID.randomUUID()))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("SCHOOL_NOT_FOUND"));
         }
     }
 
@@ -96,6 +108,27 @@ class SchoolControllerTest {
                     .andExpect(jsonPath("$.totalElements").value(3))
                     .andExpect(jsonPath("$.totalPages").value(1))
                     .andExpect(jsonPath("$.hasNext").value(false));
+        }
+    }
+
+    @Nested class GovernanceList {
+        @Test void returnsRichAllStatusProjection() throws Exception {
+            var item = new com.campusguinness.school.application.query.model.SchoolGovernanceListResult(
+                    UUID.randomUUID(), "Pending School", "PENDING_ENABLE", "UNIVERSITY", "Zhejiang",
+                    "INT-14", "USCC", "UC-14", 1
+            );
+            when(governanceQueryService.listSchools(0, 20, "PENDING_ENABLE", "Pending"))
+                    .thenReturn(new com.campusguinness.project.application.query.model.QueryPage<>(
+                            java.util.List.of(item), 0, 20, 1
+                    ));
+
+            mvc.perform(get("/api/v1/schools/governance")
+                            .param("status", "PENDING_ENABLE")
+                            .param("q", "Pending"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].status").value("PENDING_ENABLE"))
+                    .andExpect(jsonPath("$.items[0].internalCode").value("INT-14"))
+                    .andExpect(jsonPath("$.items[0].normalActiveSchoolAdminCount").value(1));
         }
     }
 }

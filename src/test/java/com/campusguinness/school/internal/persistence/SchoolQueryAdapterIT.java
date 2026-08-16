@@ -103,6 +103,20 @@ class SchoolQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         assertThat(result.totalElements()).isEqualTo(1);
     }
 
+    @Test @DisplayName("school-admin provisioning accepts pending and normal schools only")
+    void schoolAdminProvisioningEligibility() {
+        var pending = school("Pending", "PENDING_ENABLE", Instant.now());
+        var normal = school("Normal", "NORMAL", Instant.now());
+        var suspended = school("Suspended", "SUSPENDED", Instant.now());
+        var disabled = school("Disabled", "DISABLED", Instant.now());
+        jpa.saveAll(List.of(pending, normal, suspended, disabled));
+
+        assertThat(adapter.isEligibleForMembership(pending.getId())).isTrue();
+        assertThat(adapter.isEligibleForMembership(normal.getId())).isTrue();
+        assertThat(adapter.isEligibleForMembership(suspended.getId())).isFalse();
+        assertThat(adapter.isEligibleForMembership(disabled.getId())).isFalse();
+    }
+
     private SchoolEntity school(String name, String status, Instant now) {
         var e = new SchoolEntity();
         e.setId(UUID.randomUUID()); e.setName(name); e.setUnifiedCodeType("USCC");

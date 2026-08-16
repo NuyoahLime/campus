@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import WorkspaceShell from '../components/WorkspaceShell.vue';
 import { ApiError } from '../api/http';
 import { listSchoolRegistrations } from '../api/schoolRegistrations';
-import type { WorkspaceNavigationItem } from '../types/workspace';
+import { superAdminNavigation as navigation } from '../router/superAdminNavigation';
 import type {
   PageResponse,
   SchoolRegistrationListItem,
@@ -11,14 +11,6 @@ import type {
 } from '../types/schoolRegistration';
 
 const PAGE_SIZE = 20;
-
-const navigation: WorkspaceNavigationItem[] = [
-  { label: '工作台概览', to: '/super-admin' },
-  { label: '学校治理', to: '/super-admin/school-registrations' },
-  { label: '学校管理员', disabled: true },
-  { label: '挑战项目', disabled: true },
-  { label: '平台运营', disabled: true }
-];
 
 const statusOptions: Array<{ value: SchoolRegistrationStatus; label: string }> = [
   { value: 'DRAFT', label: '草稿' },

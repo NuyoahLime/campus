@@ -64,6 +64,18 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
         mvc.perform(get("/api/v1/schools/{id}", schoolId).with(principal(superAdminId, "SUPER_ADMIN", List.of())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(schoolId.toString()));
+
+        mvc.perform(get("/api/v1/schools/governance")
+                        .with(principal(superAdminId, "SUPER_ADMIN", List.of())))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/schools/{id}/school-admins", schoolId)
+                        .with(principal(superAdminId, "SUPER_ADMIN", List.of())))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/schools/{id}/school-admin-invitations", schoolId)
+                        .with(principal(superAdminId, "SUPER_ADMIN", List.of())))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -98,6 +110,11 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
                 .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
 
         assertThat(countUsers(forgedUsername)).isZero();
+
+        mvc.perform(get("/api/v1/schools/governance")
+                        .with(principal(studentId, "SUPER_ADMIN", memberships(studentId, "STUDENT"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
     }
 
     @Test
