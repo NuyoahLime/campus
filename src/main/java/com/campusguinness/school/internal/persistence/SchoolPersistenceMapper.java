@@ -9,6 +9,12 @@ final class SchoolPersistenceMapper {
     static SchoolEntity toEntity(School domain) {
         SchoolEntity e = new SchoolEntity();
         e.setId(domain.id().value());
+        updateEntity(e, domain);
+        e.setCreatedAt(Instant.now());
+        return e;
+    }
+
+    static void updateEntity(SchoolEntity e, School domain) {
         e.setName(domain.name());
         e.setUnifiedCodeType(domain.unifiedCodeType());
         e.setUnifiedCode(domain.unifiedCode());
@@ -20,9 +26,7 @@ final class SchoolPersistenceMapper {
         e.setContactPhone(domain.contactPhone());
         e.setContactEmail(domain.contactEmail());
         e.setSchoolStatus(domain.status().name());
-        e.setCreatedAt(Instant.now());
         e.setUpdatedAt(Instant.now());
-        return e;
     }
 
     static School toDomain(SchoolEntity e) {

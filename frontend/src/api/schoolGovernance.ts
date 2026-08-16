@@ -7,6 +7,8 @@ import type {
   PageResponse,
   SchoolAdminAccount,
   SchoolAdminInvitation,
+  SchoolLifecycleAction,
+  SchoolLifecycleResult,
   SchoolStatus
 } from '../types/schoolGovernance';
 
@@ -24,6 +26,20 @@ export async function listGovernanceSchools(
 
 export async function getGovernanceSchool(schoolId: string): Promise<GovernanceSchoolDetail> {
   return apiRequest<GovernanceSchoolDetail>(`/schools/${encodeURIComponent(schoolId)}`);
+}
+
+export async function updateSchoolLifecycle(
+  schoolId: string,
+  action: SchoolLifecycleAction,
+  reason: string
+): Promise<SchoolLifecycleResult> {
+  return apiRequest<SchoolLifecycleResult>(
+    `/schools/${encodeURIComponent(schoolId)}/${action}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason.trim() })
+    }
+  );
 }
 
 export async function listSchoolAdmins(schoolId: string): Promise<SchoolAdminAccount[]> {

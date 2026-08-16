@@ -52,6 +52,9 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
 
     @AfterEach
     void cleanUp() {
+        jdbc.update("DELETE FROM audit_records WHERE actor_id IN (SELECT id FROM users WHERE username LIKE ?) " +
+                        "OR school_id IN (SELECT id FROM schools WHERE name LIKE ?)",
+                runPrefix + "%", runPrefix + "%");
         jdbc.update("DELETE FROM school_registrations WHERE school_name LIKE ?", runPrefix + "%");
         jdbc.update("DELETE FROM school_memberships WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)",
                 runPrefix + "%");
@@ -76,6 +79,43 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
         mvc.perform(get("/api/v1/schools/{id}/school-admin-invitations", schoolId)
                         .with(principal(superAdminId, "SUPER_ADMIN", List.of())))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void authoritativeSuperAdminCanMutateSchoolLifecycle() throws Exception {
+        mvc.perform(post("/api/v1/schools/{id}/suspend", schoolId)
+                        .with(principal(superAdminId, "SUPER_ADMIN", List.of()))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"platform governance pause\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"));
+    }
+
+    @Test
+    void schoolAdminStudentAndAnonymousCannotMutateSchoolLifecycle() throws Exception {
+        mvc.perform(post("/api/v1/schools/{id}/suspend", schoolId)
+                        .with(principal(schoolAdminId, "SCHOOL_ADMIN", memberships(schoolAdminId, "SCHOOL_ADMIN")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"unauthorized\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(post("/api/v1/schools/{id}/suspend", schoolId)
+                        .with(principal(studentId, "STUDENT", memberships(studentId, "STUDENT")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"unauthorized\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(post("/api/v1/schools/{id}/suspend", schoolId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"unauthorized\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
     @Test
@@ -115,6 +155,14 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
                         .with(principal(studentId, "SUPER_ADMIN", memberships(studentId, "STUDENT"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
+
+        mvc.perform(post("/api/v1/schools/{id}/suspend", schoolId)
+                        .with(principal(studentId, "SUPER_ADMIN", memberships(studentId, "STUDENT")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"forged authority\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
     }
 
     @Test
@@ -124,6 +172,15 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
         mvc.perform(get("/api/v1/schools/{id}", schoolId)
                         .with(principal(superAdminId, "SUPER_ADMIN", List.of(
                                 new AuthenticatedSchoolMembership(membershipId, schoolId, "SCHOOL_ADMIN")))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
+
+        mvc.perform(post("/api/v1/schools/{id}/suspend", schoolId)
+                        .with(principal(superAdminId, "SUPER_ADMIN", List.of(
+                                new AuthenticatedSchoolMembership(membershipId, schoolId, "SCHOOL_ADMIN"))))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"stale identity\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
     }

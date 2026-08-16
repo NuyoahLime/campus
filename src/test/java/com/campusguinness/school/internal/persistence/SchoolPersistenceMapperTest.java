@@ -49,5 +49,25 @@ class SchoolPersistenceMapperTest {
             assertThat(e.getId()).isEqualTo(s.id().value());
             assertThat(e.getSchoolStatus()).isEqualTo("PENDING_ENABLE");
         }
+
+        @Test
+        void updatePreservesCreatedAtAndVersion() {
+            var entity = buildEntity("PENDING_ENABLE");
+            var createdAt = java.time.Instant.parse("2026-01-01T00:00:00Z");
+            entity.setCreatedAt(createdAt);
+            entity.setVersion(3);
+            var school = School.reconstitute(new School.Builder()
+                    .id(new SchoolId(entity.getId())).name("test").unifiedCodeType("USCC").unifiedCode("123")
+                    .internalCode("INT-001").schoolType("PRIMARY").region("Beijing")
+                    .address("addr").contactName("name").contactPhone("phone").contactEmail("email")
+                    .status(SchoolStatus.NORMAL));
+
+            SchoolPersistenceMapper.updateEntity(entity, school);
+
+            assertThat(entity.getSchoolStatus()).isEqualTo("NORMAL");
+            assertThat(entity.getCreatedAt()).isEqualTo(createdAt);
+            assertThat(entity.getVersion()).isEqualTo(3);
+            assertThat(entity.getUpdatedAt()).isNotNull();
+        }
     }
 }

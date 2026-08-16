@@ -1039,6 +1039,92 @@
   font: inherit;
 }
 
+.governance-dialog .field-group textarea {
+  width: 100%;
+  min-height: 108px;
+  resize: vertical;
+  border: 1px solid #d6dce4;
+  border-radius: 6px;
+  padding: 10px 11px;
+  color: #202b3c;
+  background: #ffffff;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.governance-dialog .field-group input:focus-visible,
+.governance-dialog .field-group textarea:focus-visible {
+  border-color: #2d6db3;
+  outline: 3px solid rgba(45, 109, 179, 0.14);
+}
+
+.governance-lifecycle-panel {
+  margin-top: 18px;
+  border: 1px solid #dfe5ec;
+  border-radius: 8px;
+  padding: 20px;
+  background: #ffffff;
+}
+
+.governance-lifecycle-summary,
+.governance-lifecycle-dialog-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 18px 0 0;
+  border: 1px solid #e2e7ed;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.governance-lifecycle-summary > div,
+.governance-lifecycle-dialog-summary > div {
+  min-width: 0;
+  padding: 13px 14px;
+  border-right: 1px solid #e2e7ed;
+}
+
+.governance-lifecycle-summary > div:last-child,
+.governance-lifecycle-dialog-summary > div:last-child {
+  border-right: 0;
+}
+
+.governance-lifecycle-summary dt,
+.governance-lifecycle-dialog-summary dt {
+  color: #718096;
+  font-size: 12px;
+}
+
+.governance-lifecycle-summary dd,
+.governance-lifecycle-dialog-summary dd {
+  margin: 7px 0 0;
+  color: #202b3c;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.governance-condition-met { color: #23724a !important; }
+.governance-condition-unmet { color: #9c5c18 !important; }
+
+.governance-lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.governance-lifecycle-actions button {
+  min-width: 112px;
+}
+
+.governance-lifecycle-dialog-summary {
+  margin-top: 18px;
+}
+
+.governance-lifecycle-impact {
+  margin-top: 16px;
+}
+
 .governance-code-warning {
   margin-top: 18px;
 }
@@ -1485,6 +1571,27 @@
 
   .governance-code-summary {
     grid-template-columns: 1fr;
+  }
+
+  .governance-lifecycle-summary,
+  .governance-lifecycle-dialog-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .governance-lifecycle-summary > div,
+  .governance-lifecycle-dialog-summary > div {
+    border-right: 0;
+    border-bottom: 1px solid #e2e7ed;
+  }
+
+  .governance-lifecycle-summary > div:last-child,
+  .governance-lifecycle-dialog-summary > div:last-child {
+    border-bottom: 0;
+  }
+
+  .governance-lifecycle-actions,
+  .governance-lifecycle-actions button {
+    width: 100%;
   }
 
   .governance-code-summary > div:first-child {

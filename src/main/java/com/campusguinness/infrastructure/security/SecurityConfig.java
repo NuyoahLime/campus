@@ -124,7 +124,10 @@ public class SecurityConfig {
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/schools/*/activate",
+                        "/api/v1/schools/*/suspend",
+                        "/api/v1/schools/*/restore",
                         "/api/v1/schools/*/disable",
+                        "/api/v1/schools/*/re-enable",
                         "/api/v1/school-registrations/*/request-supplement",
                         "/api/v1/school-registrations/*/approve",
                         "/api/v1/school-registrations/*/reject",

@@ -200,7 +200,10 @@ public class GlobalExceptionHandler {
                     "APPLICANT_ACCOUNT_NOT_ACTIVATABLE",
                     "STUDENT_MEMBERSHIP_CONFLICT",
                     "STUDENT_PROFILE_ALREADY_EXISTS",
-                    "STUDENT_APPROVAL_CONFLICT" -> HttpStatus.CONFLICT;
+                    "STUDENT_APPROVAL_CONFLICT",
+                    "SCHOOL_ADMIN_CONFIGURATION_INSUFFICIENT",
+                    "INVALID_SCHOOL_STATE_TRANSITION",
+                    "SCHOOL_LIFECYCLE_CONFLICT" -> HttpStatus.CONFLICT;
             case "INVITATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             default -> HttpStatus.BAD_REQUEST;
         };

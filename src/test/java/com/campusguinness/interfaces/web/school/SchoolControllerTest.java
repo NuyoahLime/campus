@@ -61,8 +61,37 @@ class SchoolControllerTest {
     @Nested class Activate {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.activate(id)).thenReturn(new SchoolResult(id, "test", "NORMAL"));
-            mvc.perform(post("/api/v1/schools/" + id + "/activate"))
+            when(service.activate(id, "administrators configured"))
+                    .thenReturn(new SchoolResult(id, "test", "NORMAL"));
+            mvc.perform(post("/api/v1/schools/" + id + "/activate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"administrators configured\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("NORMAL"));
+        }
+    }
+
+    @Nested class Suspend {
+        @Test void shouldReturn200() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(service.suspend(id, "governance pause"))
+                    .thenReturn(new SchoolResult(id, "test", "SUSPENDED"));
+            mvc.perform(post("/api/v1/schools/" + id + "/suspend")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"governance pause\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("SUSPENDED"));
+        }
+    }
+
+    @Nested class Restore {
+        @Test void shouldReturn200() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(service.restore(id, "issue resolved"))
+                    .thenReturn(new SchoolResult(id, "test", "NORMAL"));
+            mvc.perform(post("/api/v1/schools/" + id + "/restore")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"issue resolved\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("NORMAL"));
         }
@@ -74,9 +103,33 @@ class SchoolControllerTest {
             when(service.disable(eq(id), any())).thenReturn(new SchoolResult(id, "test", "DISABLED"));
             mvc.perform(post("/api/v1/schools/" + id + "/disable")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(new DisableSchoolRequest("violation"))))
+                    .content(mapper.writeValueAsString(new SchoolLifecycleReasonRequest("violation"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("DISABLED"));
+        }
+    }
+
+    @Nested class ReEnable {
+        @Test void shouldReturnPendingEnable() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(service.reEnable(id, "school reapplied"))
+                    .thenReturn(new SchoolResult(id, "test", "PENDING_ENABLE"));
+            mvc.perform(post("/api/v1/schools/" + id + "/re-enable")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"school reapplied\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("PENDING_ENABLE"));
+        }
+    }
+
+    @Test
+    void lifecycleCommandsRequireReason() throws Exception {
+        for (String action : java.util.List.of("activate", "suspend", "restore", "disable", "re-enable")) {
+            mvc.perform(post("/api/v1/schools/" + UUID.randomUUID() + "/" + action)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\" \"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
     }
     @Nested class ListQuery {

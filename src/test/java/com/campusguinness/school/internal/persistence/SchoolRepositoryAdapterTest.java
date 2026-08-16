@@ -32,6 +32,28 @@ class SchoolRepositoryAdapterTest {
             adapter.save(s);
             verify(jpaRepository).save(any(SchoolEntity.class));
         }
+
+        @Test
+        void updatesManagedEntityWithoutResettingPersistenceMetadata() {
+            UUID id = UUID.randomUUID();
+            var entity = buildEntity(id, "PENDING_ENABLE");
+            var createdAt = java.time.Instant.parse("2026-01-01T00:00:00Z");
+            entity.setCreatedAt(createdAt);
+            entity.setVersion(7);
+            var school = School.reconstitute(new School.Builder()
+                    .id(new SchoolId(id)).name("test").unifiedCodeType("USCC").unifiedCode("123")
+                    .internalCode("INT-001").schoolType("PRIMARY").region("Beijing")
+                    .address("addr").contactName("n").contactPhone("p").contactEmail("e")
+                    .status(SchoolStatus.NORMAL));
+            when(jpaRepository.findById(id)).thenReturn(Optional.of(entity));
+
+            adapter.save(school);
+
+            assertThat(entity.getSchoolStatus()).isEqualTo("NORMAL");
+            assertThat(entity.getCreatedAt()).isEqualTo(createdAt);
+            assertThat(entity.getVersion()).isEqualTo(7);
+            verify(jpaRepository, never()).save(any());
+        }
     }
 
     @Nested @DisplayName("findById")
@@ -51,6 +73,19 @@ class SchoolRepositoryAdapterTest {
             assertThat(s).isPresent();
             assertThat(s.get().status()).isEqualTo(SchoolStatus.DISABLED);
             assertThat(s.get().domainEvents()).isEmpty();
+        }
+
+        @Test
+        void locksSchoolForLifecycleUpdate() {
+            UUID id = UUID.randomUUID();
+            when(jpaRepository.findByIdForUpdate(id)).thenReturn(Optional.of(buildEntity(id, "NORMAL")));
+
+            assertThat(adapter.findByIdForUpdate(new SchoolId(id)))
+                    .get()
+                    .extracting(School::status)
+                    .isEqualTo(SchoolStatus.NORMAL);
+
+            verify(jpaRepository).findByIdForUpdate(id);
         }
     }
 
