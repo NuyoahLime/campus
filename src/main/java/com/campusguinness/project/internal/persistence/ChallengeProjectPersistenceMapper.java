@@ -10,10 +10,25 @@ final class ChallengeProjectPersistenceMapper {
 
     static ChallengeProjectEntity toEntity(ChallengeProject domain) {
         ChallengeProjectEntity e = new ChallengeProjectEntity();
+        copy(domain, e);
+        e.setCreatedAt(Instant.now());
+        e.setUpdatedAt(Instant.now());
+        return e;
+    }
+
+    static void updateEntity(ChallengeProject domain, ChallengeProjectEntity e) {
+        copy(domain, e);
+        e.setUpdatedAt(Instant.now());
+    }
+
+    private static void copy(ChallengeProject domain, ChallengeProjectEntity e) {
         e.setId(domain.id().value());
         e.setName(domain.name().value());
         e.setCategory(domain.category().value());
         e.setDescription(domain.description());
+        e.setVenueRequirements(domain.venueRequirements());
+        e.setEquipmentRequirements(domain.equipmentRequirements());
+        e.setRulesText(domain.scoreConfig().rulesText());
         e.setScoreStorageType(domain.scoreConfig().storageType().name());
         e.setScoreIndicatorType(domain.scoreConfig().indicatorType().name());
         e.setComparisonDirection(domain.scoreConfig().comparisonDirection().name());
@@ -23,9 +38,7 @@ final class ChallengeProjectPersistenceMapper {
         e.setAllowTie(domain.scoreConfig().allowTie());
         e.setEffectiveScoreRule(domain.scoreConfig().effectiveScoreRule());
         e.setProjectStatus(domain.status().name());
-        e.setCreatedAt(Instant.now());
-        e.setUpdatedAt(Instant.now());
-        return e;
+        e.setCurrentRuleVersionId(domain.currentRuleVersionId());
     }
 
     static ChallengeProject toDomain(ChallengeProjectEntity entity) {
@@ -43,7 +56,8 @@ final class ChallengeProjectPersistenceMapper {
                         entity.getGradeOrder(),
                         entity.getRulesText(),
                         entity.isAllowTie()),
-                entity.getDescription(),
-                ProjectStatus.valueOf(entity.getProjectStatus()));
+                entity.getDescription(), entity.getVenueRequirements(),
+                entity.getEquipmentRequirements(), ProjectStatus.valueOf(entity.getProjectStatus()),
+                entity.getCurrentRuleVersionId());
     }
 }

@@ -53,16 +53,17 @@ class ChallengeProjectControllerTest {
     @Nested class Get {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            var project = ChallengeProject.create(new ChallengeProjectId(id), new ProjectName("test"), new ProjectCategory("MATH"),
-                    new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC, ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false), "desc");
-            when(service.findById(id)).thenReturn(project);
+            var detail = new com.campusguinness.project.application.query.model.ChallengeProjectDetailResult(
+                    id, "test", "MATH", "desc", null, null, "rules", "INTEGER", "NUMERIC",
+                    "HIGHER_BETTER", null, null, null, false, "BEST", "PUBLISHED", null, null, null, null);
+            when(queryService.publicDetail(id)).thenReturn(detail);
             mvc.perform(get("/api/v1/challenge-projects/" + id))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(id.toString()));
         }
         @Test void shouldReturn404() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.findById(id)).thenThrow(new IllegalArgumentException("ChallengeProject not found: " + id));
+            when(queryService.publicDetail(id)).thenThrow(new IllegalArgumentException("ChallengeProject not found: " + id));
             mvc.perform(get("/api/v1/challenge-projects/" + id))
                     .andExpect(status().isNotFound());
         }

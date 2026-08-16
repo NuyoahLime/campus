@@ -93,16 +93,16 @@ class AggregateBoundaryPersistenceTest extends PostgreSqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("All 19 entities are mapped to known business tables")
+    @DisplayName("All 20 entities are mapped to known business tables")
     void entitiesMappedToCorrectTables() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(19);
+        assertThat(entities).hasSize(20);
 
         Set<String> expectedTableNames = Set.of(
                 "users", "school_memberships", "student_profiles",
                 "student_identity_applications", "school_admin_invitations",
                 "schools", "school_registrations",
-                "challenge_projects",
+                "challenge_projects", "project_rule_versions",
                 "activities", "activity_applications",
                 "score_attempts",
                 "ranking_definitions", "l3_authorizations",

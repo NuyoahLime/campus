@@ -119,22 +119,22 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 17 migrations")
-    void flywayExecuted17Migrations() {
+    @DisplayName("Flyway executed exactly 18 migrations")
+    void flywayExecuted18Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(17);
+        assertThat(count).isEqualTo(18);
     }
 
     @Test
-    @DisplayName("Entity count matches known expected count (19)")
+    @DisplayName("Entity count matches known expected count (20)")
     void entityCountIsAsExpected() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
-        assertThat(entities).hasSize(19);
+        assertThat(entities).hasSize(20);
     }
 
     @Test
-    @DisplayName("All 19 entity table names match their @Table annotations")
+    @DisplayName("All 20 entity table names match their @Table annotations")
     void entityTableNamesAreCorrect() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         Set<String> actualTableNames = entities.stream()
@@ -144,7 +144,7 @@ class PersistenceSchemaCoverageTest extends PostgreSqlIntegrationTestSupport {
         Set<String> expectedTables = Set.of(
                 "users", "schools", "school_registrations", "school_memberships",
                 "student_profiles", "student_identity_applications", "school_admin_invitations",
-                "challenge_projects",
+                "challenge_projects", "project_rule_versions",
                 "activities", "activity_applications",
                 "score_attempts",
                 "ranking_definitions", "l3_authorizations",

@@ -13,7 +13,20 @@ public record CreateChallengeProjectCommand(
         Integer decimalPlaces,
         String gradeOrder,
         String rulesText,
-        String description) {
+        String description,
+        String venueRequirements,
+        String equipmentRequirements) {
+    public CreateChallengeProjectCommand(
+            String name, String category, String scoreStorageType,
+            String scoreIndicatorType, String comparisonDirection,
+            String effectiveScoreRule, boolean allowTie, String scoreUnit,
+            Integer decimalPlaces, String gradeOrder, String rulesText,
+            String description) {
+        this(name, category, scoreStorageType, scoreIndicatorType, comparisonDirection,
+                effectiveScoreRule, allowTie, scoreUnit, decimalPlaces, gradeOrder,
+                rulesText, description, null, null);
+    }
+
     public CreateChallengeProjectCommand {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("name required");
         if (category == null || category.isBlank()) throw new IllegalArgumentException("category required");

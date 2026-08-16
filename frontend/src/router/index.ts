@@ -16,6 +16,10 @@ import SuperAdminSchoolRegistrationListView from '../views/SuperAdminSchoolRegis
 import SuperAdminSchoolAdminsView from '../views/SuperAdminSchoolAdminsView.vue';
 import SuperAdminSchoolDetailView from '../views/SuperAdminSchoolDetailView.vue';
 import SuperAdminSchoolListView from '../views/SuperAdminSchoolListView.vue';
+import PublicProjectsView from '../views/PublicProjectsView.vue';
+import PublicProjectDetailView from '../views/PublicProjectDetailView.vue';
+import SuperAdminProjectListView from '../views/SuperAdminProjectListView.vue';
+import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -41,6 +45,16 @@ const router = createRouter({
       name: 'school-admin-activate',
       component: SchoolAdminActivationView,
       meta: { guestOnly: true }
+    },
+    {
+      path: '/projects',
+      name: 'public-projects',
+      component: PublicProjectsView
+    },
+    {
+      path: '/projects/:id',
+      name: 'public-project-detail',
+      component: PublicProjectDetailView
     },
     {
       path: '/student/application/rejected',
@@ -94,6 +108,18 @@ const router = createRouter({
       path: '/super-admin/schools/:id/admins',
       name: 'super-admin-school-admins',
       component: SuperAdminSchoolAdminsView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/projects',
+      name: 'super-admin-projects',
+      component: SuperAdminProjectListView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/projects/:id',
+      name: 'super-admin-project-detail',
+      component: SuperAdminProjectDetailView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
     },
     {

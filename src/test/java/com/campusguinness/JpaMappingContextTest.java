@@ -17,9 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies the JPA mapping context is correctly configured:
  * - EntityManagerFactory starts with PostgreSQL 18.4 Testcontainer.
- * - All 19 entities are scanned and mapped.
+ * - All 20 entities are scanned and mapped.
  * - Hibernate ddl-auto is 'none' (verified via configuration).
- * - Flyway executed all 17 migrations.
+ * - Flyway executed all 18 migrations.
  */
 class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
 
@@ -36,12 +36,12 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("All 19 entities are scanned by JPA metamodel")
-    void all19EntitiesAreScanned() {
+    @DisplayName("All 20 entities are scanned by JPA metamodel")
+    void all20EntitiesAreScanned() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         assertThat(entities)
-                .as("Expected 19 JPA entities, found %d", entities.size())
-                .hasSize(19);
+                .as("Expected 20 JPA entities, found %d", entities.size())
+                .hasSize(20);
     }
 
     @Test
@@ -51,11 +51,11 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 17 successful migrations")
-    void flywayExecutedAll17Migrations() {
+    @DisplayName("Flyway executed exactly 18 successful migrations")
+    void flywayExecutedAll18Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(17);
+        assertThat(count).isEqualTo(18);
     }
 
     @Test
