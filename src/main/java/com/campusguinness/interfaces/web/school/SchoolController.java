@@ -1,6 +1,7 @@
 package com.campusguinness.interfaces.web.school;
 
 import com.campusguinness.interfaces.web.common.PageResponse;
+import com.campusguinness.school.application.query.SchoolAdminGovernanceQueryService;
 import com.campusguinness.school.application.query.SchoolQueryService;
 import com.campusguinness.school.application.result.SchoolResult;
 import com.campusguinness.school.application.service.SchoolApplicationService;
@@ -18,10 +19,16 @@ public class SchoolController {
 
     private final SchoolApplicationService service;
     private final SchoolQueryService queryService;
+    private final SchoolAdminGovernanceQueryService governanceQueryService;
 
-    public SchoolController(SchoolApplicationService service, SchoolQueryService queryService) {
+    public SchoolController(
+            SchoolApplicationService service,
+            SchoolQueryService queryService,
+            SchoolAdminGovernanceQueryService governanceQueryService
+    ) {
         this.service = service;
         this.queryService = queryService;
+        this.governanceQueryService = governanceQueryService;
     }
 
     @GetMapping
@@ -35,11 +42,23 @@ public class SchoolController {
         return ResponseEntity.ok(PageResponse.of(items, result.page(), result.size(), result.totalElements()));
     }
 
+    @GetMapping("/governance")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<PageResponse<SchoolGovernanceListResponse>> governanceList(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, name = "q") String search
+    ) {
+        var result = governanceQueryService.listSchools(page, size, status, search);
+        var items = result.items().stream().map(SchoolGovernanceListResponse::from).toList();
+        return ResponseEntity.ok(PageResponse.of(items, result.page(), result.size(), result.totalElements()));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<SchoolResponse> get(@PathVariable UUID id) {
-        var school = service.findById(id);
-        return ResponseEntity.ok(new SchoolResponse(school.id().value(), school.name(), school.status().name()));
+    public ResponseEntity<SchoolGovernanceDetailResponse> get(@PathVariable UUID id) {
+        return ResponseEntity.ok(SchoolGovernanceDetailResponse.from(governanceQueryService.schoolDetail(id)));
     }
 
     @PostMapping("/{id}/activate")

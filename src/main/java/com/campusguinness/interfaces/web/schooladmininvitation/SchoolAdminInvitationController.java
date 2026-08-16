@@ -30,7 +30,10 @@ public class SchoolAdminInvitationController {
             @Valid @RequestBody CreateSchoolAdminInvitationRequest request
     ) {
         var result = service.create(request.username(), request.schoolId(), request.expiresAt());
-        return noStore(ResponseEntity.created(URI.create("/api/v1/school-admin-invitations/" + result.invitationId())))
+        return noStore(ResponseEntity.created(URI.create(
+                "/api/v1/schools/" + result.schoolId()
+                        + "/school-admin-invitations/" + result.invitationId()
+        )))
                 .body(SchoolAdminInvitationResponse.from(result));
     }
 

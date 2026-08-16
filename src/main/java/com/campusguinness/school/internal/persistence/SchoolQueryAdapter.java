@@ -33,7 +33,10 @@ class SchoolQueryAdapter implements SchoolQueryPort, StudentRegistrationSchoolQu
 
     @Override
     public boolean isEligibleForMembership(UUID schoolId) {
-        return schoolId != null && jpa.existsByIdAndSchoolStatus(schoolId, "NORMAL");
+        return schoolId != null && jpa.existsByIdAndSchoolStatusIn(
+                schoolId,
+                List.of("PENDING_ENABLE", "NORMAL")
+        );
     }
 
     @Override

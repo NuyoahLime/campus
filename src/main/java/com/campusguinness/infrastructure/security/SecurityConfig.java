@@ -135,7 +135,12 @@ public class SecurityConfig {
                         "/api/v1/school-admin-invitations/*/regenerate",
                         "/api/v1/l3-authorizations/*/approve"
                 ).hasRole("SUPER_ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/v1/schools/*").hasRole("SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET,
+                        "/api/v1/schools/*",
+                        "/api/v1/schools/*/school-admins",
+                        "/api/v1/schools/*/school-admin-invitations",
+                        "/api/v1/schools/*/school-admin-invitations/*"
+                ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/score-appeals",
                         "/api/v1/score-appeals/*/withdraw",
