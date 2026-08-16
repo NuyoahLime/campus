@@ -63,15 +63,51 @@ public class SchoolController {
 
     @PostMapping("/{id}/activate")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<SchoolResponse> activate(@PathVariable UUID id) {
-        SchoolResult result = service.activate(id);
+    public ResponseEntity<SchoolResponse> activate(
+            @PathVariable UUID id,
+            @Valid @RequestBody SchoolLifecycleReasonRequest request
+    ) {
+        SchoolResult result = service.activate(id, request.reason());
+        return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));
+    }
+
+    @PostMapping("/{id}/suspend")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<SchoolResponse> suspend(
+            @PathVariable UUID id,
+            @Valid @RequestBody SchoolLifecycleReasonRequest request
+    ) {
+        SchoolResult result = service.suspend(id, request.reason());
+        return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<SchoolResponse> restore(
+            @PathVariable UUID id,
+            @Valid @RequestBody SchoolLifecycleReasonRequest request
+    ) {
+        SchoolResult result = service.restore(id, request.reason());
         return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));
     }
 
     @PostMapping("/{id}/disable")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<SchoolResponse> disable(@PathVariable UUID id, @Valid @RequestBody DisableSchoolRequest req) {
-        SchoolResult result = service.disable(id, req.reason());
+    public ResponseEntity<SchoolResponse> disable(
+            @PathVariable UUID id,
+            @Valid @RequestBody SchoolLifecycleReasonRequest request
+    ) {
+        SchoolResult result = service.disable(id, request.reason());
+        return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));
+    }
+
+    @PostMapping("/{id}/re-enable")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<SchoolResponse> reEnable(
+            @PathVariable UUID id,
+            @Valid @RequestBody SchoolLifecycleReasonRequest request
+    ) {
+        SchoolResult result = service.reEnable(id, request.reason());
         return ResponseEntity.ok(new SchoolResponse(result.id(), result.name(), result.status()));
     }
 }

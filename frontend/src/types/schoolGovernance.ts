@@ -8,7 +8,14 @@ export interface PageResponse<T> {
 }
 
 export type SchoolStatus = 'PENDING_ENABLE' | 'NORMAL' | 'SUSPENDED' | 'DISABLED';
+export type SchoolLifecycleAction = 'activate' | 'suspend' | 'restore' | 'disable' | 're-enable';
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+
+export interface SchoolLifecycleResult {
+  id: string;
+  name: string;
+  status: SchoolStatus;
+}
 
 export interface GovernanceSchoolListItem {
   id: string;

@@ -21,13 +21,25 @@ class SchoolRepositoryAdapter implements SchoolRepository {
     @Override
     @Transactional
     public void save(School school) {
-        jpaRepository.save(SchoolPersistenceMapper.toEntity(school));
+        var existing = jpaRepository.findById(school.id().value());
+        if (existing.isPresent()) {
+            SchoolPersistenceMapper.updateEntity(existing.get(), school);
+        } else {
+            jpaRepository.save(SchoolPersistenceMapper.toEntity(school));
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<School> findById(SchoolId id) {
         return jpaRepository.findById(id.value())
+                .map(SchoolPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<School> findByIdForUpdate(SchoolId id) {
+        return jpaRepository.findByIdForUpdate(id.value())
                 .map(SchoolPersistenceMapper::toDomain);
     }
 
