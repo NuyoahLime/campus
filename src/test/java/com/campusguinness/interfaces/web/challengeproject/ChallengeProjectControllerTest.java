@@ -53,16 +53,17 @@ class ChallengeProjectControllerTest {
     @Nested class Get {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            var project = ChallengeProject.create(new ChallengeProjectId(id), new ProjectName("test"), new ProjectCategory("MATH"),
-                    new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC, ComparisonDirection.HIGHER_BETTER, null, null, "BEST", null, null, false), "desc");
-            when(service.findById(id)).thenReturn(project);
+            var detail = new com.campusguinness.project.application.query.model.ChallengeProjectDetailResult(
+                    id, "test", "MATH", "desc", null, null, "rules", "INTEGER", "NUMERIC",
+                    "HIGHER_BETTER", null, null, null, false, "BEST", "PUBLISHED", null, null, null, null);
+            when(queryService.publicDetail(id)).thenReturn(detail);
             mvc.perform(get("/api/v1/challenge-projects/" + id))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(id.toString()));
         }
         @Test void shouldReturn404() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.findById(id)).thenThrow(new IllegalArgumentException("ChallengeProject not found: " + id));
+            when(queryService.publicDetail(id)).thenThrow(new IllegalArgumentException("ChallengeProject not found: " + id));
             mvc.perform(get("/api/v1/challenge-projects/" + id))
                     .andExpect(status().isNotFound());
         }
@@ -71,10 +72,43 @@ class ChallengeProjectControllerTest {
     @Nested class Publish {
         @Test void shouldReturn200() throws Exception {
             UUID id = UUID.randomUUID();
-            when(service.publish(id)).thenReturn(new ChallengeProjectResult(id, "test", "PUBLISHED"));
-            mvc.perform(post("/api/v1/challenge-projects/" + id + "/publish"))
+            when(service.publish(id, "Initial release"))
+                    .thenReturn(new ChallengeProjectResult(id, "test", "PUBLISHED"));
+            mvc.perform(post("/api/v1/challenge-projects/" + id + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Initial release\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("PUBLISHED"));
+        }
+
+        @Test void shouldRejectMissingBody() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test void shouldRejectBlankReason() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\" \"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test void shouldRejectEmptyObject() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test void shouldRejectReasonOutsideLengthBounds() throws Exception {
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"x\"}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(post("/api/v1/challenge-projects/" + UUID.randomUUID() + "/publish")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"" + "x".repeat(501) + "\"}"))
+                    .andExpect(status().isBadRequest());
         }
     }
 

@@ -52,6 +52,11 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
 
     @AfterEach
     void cleanUp() {
+        jdbc.update("DELETE FROM project_rule_compatibilities WHERE project_id IN (SELECT id FROM challenge_projects WHERE name LIKE ?)", runPrefix + "%");
+        jdbc.update("DELETE FROM activity_projects WHERE project_id IN (SELECT id FROM challenge_projects WHERE name LIKE ?)", runPrefix + "%");
+        jdbc.update("UPDATE challenge_projects SET current_rule_version_id = NULL WHERE name LIKE ?", runPrefix + "%");
+        jdbc.update("DELETE FROM project_rule_versions WHERE project_id IN (SELECT id FROM challenge_projects WHERE name LIKE ?)", runPrefix + "%");
+        jdbc.update("DELETE FROM challenge_projects WHERE name LIKE ?", runPrefix + "%");
         jdbc.update("DELETE FROM audit_records WHERE actor_id IN (SELECT id FROM users WHERE username LIKE ?) " +
                         "OR school_id IN (SELECT id FROM schools WHERE name LIKE ?)",
                 runPrefix + "%", runPrefix + "%");
@@ -186,6 +191,35 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
     }
 
     @Test
+    void publicProjectDetailExposesOnlyPublishedProjects() throws Exception {
+        UUID published = insertProject("PUBLISHED");
+        UUID draft = insertProject("DRAFT");
+        UUID archived = insertProject("ARCHIVED");
+
+        mvc.perform(get("/api/v1/challenge-projects/{id}", published))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
+        mvc.perform(get("/api/v1/challenge-projects/{id}", draft)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/challenge-projects/{id}", archived)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void projectGovernanceRequiresAuthoritativeSuperAdmin() throws Exception {
+        mvc.perform(get("/api/v1/challenge-projects/governance"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/challenge-projects/governance")
+                        .with(principal(schoolAdminId, "SCHOOL_ADMIN", memberships(schoolAdminId, "SCHOOL_ADMIN"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/challenge-projects/governance")
+                        .with(principal(studentId, "SUPER_ADMIN", memberships(studentId, "STUDENT"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PLATFORM_GOVERNANCE_DENIED"));
+        mvc.perform(get("/api/v1/challenge-projects/governance")
+                        .with(principal(superAdminId, "SUPER_ADMIN", List.of())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void schoolRegistrationReviewerComesFromAuthenticatedPrincipal() throws Exception {
         UUID registrationId = insertSchoolRegistration();
         UUID spoofedReviewerId = UUID.randomUUID();
@@ -274,6 +308,19 @@ class PlatformGovernanceAuthorizationIT extends PostgreSqlIntegrationTestSupport
                 ) VALUES (?, ?, 'USCC', 'PRIMARY', 'Beijing', 'Address', 'Contact',
                           '13800000000', 'phase10@example.com', 'SUBMITTED', 0)
                 """, id, runPrefix + "-registration");
+        return id;
+    }
+
+    private UUID insertProject(String status) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO challenge_projects(
+                    id, name, category, description, venue_requirements, equipment_requirements,
+                    rules_text, score_storage_type, score_indicator_type, comparison_direction,
+                    score_unit, allow_tie, effective_score_rule, project_status
+                ) VALUES (?, ?, 'ATHLETICS', 'description', 'gym', 'timer', 'rules',
+                          'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', false, 'BEST', ?)
+                """, id, runPrefix + "-project-" + id, status);
         return id;
     }
 

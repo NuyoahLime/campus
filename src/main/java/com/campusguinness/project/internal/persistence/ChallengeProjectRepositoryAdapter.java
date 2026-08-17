@@ -22,7 +22,13 @@ public class ChallengeProjectRepositoryAdapter implements ChallengeProjectReposi
     @Override
     @Transactional
     public void save(ChallengeProject project) {
-        jpaRepository.save(ChallengeProjectPersistenceMapper.toEntity(project));
+        var entity = jpaRepository.findById(project.id().value())
+                .map(existing -> {
+                    ChallengeProjectPersistenceMapper.updateEntity(project, existing);
+                    return existing;
+                })
+                .orElseGet(() -> ChallengeProjectPersistenceMapper.toEntity(project));
+        jpaRepository.save(entity);
     }
 
     @Override

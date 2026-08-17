@@ -1,6 +1,8 @@
 package com.campusguinness.project.internal.persistence;
 
 import com.campusguinness.PostgreSqlIntegrationTestSupport;
+import com.campusguinness.project.application.query.model.ChallengeProjectGovernanceListResult;
+import com.campusguinness.project.application.query.model.ChallengeProjectListResult;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -73,6 +75,50 @@ class ChallengeProjectQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         var result = adapter.findPublished(5, 10);
         assertThat(result.items()).isEmpty();
         assertThat(result.totalElements()).isEqualTo(1);
+    }
+
+    @Test @DisplayName("public detail exposes only PUBLISHED projects")
+    void publicDetailProtectsNonPublishedProjects() {
+        var published = jpa.save(project("Published", "PUBLISHED", Instant.now()));
+        var draft = jpa.save(project("Draft", "DRAFT", Instant.now()));
+        var archived = jpa.save(project("Archived", "ARCHIVED", Instant.now()));
+
+        assertThat(adapter.findPublishedById(published.getId())).isPresent();
+        assertThat(adapter.findPublishedById(draft.getId())).isEmpty();
+        assertThat(adapter.findPublishedById(archived.getId())).isEmpty();
+    }
+
+    @Test @DisplayName("filters public projects by category and literal keyword")
+    void filtersPublicProjects() {
+        var math = project("Math 100% Relay", "PUBLISHED", Instant.now());
+        math.setDescription("Fast team event");
+        var science = project("Science Quiz", "PUBLISHED", Instant.now().minusSeconds(1));
+        science.setCategory("SCIENCE");
+        science.setDescription("Logic and experiments");
+        jpa.saveAll(List.of(math, science));
+
+        assertThat(adapter.findPublished(0, 10, "math", null).items())
+                .extracting(ChallengeProjectListResult::name)
+                .containsExactly("Math 100% Relay");
+        assertThat(adapter.findPublished(0, 10, null, "logic").items())
+                .extracting(ChallengeProjectListResult::name)
+                .containsExactly("Science Quiz");
+        assertThat(adapter.findPublished(0, 10, null, "100%").items())
+                .extracting(ChallengeProjectListResult::name)
+                .containsExactly("Math 100% Relay");
+    }
+
+    @Test @DisplayName("filters governance projects without nullable SQL parameters")
+    void filtersGovernanceProjects() {
+        var draft = project("Draft Math", "DRAFT", Instant.now());
+        var published = project("Published Math", "PUBLISHED", Instant.now().minusSeconds(1));
+        jpa.saveAll(List.of(draft, published));
+
+        var result = adapter.findGovernance(0, 10, "DRAFT", "math", "draft");
+
+        assertThat(result.items())
+                .extracting(ChallengeProjectGovernanceListResult::name)
+                .containsExactly("Draft Math");
     }
 
     private ChallengeProjectEntity project(String name, String status, Instant createdAt) {

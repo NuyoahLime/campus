@@ -45,6 +45,23 @@ class ChallengeProjectPersistenceMapperTest {
             assertThat(domain.status()).isEqualTo(ProjectStatus.ARCHIVED);
             assertThat(domain.domainEvents()).isEmpty();
         }
+
+        @Test @DisplayName("restores project resources and current rule version")
+        void shouldRestoreResourceFields() {
+            var entity = buildEntity("PUBLISHED");
+            UUID versionId = UUID.randomUUID();
+            entity.setVenueRequirements("Main gym");
+            entity.setEquipmentRequirements("Timer");
+            entity.setRulesText("Complete rules");
+            entity.setCurrentRuleVersionId(versionId);
+
+            var domain = ChallengeProjectPersistenceMapper.toDomain(entity);
+
+            assertThat(domain.venueRequirements()).isEqualTo("Main gym");
+            assertThat(domain.equipmentRequirements()).isEqualTo("Timer");
+            assertThat(domain.scoreConfig().rulesText()).isEqualTo("Complete rules");
+            assertThat(domain.currentRuleVersionId()).isEqualTo(versionId);
+        }
     }
 
     @Nested @DisplayName("Domain → Entity")
@@ -59,6 +76,23 @@ class ChallengeProjectPersistenceMapperTest {
             var entity = ChallengeProjectPersistenceMapper.toEntity(domain);
             assertThat(entity.getId()).isEqualTo(domain.id().value());
             assertThat(entity.getProjectStatus()).isEqualTo("DRAFT");
+        }
+
+        @Test @DisplayName("updates entity without replacing createdAt")
+        void shouldPreserveCreatedAtWhenUpdating() {
+            var entity = buildEntity("DRAFT");
+            Instant createdAt = entity.getCreatedAt();
+            var domain = ChallengeProject.create(new ChallengeProjectId(entity.getId()),
+                    new ProjectName("updated"), new ProjectCategory("ATHLETICS"),
+                    new ScoreConfig(ScoreStorageType.INTEGER, ScoreIndicatorType.NUMERIC,
+                            ComparisonDirection.HIGHER_BETTER, "points", null, "BEST",
+                            null, "Updated rules", false), "desc", "Gym", "Timer");
+
+            ChallengeProjectPersistenceMapper.updateEntity(domain, entity);
+
+            assertThat(entity.getCreatedAt()).isEqualTo(createdAt);
+            assertThat(entity.getRulesText()).isEqualTo("Updated rules");
+            assertThat(entity.getVenueRequirements()).isEqualTo("Gym");
         }
     }
 }

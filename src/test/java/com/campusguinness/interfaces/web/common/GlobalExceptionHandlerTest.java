@@ -32,28 +32,28 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test void notFoundReturns404() throws Exception {
-        when(service.findById(any())).thenThrow(new IllegalArgumentException("ChallengeProject not found: x"));
+        when(queryService.publicDetail(any())).thenThrow(new IllegalArgumentException("ChallengeProject not found: x"));
         mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test void duplicateReturns409() throws Exception {
-        when(service.findById(any())).thenThrow(new IllegalArgumentException("already disabled"));
+        when(queryService.publicDetail(any())).thenThrow(new IllegalArgumentException("already disabled"));
         mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CONFLICT"));
     }
 
     @Test void stateConflictReturns409() throws Exception {
-        when(service.findById(any())).thenThrow(new IllegalStateException("Cannot publish from status"));
+        when(queryService.publicDetail(any())).thenThrow(new IllegalStateException("Cannot publish from status"));
         mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CONFLICT"));
     }
 
     @Test void persistenceCorruptionReturns500() throws Exception {
-        when(service.findById(any())).thenThrow(
+        when(queryService.publicDetail(any())).thenThrow(
                 new com.campusguinness.score.internal.persistence.ScoreValuePersistenceException("INTEGER score_value is null"));
         mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
                 .andExpect(status().isInternalServerError())
@@ -64,7 +64,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test void unknownExceptionReturns500() throws Exception {
-        when(service.findById(any())).thenThrow(new RuntimeException("boom"));
+        when(queryService.publicDetail(any())).thenThrow(new RuntimeException("boom"));
         mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
