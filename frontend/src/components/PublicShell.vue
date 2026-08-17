@@ -5,7 +5,7 @@ import { roleHomeLocation } from '../router/roleHome';
 import { useAuthStore } from '../stores/auth';
 
 defineProps<{
-  active?: 'projects';
+  active?: 'home' | 'projects' | 'activities';
 }>();
 
 const auth = useAuthStore();
@@ -16,7 +16,7 @@ const accountLabel = computed(() => auth.isAuthenticated ? '进入工作台' : '
 <template>
   <div class="public-site">
     <header class="public-site-header">
-      <RouterLink class="public-site-brand" to="/projects" aria-label="校园吉尼斯项目资源库">
+      <RouterLink class="public-site-brand" to="/" aria-label="校园吉尼斯">
         <span class="brand-mark brand-mark-small" aria-hidden="true">G</span>
         <span>
           <strong>校园吉尼斯</strong>
@@ -24,7 +24,9 @@ const accountLabel = computed(() => auth.isAuthenticated ? '进入工作台' : '
         </span>
       </RouterLink>
       <nav class="public-site-navigation" aria-label="公共导航">
+        <RouterLink :class="{ 'public-site-link-active': active === 'home' }" to="/">首页</RouterLink>
         <RouterLink :class="{ 'public-site-link-active': active === 'projects' }" to="/projects">挑战项目</RouterLink>
+        <RouterLink :class="{ 'public-site-link-active': active === 'activities' }" to="/activities">学校活动</RouterLink>
       </nav>
       <RouterLink class="secondary-button public-site-login" :to="accountLink">{{ accountLabel }}</RouterLink>
     </header>

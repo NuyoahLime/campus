@@ -1679,6 +1679,32 @@
 .project-rule-section { grid-column: 1 / -1; }
 .project-rule-text { margin: 0; min-height: 100px; white-space: pre-wrap; overflow-wrap: anywhere; color: #354155; line-height: 1.8; }
 .project-version-note { color: #718096; font-size: 12px; }
+.public-home-page { min-height: 100vh; background: var(--page-bg); }
+.public-home-hero { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 40px; align-items: center; width: min(1180px, 100%); margin: 0 auto; padding: clamp(56px, 9vw, 110px) clamp(20px, 5vw, 56px) 72px; }
+.public-home-hero h1 { max-width: 680px; margin: 8px 0 18px; color: var(--brand-deep); font-size: clamp(36px, 5vw, 62px); line-height: 1.08; }
+.public-home-hero > div:first-child > p:not(.eyebrow) { max-width: 570px; margin: 0; color: var(--text-secondary); font-size: 17px; line-height: 1.8; }
+.public-home-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.public-home-actions .primary-button, .public-home-actions .secondary-button { display: inline-flex; width: auto; min-height: 44px; align-items: center; justify-content: center; border-radius: 7px; padding: 0 18px; text-decoration: none; }
+.public-home-mark { display: grid; aspect-ratio: 1; place-items: center; align-content: center; border: 1px solid rgba(23, 105, 232, .2); border-radius: 50%; color: var(--brand-primary); background: var(--card-bg); box-shadow: var(--shadow-card); }
+.public-home-mark span { font-size: 100px; font-weight: 900; line-height: 1; }
+.public-home-mark small { margin-top: 8px; color: var(--text-muted); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.public-home-section { width: min(1180px, 100%); margin: 0 auto; padding: 0 clamp(20px, 5vw, 56px) 76px; }
+.public-home-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.public-home-section-heading h2 { margin: 6px 0 0; font-size: 25px; }
+.activity-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.activity-card { display: grid; min-height: 190px; align-content: start; gap: 12px; border: 1px solid #dde3ea; border-radius: 8px; padding: 22px; color: inherit; background: #fff; text-decoration: none; box-shadow: 0 6px 18px rgba(32, 43, 60, .04); }
+.activity-card:hover { border-color: #9ebbe4; box-shadow: 0 9px 24px rgba(32, 43, 60, .08); }
+.activity-card-meta, .activity-detail-status { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: #4875ae; font-size: 11px; font-weight: 850; letter-spacing: .04em; }
+.activity-card h2, .activity-card h3 { margin: 0; color: var(--text-primary); font-size: 20px; line-height: 1.35; }
+.activity-card p { margin: 0; color: #637084; font-size: 13px; line-height: 1.6; }
+.activity-card-location { color: var(--text-muted) !important; }
+.activity-detail-status { justify-content: flex-start; margin-bottom: 14px; }
+.activity-detail-status span:first-child { color: #08724e; }
+.activity-project-block { border-top: 1px solid #edf0f4; padding-top: 16px; }
+.activity-project-block + .activity-project-block { margin-top: 18px; }
+.activity-project-block h3 { margin: 0 0 5px; font-size: 16px; }
+.activity-project-block > p:not(.project-rule-text) { margin: 0 0 10px; color: #718096; font-size: 12px; }
+.activity-empty-note { color: #718096; font-size: 13px; line-height: 1.7; }
 .project-admin-panel { border: 1px solid #dde3ea; border-radius: 10px; background: #fff; }
 .project-admin-toolbar, .project-detail-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #e5e9ef; padding: 22px 24px; }
 .project-admin-toolbar h2, .project-admin-toolbar span { margin: 5px 0 0; }
@@ -1720,7 +1746,7 @@
 .project-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 @media (max-width: 900px) {
-  .project-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .project-card-grid, .activity-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -1729,8 +1755,12 @@
   .public-site-login { grid-row: 1; grid-column: 2; }
   .public-site-footer { align-items: flex-start; flex-direction: column; }
   .project-public-content { padding-top: 30px; }
+  .public-home-hero { grid-template-columns: 1fr; padding-top: 48px; }
+  .public-home-mark { width: 150px; justify-self: start; }
+  .public-home-mark span { font-size: 66px; }
+  .public-home-section-heading { align-items: flex-start; flex-direction: column; }
   .project-page-heading h1, .project-detail-heading h1 { font-size: 28px; }
-  .project-card-grid, .project-detail-grid, .project-form-grid { grid-template-columns: 1fr; }
+  .project-card-grid, .activity-card-grid, .project-detail-grid, .project-form-grid { grid-template-columns: 1fr; }
   .project-rule-section, .project-form-wide { grid-column: auto; }
   .project-admin-toolbar, .project-detail-toolbar { align-items: flex-start; flex-direction: column; }
   .project-admin-toolbar .primary-button { width: 100%; }

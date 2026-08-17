@@ -18,6 +18,9 @@ import SuperAdminSchoolDetailView from '../views/SuperAdminSchoolDetailView.vue'
 import SuperAdminSchoolListView from '../views/SuperAdminSchoolListView.vue';
 import PublicProjectsView from '../views/PublicProjectsView.vue';
 import PublicProjectDetailView from '../views/PublicProjectDetailView.vue';
+import PublicHomeView from '../views/PublicHomeView.vue';
+import PublicActivitiesView from '../views/PublicActivitiesView.vue';
+import PublicActivityDetailView from '../views/PublicActivityDetailView.vue';
 import SuperAdminProjectListView from '../views/SuperAdminProjectListView.vue';
 import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vue';
 
@@ -26,8 +29,8 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'role-dispatch',
-      component: RoleUnavailableView
+      name: 'public-home',
+      component: PublicHomeView
     },
     {
       path: '/login',
@@ -55,6 +58,16 @@ const router = createRouter({
       path: '/projects/:id',
       name: 'public-project-detail',
       component: PublicProjectDetailView
+    },
+    {
+      path: '/activities',
+      name: 'public-activities',
+      component: PublicActivitiesView
+    },
+    {
+      path: '/activities/:id',
+      name: 'public-activity-detail',
+      component: PublicActivityDetailView
     },
     {
       path: '/student/application/rejected',
@@ -147,12 +160,6 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore();
   if (!auth.initialized) {
     await auth.restoreSession();
-  }
-
-  if (to.name === 'role-dispatch') {
-    return auth.isAuthenticated
-      ? roleHomeLocation(auth.currentUser)
-      : { name: 'login' };
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

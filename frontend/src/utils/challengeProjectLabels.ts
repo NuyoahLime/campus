@@ -30,8 +30,15 @@ const EFFECTIVE_SCORE_RULE_LABELS: Record<string, string> = {
   ADMIN_DESIGNATED: '管理员指定'
 };
 
-// Categories remain extensible strings; unknown identifiers are intentionally preserved.
-const CATEGORY_LABELS: Record<string, string> = {};
+// Categories remain extensible; known platform identifiers receive user-facing labels.
+const CATEGORY_LABELS: Record<string, string> = {
+  ATHLETICS: '田径运动',
+  SPEED: '速度挑战',
+  ACADEMIC: '学术挑战',
+  MATH: '数学挑战',
+  SCIENCE: '科学挑战',
+  SPORT: '体育运动'
+};
 
 function label(value: string | null | undefined, labels: Record<string, string>): string {
   if (!value) return '未填写';
