@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import PublicShell from '../components/PublicShell.vue';
 import { getPublicProject } from '../api/challengeProjects';
 import type { ChallengeProjectDetail } from '../types/challengeProject';
 import {
@@ -33,9 +34,9 @@ onMounted(() => void load());
 </script>
 
 <template>
-  <main class="project-public-page">
-    <header class="project-public-header"><div><RouterLink class="project-brand" to="/projects">校园吉尼斯</RouterLink><p>挑战项目资源库</p></div><RouterLink class="secondary-button" to="/login">登录</RouterLink></header>
-    <section class="project-public-content project-detail-page">
+  <PublicShell active="projects">
+    <main class="project-public-page">
+      <section class="project-public-content project-detail-page">
       <RouterLink class="project-back-link" to="/projects">返回项目资源库</RouterLink>
       <div v-if="loading" class="project-state">正在加载项目详情...</div>
       <div v-else-if="error" class="project-state project-state-error"><strong>{{ error }}</strong><RouterLink class="secondary-button" to="/projects">返回列表</RouterLink></div>
@@ -48,6 +49,7 @@ onMounted(() => void load());
         </div>
         <p v-if="project.currentRuleVersionNumber" class="project-version-note">当前公开规则版本 V{{ project.currentRuleVersionNumber }}</p>
       </template>
-    </section>
-  </main>
+      </section>
+    </main>
+  </PublicShell>
 </template>

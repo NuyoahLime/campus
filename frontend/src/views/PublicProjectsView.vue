@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import PublicShell from '../components/PublicShell.vue';
 import { ApiError } from '../api/http';
 import { listPublicProjects } from '../api/challengeProjects';
 import type { ChallengeProjectListItem, ProjectPage } from '../types/challengeProject';
@@ -45,15 +46,9 @@ onMounted(() => void load());
 </script>
 
 <template>
-  <main class="project-public-page">
-    <header class="project-public-header">
-      <div>
-        <RouterLink class="project-brand" to="/">校园吉尼斯</RouterLink>
-        <p>挑战项目资源库</p>
-      </div>
-      <RouterLink class="secondary-button" to="/login">登录</RouterLink>
-    </header>
-    <section class="project-public-content">
+  <PublicShell active="projects">
+    <main class="project-public-page">
+      <section class="project-public-content">
       <div class="project-page-heading">
         <p class="eyebrow">PROJECT LIBRARY</p>
         <h1>挑战项目资源库</h1>
@@ -78,6 +73,7 @@ onMounted(() => void load());
         </RouterLink>
       </div>
       <p v-if="result" class="project-result-count">共 {{ result.totalElements }} 个已上架项目</p>
-    </section>
-  </main>
+      </section>
+    </main>
+  </PublicShell>
 </template>
