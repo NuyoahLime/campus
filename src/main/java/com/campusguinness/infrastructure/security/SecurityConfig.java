@@ -102,7 +102,7 @@ public class SecurityConfig {
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/challenge-projects").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/challenge-projects/*").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/activities").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/activities", "/api/v1/activities/*").permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/api/v1/schools/*/student-identity-applications",
                         "/api/v1/schools/*/student-identity-applications/*"

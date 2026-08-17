@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ActivityController.class)
@@ -72,6 +73,30 @@ class ActivityControllerTest {
                     .andExpect(jsonPath("$.totalElements").value(5))
                     .andExpect(jsonPath("$.totalPages").value(3))
                     .andExpect(jsonPath("$.hasNext").value(true));
+        }
+    }
+    @Nested class DetailQuery {
+        @Test void shouldReturnPublicDetail() throws Exception {
+            UUID id = UUID.randomUUID();
+            var detail = new com.campusguinness.activity.application.query.model.ActivityDetailResult(
+                    id, UUID.randomUUID(), "Test School", "Beijing", "Public activity", "Description",
+                    java.time.Instant.now(), null, "Main court", "PUBLISHED", java.util.List.of());
+            when(queryService.publicDetail(id)).thenReturn(detail);
+
+            mvc.perform(get("/api/v1/activities/" + id))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.title").value("Public activity"))
+                    .andExpect(jsonPath("$.schoolName").value("Test School"))
+                    .andExpect(jsonPath("$.projects").isArray());
+        }
+
+        @Test void hiddenDetailIsNotFound() throws Exception {
+            UUID id = UUID.randomUUID();
+            when(queryService.publicDetail(id)).thenThrow(new IllegalArgumentException("Activity not found: " + id));
+
+            mvc.perform(get("/api/v1/activities/" + id))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         }
     }
     @Nested class Errors {

@@ -1,6 +1,7 @@
 package com.campusguinness.activity.internal.persistence;
 
 import com.campusguinness.PostgreSqlIntegrationTestSupport;
+import com.campusguinness.activity.application.query.model.ActivityListResult;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -83,6 +84,17 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         assertThat(result.items().stream().map(a -> a.title())).containsExactlyInAnyOrder("Published", "InProgress", "Ended");
     }
 
+    @Test @DisplayName("does not expose non-public activities even with a public execution status")
+    void excludesNonPublicActivity() {
+        jpa.save(activity("Visible", "PUBLISHED", Instant.now(), "PUBLIC"));
+        jpa.save(activity("Hidden", "PUBLISHED", Instant.now().plusSeconds(1), "NOT_SUBMITTED"));
+
+        var result = adapter.findPublic(0, 10, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
+
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items()).extracting(ActivityListResult::title).containsExactly("Visible");
+    }
+
     @Test @DisplayName("ties on startTime resolved by id DESC")
     void tiesResolvedByIdDesc() {
         var base = Instant.parse("2026-01-01T00:00:00Z");
@@ -119,10 +131,42 @@ class ActivityQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         assertThat(result.totalElements()).isEqualTo(1);
     }
 
+    @Test @DisplayName("detail uses the activity's historical rule version snapshot")
+    void detailUsesHistoricalRuleVersion() {
+        var projectId = UUID.randomUUID();
+        var ruleVersionId = UUID.randomUUID();
+        var activityId = UUID.randomUUID();
+        jdbc.update("INSERT INTO challenge_projects(id,name,category,score_storage_type,score_indicator_type,comparison_direction,effective_score_rule,project_status) VALUES (?,?,?,?,?,?,?,?)",
+                projectId, "Historical Project", "SPORT", "INTEGER", "VALUE", "HIGHER_BETTER", "BEST", "PUBLISHED");
+        jdbc.update("INSERT INTO project_rule_versions(id,project_id,version_number,score_storage_type,score_indicator_type,comparison_direction,rules_text,allow_tie,effective_score_rule,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                ruleVersionId, projectId, 3, "INTEGER", "VALUE", "HIGHER_BETTER", "Snapshot rules V3", true, "BEST", userId);
+        jdbc.update("INSERT INTO activities(id,school_id,title,description,execution_status,public_status,created_by,start_time,end_time,location) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                activityId, schoolId, "Public activity", "Public description", "PUBLISHED", "PUBLIC", userId,
+                java.sql.Timestamp.from(Instant.now()), java.sql.Timestamp.from(Instant.now().plusSeconds(3600)),
+                "Main court");
+        jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
+                UUID.randomUUID(), activityId, projectId, ruleVersionId);
+
+        var result = adapter.findPublicById(activityId, List.of("PUBLISHED", "IN_PROGRESS", "ENDED"));
+
+        assertThat(result).isPresent();
+        assertThat(result.orElseThrow().schoolName()).isEqualTo("Test School");
+        assertThat(result.orElseThrow().projects()).singleElement()
+                .satisfies(project -> {
+                    assertThat(project.projectName()).isEqualTo("Historical Project");
+                    assertThat(project.ruleVersionNumber()).isEqualTo(3);
+                    assertThat(project.rulesText()).isEqualTo("Snapshot rules V3");
+                });
+    }
+
     private ActivityEntity activity(String title, String execStatus, Instant startTime) {
+        return activity(title, execStatus, startTime, "PUBLIC");
+    }
+
+    private ActivityEntity activity(String title, String execStatus, Instant startTime, String publicStatus) {
         var e = new ActivityEntity();
         e.setId(UUID.randomUUID()); e.setSchoolId(schoolId); e.setCreatedBy(userId);
-        e.setTitle(title); e.setExecutionStatus(execStatus); e.setPublicStatus("NOT_SUBMITTED");
+        e.setTitle(title); e.setExecutionStatus(execStatus); e.setPublicStatus(publicStatus);
         e.setStartTime(startTime); e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
         return e;
     }

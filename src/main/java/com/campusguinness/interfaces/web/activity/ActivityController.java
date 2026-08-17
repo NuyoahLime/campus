@@ -32,10 +32,16 @@ public class ActivityController {
             @RequestParam(defaultValue = "20") int size) {
         var result = queryService.listPublic(page, size);
         var items = result.items().stream()
-                .map(r -> new ActivityListItem(r.id(), r.schoolId(), r.title(),
-                        r.startTime(), r.endTime(), r.location(), r.executionStatus()))
+                .map(r -> new ActivityListItem(r.id(), r.schoolId(), r.schoolName(), r.schoolRegion(),
+                        r.title(), r.startTime(), r.endTime(), r.location(), r.executionStatus()))
                 .toList();
         return ResponseEntity.ok(PageResponse.of(items, result.page(), result.size(), result.totalElements()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ActivityDetailResponse> detail(@PathVariable UUID id) {
+        var result = queryService.publicDetail(id);
+        return ResponseEntity.ok(ActivityDetailResponse.from(result));
     }
 
     @PostMapping
