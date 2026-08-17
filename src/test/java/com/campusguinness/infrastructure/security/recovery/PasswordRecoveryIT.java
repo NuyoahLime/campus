@@ -110,8 +110,10 @@ class PasswordRecoveryIT {
 
     @Test void sessionsClearedOnRecovery() {
         // Insert a session for the target user
+        long now = System.currentTimeMillis();
         jdbc.update("INSERT INTO spring_session(primary_id,session_id,creation_time,last_access_time,max_inactive_interval,expiry_time,principal_name) VALUES (?,?,?,?,?,?,?)",
-                UUID.randomUUID().toString(), UUID.randomUUID().toString(), 1000L, 1000L, 1800, 9999999999L, targetUsername);
+                UUID.randomUUID().toString(), UUID.randomUUID().toString(), now, now, 1800,
+                now + 1_800_000L, targetUsername);
 
         var result = service.recover(validProps());
         assertThat(result.success()).isTrue();
@@ -127,8 +129,10 @@ class PasswordRecoveryIT {
         String otherUser = "other-" + UUID.randomUUID().toString().substring(0, 6);
         jdbc.update("INSERT INTO users(id,username,password_hash,account_status) VALUES (?,?,?,?)",
                 otherId, otherUser, encoder.encode("otherPass1"), "NORMAL");
+        long now = System.currentTimeMillis();
         jdbc.update("INSERT INTO spring_session(primary_id,session_id,creation_time,last_access_time,max_inactive_interval,expiry_time,principal_name) VALUES (?,?,?,?,?,?,?)",
-                UUID.randomUUID().toString(), UUID.randomUUID().toString(), 1000L, 1000L, 1800, 9999999999L, otherUser);
+                UUID.randomUUID().toString(), UUID.randomUUID().toString(), now, now, 1800,
+                now + 1_800_000L, otherUser);
 
         try {
             var result = service.recover(validProps());
