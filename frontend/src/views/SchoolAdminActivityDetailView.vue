@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import WorkspaceShell from '../components/WorkspaceShell.vue';
 import { ApiError } from '../api/http';
@@ -13,7 +13,7 @@ import { labelForCategory } from '../utils/challengeProjectLabels';
 
 const route = useRoute();
 const router = useRouter();
-const isNew = computed(() => route.params.id === 'new');
+const isNew = computed(() => route.name === 'school-admin-activity-new' || route.params.id === 'new');
 const isEditing = computed(() => isNew.value || route.name === 'school-admin-activity-edit');
 const detail = ref<ActivityManagementDetail | null>(null);
 const projects = ref<ChallengeProjectListItem[]>([]);
@@ -72,6 +72,7 @@ async function action(fn: (id: string) => Promise<unknown>, success: string) {
 }
 
 onMounted(() => void load());
+watch(() => route.fullPath, () => void load());
 </script>
 
 <template>
