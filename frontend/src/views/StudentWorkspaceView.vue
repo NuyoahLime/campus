@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import WorkspaceShell from '../components/WorkspaceShell.vue';
-import type { WorkspaceNavigationItem } from '../types/workspace';
-
-const navigation: WorkspaceNavigationItem[] = [
-  { label: '工作台概览', to: '/student' },
-  { label: '活动', disabled: true },
-  { label: '我的成绩', disabled: true },
-  { label: '排行榜', disabled: true },
-  { label: '申诉', disabled: true },
-  { label: '个人信息', disabled: true }
-];
+import { RouterLink } from 'vue-router';
+import { studentNavigation as navigation } from '../router/studentNavigation';
 </script>
 
 <template>
@@ -17,8 +9,13 @@ const navigation: WorkspaceNavigationItem[] = [
     role-label="学生"
     workspace-title="学生个人工作台"
     page-title="欢迎进入学生个人工作台"
-    description="查看当前学生身份，并从导航进入后续开放的校园挑战功能。"
+    description="查看当前学生身份，浏览公开活动并读取已经确认的个人成绩。"
     home-path="/student"
     :navigation="navigation"
-  />
+  >
+    <section class="student-overview-actions">
+      <RouterLink class="student-overview-action" to="/activities"><strong>浏览公开活动</strong><span>查看当前开放的校园挑战活动。</span></RouterLink>
+      <RouterLink class="student-overview-action" to="/student/scores"><strong>我的成绩</strong><span>查看已经确认的个人成绩记录。</span></RouterLink>
+    </section>
+  </WorkspaceShell>
 </template>
