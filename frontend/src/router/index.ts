@@ -23,6 +23,8 @@ import PublicActivitiesView from '../views/PublicActivitiesView.vue';
 import PublicActivityDetailView from '../views/PublicActivityDetailView.vue';
 import SuperAdminProjectListView from '../views/SuperAdminProjectListView.vue';
 import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vue';
+import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vue';
+import SchoolAdminActivityDetailView from '../views/SchoolAdminActivityDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -85,6 +87,30 @@ const router = createRouter({
       path: '/school-admin/student-applications',
       name: 'student-identity-review',
       component: StudentIdentityReviewView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/activities',
+      name: 'school-admin-activities',
+      component: SchoolAdminActivityListView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/activities/new',
+      name: 'school-admin-activity-new',
+      component: SchoolAdminActivityDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/activities/:id/edit',
+      name: 'school-admin-activity-edit',
+      component: SchoolAdminActivityDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/activities/:id',
+      name: 'school-admin-activity-detail',
+      component: SchoolAdminActivityDetailView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {

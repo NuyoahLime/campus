@@ -1744,6 +1744,20 @@
 .project-modal h2 { margin: 6px 0 8px; }
 .project-modal p { color: #637084; font-size: 13px; }
 .project-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.activity-management-panel .project-admin-table { min-width: 980px; }
+  .activity-admin-table td small { display: block; color: #718096; font-size: 11px; margin-top: 4px; }
+  .activity-row-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.activity-status-group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: #718096; font-size: 13px; }
+.activity-status { display: inline-flex; align-items: center; border: 1px solid #d6dce4; border-radius: 999px; padding: 4px 9px; color: #536176; background: #f7f9fb; font-size: 12px; font-weight: 700; }
+.activity-status[data-status="DRAFT"] { color: #8a5a00; border-color: #efd8a2; background: #fff8e7; }
+.activity-status[data-status="PUBLISHED"], .activity-status[data-status="PUBLIC"] { color: #08724e; border-color: #b9e5d2; background: #eefaf4; }
+.activity-status[data-status="CANCELLED"] { color: #a92c38; border-color: #efc5ca; background: #fff0f1; }
+.activity-editor { overflow: hidden; }
+.activity-form { padding-bottom: 24px; }
+.activity-form small { display: block; margin-top: 7px; color: #718096; font-size: 12px; }
+.activity-snapshot { margin-top: 24px; }
+.activity-snapshot .registration-detail-grid-wide { grid-column: 1 / -1; }
+.danger-outline { color: #a92c38 !important; border-color: #e6b6bc !important; }
 
 @media (max-width: 900px) {
   .project-card-grid, .activity-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

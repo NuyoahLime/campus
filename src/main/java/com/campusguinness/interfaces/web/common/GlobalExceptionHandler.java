@@ -201,6 +201,8 @@ public class GlobalExceptionHandler {
                     "STUDENT_MEMBERSHIP_CONFLICT",
                     "STUDENT_PROFILE_ALREADY_EXISTS",
                     "STUDENT_APPROVAL_CONFLICT",
+                    "SCHOOL_NOT_OPERATIONAL",
+                    "ACTIVITY_PROJECT_UNAVAILABLE",
                     "SCHOOL_ADMIN_CONFIGURATION_INSUFFICIENT",
                     "INVALID_SCHOOL_STATE_TRANSITION",
                     "SCHOOL_LIFECYCLE_CONFLICT" -> HttpStatus.CONFLICT;
