@@ -8,6 +8,12 @@ final class ActivityPersistenceMapper {
 
     static ActivityEntity toEntity(Activity domain) {
         var e = new ActivityEntity();
+        updateEntity(domain, e);
+        e.setCreatedAt(Instant.now());
+        return e;
+    }
+
+    static void updateEntity(Activity domain, ActivityEntity e) {
         e.setId(domain.id().value()); e.setSchoolId(domain.schoolId());
         e.setTitle(domain.title()); e.setDescription(domain.description());
         e.setStartTime(domain.startTime()); e.setEndTime(domain.endTime());
@@ -15,8 +21,7 @@ final class ActivityPersistenceMapper {
         e.setExecutionStatus(domain.executionStatus().name());
         e.setPublicStatus(domain.publicStatus().name());
         e.setCreatedBy(domain.createdBy());
-        e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
-        return e;
+        e.setUpdatedAt(Instant.now());
     }
 
     static Activity toDomain(ActivityEntity e) {

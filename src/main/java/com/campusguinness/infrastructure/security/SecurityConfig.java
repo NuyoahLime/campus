@@ -102,6 +102,10 @@ public class SecurityConfig {
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/challenge-projects").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/challenge-projects/*").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                        "/api/v1/activities/management",
+                        "/api/v1/activities/management/*"
+                ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/activities", "/api/v1/activities/*").permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/api/v1/schools/*/student-identity-applications",
@@ -112,6 +116,7 @@ public class SecurityConfig {
                         "/api/v1/schools/*/student-identity-applications/*/reject",
                         "/api/v1/activities",
                         "/api/v1/activities/*/publish",
+                        "/api/v1/activities/*/cancel",
                         "/api/v1/activity-applications/*/approve",
                         "/api/v1/activity-applications/*/reject",
                         "/api/v1/activity-results/*/publish",
@@ -126,6 +131,7 @@ public class SecurityConfig {
                         "/api/v1/feedbacks/*/begin-processing",
                         "/api/v1/feedbacks/*/resolve"
                 ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/activities/*").hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/schools/*/activate",
                         "/api/v1/schools/*/suspend",

@@ -6,6 +6,7 @@ import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
+import java.util.List;
 
 @Component
 public class SchoolResourceAuthorization {
@@ -25,5 +26,16 @@ public class SchoolResourceAuthorization {
             throw new IdentityApplicationException("SCHOOL_ADMIN_SCOPE_DENIED", "School administration scope denied.");
         }
         return actorId;
+    }
+
+    public UUID requireUniqueSchoolAdminSchool() {
+        UUID actorId = currentActor.requireUserId();
+        List<UUID> schools = accessQuery.findActiveSchoolAdminSchoolIds(actorId);
+        if (schools.size() != 1) {
+            throw new IdentityApplicationException(
+                    "SCHOOL_ADMIN_SCOPE_DENIED",
+                    "A unique active school administration membership is required.");
+        }
+        return schools.get(0);
     }
 }

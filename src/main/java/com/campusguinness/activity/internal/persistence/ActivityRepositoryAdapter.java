@@ -13,7 +13,12 @@ class ActivityRepositoryAdapter implements ActivityRepository {
     ActivityRepositoryAdapter(ActivityJpaRepository r) { this.jpaRepository = r; }
 
     @Override @Transactional
-    public void save(Activity a) { jpaRepository.save(ActivityPersistenceMapper.toEntity(a)); }
+    public void save(Activity a) {
+        var entity = jpaRepository.findById(a.id().value())
+                .orElseGet(() -> ActivityPersistenceMapper.toEntity(a));
+        ActivityPersistenceMapper.updateEntity(a, entity);
+        jpaRepository.save(entity);
+    }
 
     @Override @Transactional(readOnly = true)
     public Optional<Activity> findById(ActivityId id) {
