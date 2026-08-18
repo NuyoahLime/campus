@@ -13,6 +13,7 @@ import com.campusguinness.project.application.port.ProjectRuleVersionRepository;
 import com.campusguinness.project.internal.domain.ChallengeProjectId;
 import com.campusguinness.project.internal.domain.ProjectStatus;
 import com.campusguinness.school.application.query.SchoolOperationalQuery;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
@@ -27,6 +28,7 @@ public class ActivityManagementService {
     private final ProjectRuleVersionRepository ruleVersions;
     private final SchoolOperationalQuery schoolOperational;
 
+    @Autowired
     public ActivityManagementService(ActivityRepository repository,
             SchoolResourceAuthorization authorization,
             ActivityProjectRepository activityProjects,

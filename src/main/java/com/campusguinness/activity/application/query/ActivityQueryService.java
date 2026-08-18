@@ -8,6 +8,7 @@ import com.campusguinness.activity.application.query.port.ActivityQueryPort;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.project.application.query.model.QueryPage;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ public class ActivityQueryService {
     private final ActivityQueryPort queryPort;
     private final SchoolResourceAuthorization authorization;
     public ActivityQueryService(ActivityQueryPort p) { this(p, null); }
+    @Autowired
     public ActivityQueryService(ActivityQueryPort p, SchoolResourceAuthorization authorization) {
         this.queryPort = p; this.authorization = authorization;
     }
