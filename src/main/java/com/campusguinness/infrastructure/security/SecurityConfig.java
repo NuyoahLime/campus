@@ -106,6 +106,12 @@ public class SecurityConfig {
                         "/api/v1/activities/management",
                         "/api/v1/activities/management/*"
                 ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.GET,
+                        "/api/v1/school-admin/appeals",
+                        "/api/v1/school-admin/appeals/*",
+                        "/api/v1/school-admin/feedback",
+                        "/api/v1/school-admin/feedback/*"
+                ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/activities", "/api/v1/activities/*").permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/api/v1/schools/*/student-identity-applications",
@@ -122,6 +128,8 @@ public class SecurityConfig {
                         "/api/v1/activity-results/*/publish",
                         "/api/v1/score-appeals/*/begin-processing",
                         "/api/v1/score-appeals/*/reject",
+                        "/api/v1/school-admin/appeals/*/begin-processing",
+                        "/api/v1/school-admin/appeals/*/reject",
                         "/api/v1/ranking-definitions",
                         "/api/v1/ranking-definitions/*/enable",
                         "/api/v1/ranking-definitions/*/disable",
@@ -129,7 +137,9 @@ public class SecurityConfig {
                         "/api/v1/l3-authorizations/*/withdraw",
                         "/api/v1/media/*/internal-approve",
                         "/api/v1/feedbacks/*/begin-processing",
-                        "/api/v1/feedbacks/*/resolve"
+                        "/api/v1/feedbacks/*/resolve",
+                        "/api/v1/school-admin/feedback/*/begin-processing",
+                        "/api/v1/school-admin/feedback/*/resolve"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/activities/*").hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
@@ -160,8 +170,20 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/score-appeals",
                         "/api/v1/score-appeals/*/withdraw",
+                        "/api/v1/student/appeals",
+                        "/api/v1/student/appeals/*/withdraw",
                         "/api/v1/feedbacks",
-                        "/api/v1/feedbacks/*/close"
+                        "/api/v1/feedbacks/*/close",
+                        "/api/v1/student/feedback",
+                        "/api/v1/student/feedback/*/close"
+                ).hasRole("STUDENT")
+                .requestMatchers(HttpMethod.GET,
+                        "/api/v1/student/scores",
+                        "/api/v1/student/scores/*",
+                        "/api/v1/student/appeals",
+                        "/api/v1/student/appeals/*",
+                        "/api/v1/student/feedback",
+                        "/api/v1/student/feedback/*"
                 ).hasRole("STUDENT")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-registrations/*/withdraw",

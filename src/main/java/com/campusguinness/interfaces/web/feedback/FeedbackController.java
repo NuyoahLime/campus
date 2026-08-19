@@ -24,7 +24,7 @@ public class FeedbackController {
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<FeedbackResponse> submit(@Valid @RequestBody SubmitFeedbackRequest req) {
-        FeedbackResult r = service.submit(req.schoolId(), req.feedbackType(), req.content());
+        FeedbackResult r = service.submitForCurrentStudent(req.feedbackType(), req.content());
         return ResponseEntity.created(URI.create("/api/v1/feedbacks/" + r.id()))
                 .body(new FeedbackResponse(r.id(), r.status()));
     }
@@ -32,7 +32,7 @@ public class FeedbackController {
     @PostMapping("/{id}/begin-processing")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<FeedbackResponse> beginProcessing(@PathVariable UUID id, @Valid @RequestBody BeginProcessingRequest req) {
-        FeedbackResult r = service.beginProcessing(id, req.handlerId());
+        FeedbackResult r = service.beginProcessing(id);
         return ResponseEntity.ok(new FeedbackResponse(r.id(), r.status()));
     }
 

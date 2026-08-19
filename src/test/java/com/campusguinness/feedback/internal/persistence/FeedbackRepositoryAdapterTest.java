@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 class FeedbackRepositoryAdapterTest {
     @Mock FeedbackJpaRepository jpa;
     @InjectMocks FeedbackRepositoryAdapter adapter;
-    @Test void save() { adapter.save(fb()); verify(jpa).save(any()); }
+    @Test void save() { adapter.save(fb()); verify(jpa).saveAndFlush(any()); }
     @Test void findByIdEmpty() { when(jpa.findById(any())).thenReturn(Optional.empty()); assertThat(adapter.findById(new FeedbackId(UUID.randomUUID()))).isEmpty(); }
     @Test void restoresNoEvents() { var e=ent(); when(jpa.findById(e.getId())).thenReturn(Optional.of(e)); assertThat(adapter.findById(new FeedbackId(e.getId())).get().domainEvents()).isEmpty(); }
     private Feedback fb() { return Feedback.create(new Feedback.Builder().id(new FeedbackId(UUID.randomUUID())).feedbackType("GENERAL").content("t")); }

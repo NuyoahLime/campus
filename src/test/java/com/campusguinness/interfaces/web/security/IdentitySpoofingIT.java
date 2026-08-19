@@ -4,9 +4,13 @@ import com.campusguinness.appeal.application.result.ScoreAppealResult;
 import com.campusguinness.appeal.application.service.ScoreAppealApplicationService;
 import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.application.service.FeedbackApplicationService;
+import com.campusguinness.feedback.application.service.FeedbackQueryService;
 import com.campusguinness.interfaces.web.feedback.FeedbackController;
 import com.campusguinness.interfaces.web.schoolregistration.SchoolRegistrationController;
 import com.campusguinness.interfaces.web.scoreappeal.ScoreAppealController;
+import com.campusguinness.interfaces.web.studentappeal.StudentScoreAppealController;
+import com.campusguinness.interfaces.web.studentfeedback.StudentFeedbackController;
+import com.campusguinness.appeal.application.service.ScoreAppealQueryService;
 import com.campusguinness.school.application.result.SchoolRegistrationResult;
 import com.campusguinness.school.application.query.SchoolRegistrationQueryService;
 import com.campusguinness.school.application.service.SchoolRegistrationApplicationService;
@@ -29,7 +33,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({ScoreAppealController.class, SchoolRegistrationController.class, FeedbackController.class})
+@WebMvcTest({ScoreAppealController.class, StudentScoreAppealController.class,
+        SchoolRegistrationController.class, FeedbackController.class, StudentFeedbackController.class})
 @AutoConfigureMockMvc(addFilters = false)
 class IdentitySpoofingIT {
 
@@ -39,30 +44,29 @@ class IdentitySpoofingIT {
     @MockitoBean SchoolRegistrationReviewApplicationService schoolRegistrationReviews;
     @MockitoBean SchoolRegistrationQueryService schoolRegistrationQueries;
     @MockitoBean FeedbackApplicationService feedbacks;
+    @MockitoBean ScoreAppealQueryService scoreAppealQueries;
+    @MockitoBean FeedbackQueryService feedbackQueries;
 
     @Test
     void studentCannotSubmitScoreAppealAsAnotherStudentThroughRequestStudentId() throws Exception {
         UUID schoolId = UUID.randomUUID();
         UUID scoreAttemptId = UUID.randomUUID();
-        UUID spoofedStudentId = UUID.randomUUID();
         UUID appealId = UUID.randomUUID();
-        when(scoreAppeals.submit(eq(schoolId), eq(scoreAttemptId), eq("SCORE"), eq("reason")))
+        when(scoreAppeals.submitForCurrentStudent(eq(scoreAttemptId), eq("SCORE"), eq("reason")))
                 .thenReturn(new ScoreAppealResult(appealId, "SUBMITTED"));
 
-        mvc.perform(post("/api/v1/score-appeals")
+        mvc.perform(post("/api/v1/student/appeals")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "schoolId": "%s",
                                   "scoreAttemptId": "%s",
-                                  "studentId": "%s",
                                   "appealType": "SCORE",
                                   "appealReason": "reason"
                                 }
-                                """.formatted(schoolId, scoreAttemptId, spoofedStudentId)))
+                                """.formatted(scoreAttemptId)))
                 .andExpect(status().isCreated());
 
-        verify(scoreAppeals).submit(schoolId, scoreAttemptId, "SCORE", "reason");
+        verify(scoreAppeals).submitForCurrentStudent(scoreAttemptId, "SCORE", "reason");
     }
 
     @Test
@@ -90,23 +94,20 @@ class IdentitySpoofingIT {
     @Test
     void studentCannotSubmitFeedbackAsSuperAdminThroughRequestSubmitterId() throws Exception {
         UUID schoolId = UUID.randomUUID();
-        UUID spoofedSuperAdminId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        when(feedbacks.submit(eq(schoolId), eq("GENERAL"), eq("content")))
+        when(feedbacks.submitForCurrentStudent(eq("GENERAL"), eq("content")))
                 .thenReturn(new FeedbackResult(feedbackId, "SUBMITTED"));
 
-        mvc.perform(post("/api/v1/feedbacks")
+        mvc.perform(post("/api/v1/student/feedback")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "schoolId": "%s",
-                                  "submitterId": "%s",
                                   "feedbackType": "GENERAL",
                                   "content": "content"
                                 }
-                                """.formatted(schoolId, spoofedSuperAdminId)))
+                                """.formatted()))
                 .andExpect(status().isCreated());
 
-        verify(feedbacks).submit(schoolId, "GENERAL", "content");
+        verify(feedbacks).submitForCurrentStudent("GENERAL", "content");
     }
 }

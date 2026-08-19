@@ -1775,7 +1775,7 @@
 .student-score-table th { color: #718096; font-size: 11px; font-weight: 800; }
 .student-score-table td small { display: block; margin-top: 4px; color: #718096; font-size: 11px; }
 .student-score-status { display: inline-flex; border: 1px solid #b9e5d2; border-radius: 999px; padding: 5px 9px; color: #08724e; background: #eefaf4; font-size: 11px; font-weight: 800; }
-.student-score-detail-heading { margin-top: 24px; border-bottom: 1px solid #dde3ea; padding-bottom: 22px; }
+.student-score-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 24px; border-bottom: 1px solid #dde3ea; padding-bottom: 22px; }
 .student-score-detail-heading h2, .student-score-detail-heading p { margin: 6px 0 0; }
 .student-score-detail-heading h2 { font-size: 27px; }
 .student-score-detail-heading p:last-child { color: #637084; font-size: 14px; }
@@ -1788,6 +1788,8 @@
 .student-score-detail-section dd { margin: 0; font-size: 13px; font-weight: 700; }
 .student-score-breakable { overflow-wrap: anywhere; }
 .student-score-rules { margin: 18px 0 0; color: #536176; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.student-action-form { display: grid; gap: 12px; margin-top: 14px; }
+.student-action-form textarea { width: 100%; border: 1px solid #d6dce4; border-radius: 7px; padding: 10px 12px; color: #202b3c; background: #fff; font: inherit; resize: vertical; }
 
 @media (max-width: 900px) {
   .project-card-grid, .activity-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1815,6 +1817,7 @@
   .project-version-row { grid-template-columns: 44px minmax(0, 1fr); }
   .project-version-row time { grid-column: 2; }
   .student-overview-actions, .student-score-detail-grid { grid-template-columns: 1fr; }
+  .student-score-detail-heading { align-items: flex-start; flex-direction: column; }
   .student-score-toolbar { align-items: flex-start; flex-direction: column; }
   .student-score-toolbar .secondary-button { width: 100%; justify-content: center; }
 }

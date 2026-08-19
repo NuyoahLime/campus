@@ -4,7 +4,10 @@ import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.identity.application.service.StudentResourceAuthorization;
-import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.service.StudentSchoolScope;
+import com.campusguinness.identity.application.service.StudentSchoolScopeAuthorization;
+import com.campusguinness.score.application.query.model.StudentScoreDetailResult;
+import com.campusguinness.score.application.query.port.StudentScoreQueryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -20,24 +23,47 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ScoreAppealApplicationServiceTest {
     @Mock ScoreAppealRepository repo;
-    @Mock CurrentActor currentActor;
     @Mock SchoolResourceAuthorization schoolAuthorization;
     @Mock StudentResourceAuthorization studentAuthorization;
+    @Mock StudentSchoolScopeAuthorization studentScopeAuthorization;
+    @Mock StudentScoreQueryPort studentScoreQueryPort;
     ScoreAppealApplicationService svc;
     UUID actorUserId;
+    UUID schoolId;
 
     @BeforeEach void setUp() {
         actorUserId=UUID.randomUUID();
-        lenient().when(currentActor.requireUserId()).thenReturn(actorUserId);
+        schoolId=UUID.randomUUID();
         lenient().when(schoolAuthorization.requireSchoolAdmin(any())).thenReturn(actorUserId);
         lenient().when(studentAuthorization.requireSelf(any())).thenReturn(actorUserId);
-        svc = new ScoreAppealApplicationService(repo, currentActor, schoolAuthorization, studentAuthorization);
+        lenient().when(studentScopeAuthorization.requireUniqueActiveStudent())
+                .thenReturn(new StudentSchoolScope(actorUserId, schoolId));
+        svc = new ScoreAppealApplicationService(repo, schoolAuthorization, studentAuthorization,
+                studentScopeAuthorization, studentScoreQueryPort);
     }
 
     private ScoreAppeal appeal() { return ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID())).schoolId(UUID.randomUUID()).scoreAttemptId(UUID.randomUUID()).studentId(UUID.randomUUID()).appealType("SCORE").appealReason("r")); }
 
     @Nested class Submit {
-        @Test void success() { assertThat(svc.submit(UUID.randomUUID(),UUID.randomUUID(),"SCORE","r").status()).isEqualTo("SUBMITTED"); var captor=forClass(ScoreAppeal.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().studentId()).isEqualTo(actorUserId); }
+        @Test void success() {
+            UUID scoreAttemptId = UUID.randomUUID();
+            when(studentScoreQueryPort.findVisibleById(eq(scoreAttemptId), eq(actorUserId), eq(schoolId)))
+                    .thenReturn(Optional.of(score(scoreAttemptId)));
+            assertThat(svc.submit(UUID.randomUUID(),scoreAttemptId,"SCORE","r").status()).isEqualTo("SUBMITTED");
+            var captor=forClass(ScoreAppeal.class);
+            verify(repo).save(captor.capture());
+            assertThat(captor.getValue().studentId()).isEqualTo(actorUserId);
+            assertThat(captor.getValue().schoolId()).isEqualTo(schoolId);
+        }
+
+        @Test void hiddenOrOtherStudentScoreIsNotFound() {
+            UUID scoreAttemptId = UUID.randomUUID();
+            when(studentScoreQueryPort.findVisibleById(scoreAttemptId, actorUserId, schoolId)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> svc.submitForCurrentStudent(scoreAttemptId, "SCORE", "r"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Score attempt not found");
+            verify(repo, never()).save(any());
+        }
     }
     @Nested class BeginProcessing {
         @Test void success() { var a=appeal(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.beginProcessing(a.id().value(),UUID.randomUUID()).status()).isEqualTo("PROCESSING"); verify(schoolAuthorization).requireSchoolAdmin(a.schoolId()); var captor=forClass(ScoreAppeal.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().handlerId()).isEqualTo(actorUserId); }
@@ -54,5 +80,11 @@ class ScoreAppealApplicationServiceTest {
     @Nested class Resolve {
         @Test void success() { var a=appeal(); a.beginProcessing(UUID.randomUUID()); a.acceptPendingCorrection(); a.beginScoreCorrecting(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.resolve(a.id().value(),"done").status()).isEqualTo("RESOLVED"); verify(repo).save(any()); }
         @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.resolve(UUID.randomUUID(),"done")).isInstanceOf(IllegalArgumentException.class); verify(repo,never()).save(any()); }
+    }
+
+    private StudentScoreDetailResult score(UUID scoreAttemptId) {
+        return new StudentScoreDetailResult(scoreAttemptId, UUID.randomUUID(), UUID.randomUUID(),
+                "activity", "project", 1, "INTEGER", "10", "times",
+                java.time.Instant.now(), "APPROVED", UUID.randomUUID(), 1, "rules");
     }
 }

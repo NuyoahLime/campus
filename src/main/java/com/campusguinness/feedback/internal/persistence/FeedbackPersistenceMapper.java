@@ -17,6 +17,15 @@ final class FeedbackPersistenceMapper {
         return e;
     }
 
+    static void updateEntity(FeedbackEntity e, Feedback domain) {
+        e.setFeedbackStatus(domain.status().name());
+        e.setHandlerId(domain.handlerId());
+        e.setHandlerLevel(domain.handlerLevel());
+        e.setReply(domain.reply());
+        e.setCloseReason(domain.closeReason());
+        e.setUpdatedAt(Instant.now());
+    }
+
     static Feedback toDomain(FeedbackEntity e) {
         return Feedback.reconstitute(new Feedback.Builder()
                 .id(new FeedbackId(e.getId())).schoolId(e.getSchoolId())

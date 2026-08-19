@@ -27,6 +27,16 @@ import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vu
 import SchoolAdminActivityDetailView from '../views/SchoolAdminActivityDetailView.vue';
 import StudentScoresView from '../views/StudentScoresView.vue';
 import StudentScoreDetailView from '../views/StudentScoreDetailView.vue';
+import StudentAppealsView from '../views/StudentAppealsView.vue';
+import StudentAppealCreateView from '../views/StudentAppealCreateView.vue';
+import StudentAppealDetailView from '../views/StudentAppealDetailView.vue';
+import StudentFeedbackView from '../views/StudentFeedbackView.vue';
+import StudentFeedbackCreateView from '../views/StudentFeedbackCreateView.vue';
+import StudentFeedbackDetailView from '../views/StudentFeedbackDetailView.vue';
+import SchoolAdminAppealsView from '../views/SchoolAdminAppealsView.vue';
+import SchoolAdminAppealDetailView from '../views/SchoolAdminAppealDetailView.vue';
+import SchoolAdminFeedbackView from '../views/SchoolAdminFeedbackView.vue';
+import SchoolAdminFeedbackDetailView from '../views/SchoolAdminFeedbackDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -116,6 +126,30 @@ const router = createRouter({
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {
+      path: '/school-admin/appeals',
+      name: 'school-admin-appeals',
+      component: SchoolAdminAppealsView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/appeals/:id',
+      name: 'school-admin-appeal-detail',
+      component: SchoolAdminAppealDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/feedback',
+      name: 'school-admin-feedback',
+      component: SchoolAdminFeedbackView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/feedback/:id',
+      name: 'school-admin-feedback-detail',
+      component: SchoolAdminFeedbackDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
       path: '/super-admin',
       name: 'super-admin-workspace',
       component: SuperAdminWorkspaceView,
@@ -179,6 +213,42 @@ const router = createRouter({
       path: '/student/scores/:id',
       name: 'student-score-detail',
       component: StudentScoreDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/appeals',
+      name: 'student-appeals',
+      component: StudentAppealsView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/appeals/new',
+      name: 'student-appeal-new',
+      component: StudentAppealCreateView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/appeals/:id',
+      name: 'student-appeal-detail',
+      component: StudentAppealDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/feedback',
+      name: 'student-feedback',
+      component: StudentFeedbackView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/feedback/new',
+      name: 'student-feedback-new',
+      component: StudentFeedbackCreateView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/feedback/:id',
+      name: 'student-feedback-detail',
+      component: StudentFeedbackDetailView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
     },
     {
