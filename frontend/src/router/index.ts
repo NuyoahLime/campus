@@ -25,6 +25,8 @@ import SuperAdminProjectListView from '../views/SuperAdminProjectListView.vue';
 import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vue';
 import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vue';
 import SchoolAdminActivityDetailView from '../views/SchoolAdminActivityDetailView.vue';
+import StudentScoresView from '../views/StudentScoresView.vue';
+import StudentScoreDetailView from '../views/StudentScoreDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -166,6 +168,18 @@ const router = createRouter({
       name: 'school-admin-workspace',
       component: SchoolAdminWorkspaceView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/student/scores',
+      name: 'student-scores',
+      component: StudentScoresView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/scores/:id',
+      name: 'student-score-detail',
+      component: StudentScoreDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
     },
     {
       path: '/student',

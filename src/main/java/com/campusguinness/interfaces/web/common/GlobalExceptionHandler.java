@@ -185,7 +185,8 @@ public class GlobalExceptionHandler {
             case "INVITATION_EXPIRED" -> HttpStatus.GONE;
             case "SCHOOL_ADMIN_SCOPE_DENIED",
                     "PLATFORM_GOVERNANCE_DENIED",
-                    "STUDENT_SELF_SCOPE_DENIED" -> HttpStatus.FORBIDDEN;
+                    "STUDENT_SELF_SCOPE_DENIED",
+                    "STUDENT_SCOPE_DENIED" -> HttpStatus.FORBIDDEN;
             case "SCHOOL_NOT_FOUND",
                     "STUDENT_APPLICATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "USERNAME_ALREADY_EXISTS",
