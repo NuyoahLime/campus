@@ -4,7 +4,7 @@ import com.campusguinness.feedback.application.port.FeedbackRepository;
 import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.internal.domain.*;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
-import com.campusguinness.identity.application.service.StudentResourceAuthorization;
+import com.campusguinness.identity.application.service.StudentSchoolScopeAuthorization;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,24 +16,32 @@ public class FeedbackApplicationService {
     private final FeedbackRepository repo;
     private final CurrentActor currentActor;
     private final SchoolResourceAuthorization schoolAuthorization;
-    private final StudentResourceAuthorization studentAuthorization;
+    private final StudentSchoolScopeAuthorization studentScopeAuthorization;
 
     public FeedbackApplicationService(FeedbackRepository r, CurrentActor currentActor,
-            SchoolResourceAuthorization schoolAuthorization, StudentResourceAuthorization studentAuthorization) {
+            SchoolResourceAuthorization schoolAuthorization,
+            StudentSchoolScopeAuthorization studentScopeAuthorization) {
         this.repo = r;
         this.currentActor = currentActor;
         this.schoolAuthorization = schoolAuthorization;
-        this.studentAuthorization = studentAuthorization;
+        this.studentScopeAuthorization = studentScopeAuthorization;
     }
 
     public FeedbackResult submit(UUID schoolId, String feedbackType, String content) {
-        UUID actorUserId = currentActor.requireUserId();
+        return submitForCurrentStudent(feedbackType, content);
+    }
+
+    public FeedbackResult submitForCurrentStudent(String feedbackType, String content) {
+        var scope = studentScopeAuthorization.requireUniqueActiveStudent();
         var f = Feedback.create(new Feedback.Builder().id(new FeedbackId(UUID.randomUUID()))
-                .schoolId(schoolId).submitterId(actorUserId).feedbackType(feedbackType).content(content));
+                .schoolId(scope.schoolId()).submitterId(scope.studentId()).feedbackType(feedbackType).content(content));
         repo.save(f);
         return new FeedbackResult(f.id().value(), f.status().name());
     }
     public FeedbackResult beginProcessing(UUID id, UUID handlerId) {
+        return beginProcessing(id);
+    }
+    public FeedbackResult beginProcessing(UUID id) {
         var f = find(id);
         UUID actorUserId = schoolAuthorization.requireSchoolAdmin(f.schoolId());
         f.beginProcessing(actorUserId);
@@ -48,8 +56,11 @@ public class FeedbackApplicationService {
         return result(f);
     }
     public FeedbackResult close(UUID id, String reason) {
+        var scope = studentScopeAuthorization.requireUniqueActiveStudent();
         var f = find(id);
-        studentAuthorization.requireSelf(f.submitterId());
+        if (!scope.studentId().equals(f.submitterId()) || !scope.schoolId().equals(f.schoolId())) {
+            throw new IllegalArgumentException("Feedback not found: " + id);
+        }
         f.close(reason);
         repo.save(f);
         return result(f);

@@ -24,7 +24,7 @@ public class ScoreAppealController {
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ScoreAppealResponse> submit(@Valid @RequestBody SubmitScoreAppealRequest req) {
-        ScoreAppealResult r = service.submit(req.schoolId(), req.scoreAttemptId(), req.appealType(), req.appealReason());
+        ScoreAppealResult r = service.submitForCurrentStudent(req.scoreAttemptId(), req.appealType(), req.appealReason());
         return ResponseEntity.created(URI.create("/api/v1/score-appeals/" + r.id()))
                 .body(new ScoreAppealResponse(r.id(), r.status()));
     }
@@ -32,7 +32,7 @@ public class ScoreAppealController {
     @PostMapping("/{id}/begin-processing")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ScoreAppealResponse> beginProcessing(@PathVariable UUID id, @Valid @RequestBody BeginProcessingRequest req) {
-        ScoreAppealResult r = service.beginProcessing(id, req.handlerId());
+        ScoreAppealResult r = service.beginProcessing(id);
         return ResponseEntity.ok(new ScoreAppealResponse(r.id(), r.status()));
     }
 

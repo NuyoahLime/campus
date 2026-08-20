@@ -42,7 +42,15 @@ onMounted(() => void load());
 </script>
 
 <template>
-  <WorkspaceShell role-label="学生" workspace-title="学生个人工作台" page-title="我的成绩" description="查看当前学生已经确认的成绩记录。" home-path="/student" :navigation="navigation" :show-identity="false">
+  <WorkspaceShell
+    role-label="学生"
+    workspace-title="学生个人工作台"
+    page-title="我的成绩"
+    description="查看当前学生已经确认的成绩记录。"
+    home-path="/student"
+    :navigation="navigation"
+    :show-identity="false"
+  >
     <section class="student-score-panel">
       <header class="student-score-toolbar">
         <div>
@@ -54,16 +62,36 @@ onMounted(() => void load());
       </header>
 
       <div v-if="loading" class="project-state">正在加载成绩...</div>
-      <div v-else-if="error" class="project-state project-state-error"><strong>{{ error }}</strong><button class="secondary-button" type="button" @click="load">重新加载</button></div>
-      <div v-else-if="!items.length" class="project-state"><strong>暂无可查看成绩</strong><p>确认后的学生成绩会显示在这里。</p><RouterLink class="primary-button" to="/activities">浏览公开活动</RouterLink></div>
+      <div v-else-if="error" class="project-state project-state-error">
+        <strong>{{ error }}</strong>
+        <button class="secondary-button" type="button" @click="load">重新加载</button>
+      </div>
+      <div v-else-if="!items.length" class="project-state">
+        <strong>暂无可查看成绩</strong>
+        <p>已经确认的学生成绩会显示在这里。</p>
+        <RouterLink class="primary-button" to="/activities">浏览公开活动</RouterLink>
+      </div>
       <div v-else class="student-score-table-wrap">
         <table class="student-score-table">
-          <thead><tr><th>活动</th><th>挑战项目</th><th>成绩</th><th>尝试次数</th><th>成绩时间</th><th>状态</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>活动</th>
+              <th>挑战项目</th>
+              <th>成绩</th>
+              <th>尝试次数</th>
+              <th>成绩时间</th>
+              <th>状态</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="item in items" :key="item.scoreAttemptId">
               <td><strong>{{ item.activityName }}</strong></td>
               <td>{{ item.challengeProjectName }}</td>
-              <td><strong>{{ formatStudentScore(item.scoreValue, item.scoreStorageType, item.scoreUnit) }}</strong><small>{{ labelForStudentScoreStorageType(item.scoreStorageType) }}</small></td>
+              <td>
+                <strong>{{ formatStudentScore(item.scoreValue, item.scoreStorageType, item.scoreUnit) }}</strong>
+                <small>{{ labelForStudentScoreStorageType(item.scoreStorageType) }}</small>
+              </td>
               <td>第 {{ item.attemptNumber }} 次</td>
               <td>{{ item.scoreBusinessTime ? new Date(item.scoreBusinessTime).toLocaleString() : '未记录' }}</td>
               <td><span class="student-score-status">{{ labelForStudentScoreStatus(item.status) }}</span></td>
@@ -72,7 +100,11 @@ onMounted(() => void load());
           </tbody>
         </table>
       </div>
-      <div v-if="result && result.totalPages > 1" class="project-pagination"><button class="secondary-button" :disabled="page === 0 || loading" @click="changePage(page - 1)">上一页</button><span>{{ page + 1 }} / {{ result.totalPages }}</span><button class="secondary-button" :disabled="!result.hasNext || loading" @click="changePage(page + 1)">下一页</button></div>
+      <div v-if="result && result.totalPages > 1" class="project-pagination">
+        <button class="secondary-button" :disabled="page === 0 || loading" @click="changePage(page - 1)">上一页</button>
+        <span>{{ page + 1 }} / {{ result.totalPages }}</span>
+        <button class="secondary-button" :disabled="!result.hasNext || loading" @click="changePage(page + 1)">下一页</button>
+      </div>
     </section>
   </WorkspaceShell>
 </template>

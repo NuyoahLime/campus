@@ -26,16 +26,16 @@ class FeedbackControllerTest {
 
     @Test void submitReturns201() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
+        when(service.submitForCurrentStudent(anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test content"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest("GENERAL","test content"))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
     @Test void beginProcessingReturns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.beginProcessing(eq(id), any())).thenReturn(new FeedbackResult(id, "PROCESSING"));
+        when(service.beginProcessing(eq(id))).thenReturn(new FeedbackResult(id, "PROCESSING"));
         mvc.perform(post("/api/v1/feedbacks/" + id + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
     }
     @Test void resolveReturns200() throws Exception {
@@ -53,9 +53,9 @@ class FeedbackControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CLOSED"));
     }
     @Test void notFoundReturns404() throws Exception {
-        when(service.beginProcessing(any(), any())).thenThrow(new IllegalArgumentException("not found"));
+        when(service.beginProcessing(any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/feedbacks/" + UUID.randomUUID() + "/begin-processing").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new BeginProcessingRequest(UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new BeginProcessingRequest())))
                 .andExpect(status().isNotFound());
     }
     @Test void conflictReturns409() throws Exception {
@@ -66,9 +66,9 @@ class FeedbackControllerTest {
     }
     @Test void responseExcludesInternalFields() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
+        when(service.submitForCurrentStudent(anyString(), anyString())).thenReturn(new FeedbackResult(id, "SUBMITTED"));
         mvc.perform(post("/api/v1/feedbacks").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new SubmitFeedbackRequest(UUID.randomUUID(),"GENERAL","test"))))
+                .content(mapper.writeValueAsString(new SubmitFeedbackRequest("GENERAL","test"))))
                 .andExpect(jsonPath("$.submitterId").doesNotExist()).andExpect(jsonPath("$.content").doesNotExist());
     }
 }

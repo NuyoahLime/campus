@@ -1,7 +1,6 @@
 package com.campusguinness.interfaces.web.security;
 
 import com.campusguinness.feedback.application.service.FeedbackApplicationService;
-import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -38,7 +37,7 @@ class StudentSelfScopeAuthorizationIT extends ResourceAuthorizationTestSupport {
                 List.of(snapshotMembership(membershipId, schoolId, "STUDENT")));
 
         assertThatThrownBy(() -> feedbacks.close(feedbackId, "done"))
-                .isInstanceOf(IdentityApplicationException.class)
-                .hasMessageContaining("Student resource scope denied");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Feedback not found");
     }
 }

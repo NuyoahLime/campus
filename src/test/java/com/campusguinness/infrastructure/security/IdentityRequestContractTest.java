@@ -24,6 +24,10 @@ class IdentityRequestContractTest {
             new FieldContract("com.campusguinness.interfaces.web.l3authorization.ApproveL3AuthorizationRequest", "reviewerId"),
             new FieldContract("com.campusguinness.interfaces.web.scoreappeal.SubmitScoreAppealRequest", "studentId"),
             new FieldContract("com.campusguinness.interfaces.web.feedback.SubmitFeedbackRequest", "submitterId"),
+            new FieldContract("com.campusguinness.interfaces.web.feedback.SubmitFeedbackRequest", "schoolId"),
+            new FieldContract("com.campusguinness.interfaces.web.feedback.BeginProcessingRequest", "handlerId"),
+            new FieldContract("com.campusguinness.interfaces.web.scoreappeal.SubmitScoreAppealRequest", "schoolId"),
+            new FieldContract("com.campusguinness.interfaces.web.scoreappeal.BeginProcessingRequest", "handlerId"),
             new FieldContract("com.campusguinness.interfaces.web.activityapplication.SubmitActivityApplicationRequest", "applicantId"),
             new FieldContract("com.campusguinness.interfaces.web.media.RegisterMediaRequest", "uploaderId")
     );
