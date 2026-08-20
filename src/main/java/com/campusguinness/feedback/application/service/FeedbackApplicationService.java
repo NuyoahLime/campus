@@ -4,7 +4,6 @@ import com.campusguinness.feedback.application.port.FeedbackRepository;
 import com.campusguinness.feedback.application.result.FeedbackResult;
 import com.campusguinness.feedback.internal.domain.*;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
-import com.campusguinness.identity.application.service.StudentResourceAuthorization;
 import com.campusguinness.identity.application.service.StudentSchoolScopeAuthorization;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import org.springframework.stereotype.Service;
@@ -17,16 +16,14 @@ public class FeedbackApplicationService {
     private final FeedbackRepository repo;
     private final CurrentActor currentActor;
     private final SchoolResourceAuthorization schoolAuthorization;
-    private final StudentResourceAuthorization studentAuthorization;
     private final StudentSchoolScopeAuthorization studentScopeAuthorization;
 
     public FeedbackApplicationService(FeedbackRepository r, CurrentActor currentActor,
-            SchoolResourceAuthorization schoolAuthorization, StudentResourceAuthorization studentAuthorization,
+            SchoolResourceAuthorization schoolAuthorization,
             StudentSchoolScopeAuthorization studentScopeAuthorization) {
         this.repo = r;
         this.currentActor = currentActor;
         this.schoolAuthorization = schoolAuthorization;
-        this.studentAuthorization = studentAuthorization;
         this.studentScopeAuthorization = studentScopeAuthorization;
     }
 
@@ -59,8 +56,11 @@ public class FeedbackApplicationService {
         return result(f);
     }
     public FeedbackResult close(UUID id, String reason) {
+        var scope = studentScopeAuthorization.requireUniqueActiveStudent();
         var f = find(id);
-        studentAuthorization.requireSelf(f.submitterId());
+        if (!scope.studentId().equals(f.submitterId()) || !scope.schoolId().equals(f.schoolId())) {
+            throw new IllegalArgumentException("Feedback not found: " + id);
+        }
         f.close(reason);
         repo.save(f);
         return result(f);

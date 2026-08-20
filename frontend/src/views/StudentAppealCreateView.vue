@@ -9,7 +9,6 @@ import { studentNavigation as navigation } from '../router/studentNavigation';
 const route = useRoute();
 const router = useRouter();
 const scoreAttemptId = ref(String(route.query.scoreAttemptId ?? ''));
-const appealType = ref('SCORE');
 const appealReason = ref('');
 const submitting = ref(false);
 const error = ref('');
@@ -22,7 +21,7 @@ async function submit() {
   try {
     const result = await submitStudentAppeal({
       scoreAttemptId: scoreAttemptId.value.trim(),
-      appealType: appealType.value,
+      appealType: 'SCORE',
       appealReason: appealReason.value.trim()
     });
     await router.replace(`/student/appeals/${result.id}`);
@@ -53,10 +52,7 @@ async function submit() {
           </label>
           <label>
             申诉类型
-            <select v-model="appealType">
-              <option value="SCORE">成绩申诉</option>
-              <option value="RANKING">排名申诉</option>
-            </select>
+            <input value="成绩申诉" readonly />
           </label>
           <label class="project-form-wide">
             申诉原因

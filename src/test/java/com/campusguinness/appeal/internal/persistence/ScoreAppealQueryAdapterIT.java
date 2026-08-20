@@ -60,6 +60,16 @@ class ScoreAppealQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
         assertThat(adapter.findByIdAndSchool(appealB, schoolA)).isEmpty();
     }
 
+    @Test
+    void historicalRankingAppealRemainsReadable() {
+        UUID scoreAttemptId = jdbc.queryForObject(
+                "SELECT score_attempt_id FROM score_appeals WHERE id = ?", UUID.class, appealA);
+        UUID rankingAppeal = insertAppeal(schoolA, studentA, scoreAttemptId, "RANKING", "SUBMITTED");
+
+        assertThat(adapter.findByIdAndStudent(rankingAppeal, studentA, schoolA))
+                .get().extracting("appealType").isEqualTo("RANKING");
+    }
+
     private UUID insertSchool(String label) {
         UUID id = UUID.randomUUID();
         jdbc.update("""
@@ -100,9 +110,13 @@ class ScoreAppealQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
     }
 
     private UUID insertAppeal(UUID schoolId, UUID studentId, UUID scoreId, String status) {
+        return insertAppeal(schoolId, studentId, scoreId, "SCORE", status);
+    }
+
+    private UUID insertAppeal(UUID schoolId, UUID studentId, UUID scoreId, String appealType, String status) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO score_appeals(id,school_id,score_attempt_id,student_id,appeal_type,appeal_reason,appeal_status) VALUES (?,?,?,?,?,?,?)",
-                id, schoolId, scoreId, studentId, "SCORE", "reason", status);
+                id, schoolId, scoreId, studentId, appealType, "reason", status);
         return id;
     }
 }

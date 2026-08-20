@@ -3,7 +3,6 @@ package com.campusguinness.appeal.application.service;
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
-import com.campusguinness.identity.application.service.StudentResourceAuthorization;
 import com.campusguinness.identity.application.service.StudentSchoolScope;
 import com.campusguinness.identity.application.service.StudentSchoolScopeAuthorization;
 import com.campusguinness.score.application.query.model.StudentScoreDetailResult;
@@ -24,7 +23,6 @@ import static org.mockito.Mockito.*;
 class ScoreAppealApplicationServiceTest {
     @Mock ScoreAppealRepository repo;
     @Mock SchoolResourceAuthorization schoolAuthorization;
-    @Mock StudentResourceAuthorization studentAuthorization;
     @Mock StudentSchoolScopeAuthorization studentScopeAuthorization;
     @Mock StudentScoreQueryPort studentScoreQueryPort;
     ScoreAppealApplicationService svc;
@@ -35,14 +33,19 @@ class ScoreAppealApplicationServiceTest {
         actorUserId=UUID.randomUUID();
         schoolId=UUID.randomUUID();
         lenient().when(schoolAuthorization.requireSchoolAdmin(any())).thenReturn(actorUserId);
-        lenient().when(studentAuthorization.requireSelf(any())).thenReturn(actorUserId);
         lenient().when(studentScopeAuthorization.requireUniqueActiveStudent())
                 .thenReturn(new StudentSchoolScope(actorUserId, schoolId));
-        svc = new ScoreAppealApplicationService(repo, schoolAuthorization, studentAuthorization,
+        svc = new ScoreAppealApplicationService(repo, schoolAuthorization,
                 studentScopeAuthorization, studentScoreQueryPort);
     }
 
-    private ScoreAppeal appeal() { return ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID())).schoolId(UUID.randomUUID()).scoreAttemptId(UUID.randomUUID()).studentId(UUID.randomUUID()).appealType("SCORE").appealReason("r")); }
+    private ScoreAppeal appeal() { return appeal(actorUserId, schoolId, "SCORE"); }
+
+    private ScoreAppeal appeal(UUID studentId, UUID appealSchoolId, String appealType) {
+        return ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(UUID.randomUUID()))
+                .schoolId(appealSchoolId).scoreAttemptId(UUID.randomUUID()).studentId(studentId)
+                .appealType(appealType).appealReason("r"));
+    }
 
     @Nested class Submit {
         @Test void success() {
@@ -64,6 +67,14 @@ class ScoreAppealApplicationServiceTest {
                     .hasMessageContaining("Score attempt not found");
             verify(repo, never()).save(any());
         }
+
+        @Test void rankingAppealIsRejectedBeforePersistence() {
+            assertThatThrownBy(() -> svc.submitForCurrentStudent(UUID.randomUUID(), "RANKING", "r"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Only SCORE appeals may be submitted.");
+            verifyNoInteractions(studentScoreQueryPort);
+            verify(repo, never()).save(any());
+        }
     }
     @Nested class BeginProcessing {
         @Test void success() { var a=appeal(); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.beginProcessing(a.id().value(),UUID.randomUUID()).status()).isEqualTo("PROCESSING"); verify(schoolAuthorization).requireSchoolAdmin(a.schoolId()); var captor=forClass(ScoreAppeal.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().handlerId()).isEqualTo(actorUserId); }
@@ -74,7 +85,9 @@ class ScoreAppealApplicationServiceTest {
         @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.reject(UUID.randomUUID(),"no")).isInstanceOf(IllegalArgumentException.class); verify(repo,never()).save(any()); }
     }
     @Nested class Withdraw {
-        @Test void success() { var a=appeal(); a.beginProcessing(UUID.randomUUID()); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.withdraw(a.id().value()).status()).isEqualTo("WITHDRAWN"); verify(studentAuthorization).requireSelf(a.studentId()); verify(repo).save(any()); }
+        @Test void success() { var a=appeal(); a.beginProcessing(UUID.randomUUID()); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThat(svc.withdraw(a.id().value()).status()).isEqualTo("WITHDRAWN"); verify(studentScopeAuthorization).requireUniqueActiveStudent(); verify(repo).save(any()); }
+        @Test void otherStudentIsSafelyDenied() { var a=appeal(UUID.randomUUID(), schoolId, "SCORE"); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThatThrownBy(()->svc.withdraw(a.id().value())).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not found"); verify(repo,never()).save(any()); }
+        @Test void otherSchoolIsSafelyDenied() { var a=appeal(actorUserId, UUID.randomUUID(), "SCORE"); when(repo.findById(any())).thenReturn(Optional.of(a)); assertThatThrownBy(()->svc.withdraw(a.id().value())).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not found"); verify(repo,never()).save(any()); }
         @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.withdraw(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); verify(repo,never()).save(any()); }
     }
     @Nested class Resolve {
