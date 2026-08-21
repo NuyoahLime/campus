@@ -21,6 +21,7 @@ import PublicProjectDetailView from '../views/PublicProjectDetailView.vue';
 import PublicHomeView from '../views/PublicHomeView.vue';
 import PublicActivitiesView from '../views/PublicActivitiesView.vue';
 import PublicActivityDetailView from '../views/PublicActivityDetailView.vue';
+import PublicSchoolRegistrationView from '../views/PublicSchoolRegistrationView.vue';
 import SuperAdminProjectListView from '../views/SuperAdminProjectListView.vue';
 import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vue';
 import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vue';
@@ -82,6 +83,11 @@ const router = createRouter({
       path: '/activities/:id',
       name: 'public-activity-detail',
       component: PublicActivityDetailView
+    },
+    {
+      path: '/school-registration',
+      name: 'public-school-registration',
+      component: PublicSchoolRegistrationView
     },
     {
       path: '/student/application/rejected',

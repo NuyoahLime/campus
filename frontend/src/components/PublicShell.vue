@@ -5,7 +5,7 @@ import { roleHomeLocation } from '../router/roleHome';
 import { useAuthStore } from '../stores/auth';
 
 defineProps<{
-  active?: 'home' | 'projects' | 'activities';
+  active?: 'home' | 'projects' | 'activities' | 'registration';
 }>();
 
 const auth = useAuthStore();
@@ -27,6 +27,7 @@ const accountLabel = computed(() => auth.isAuthenticated ? '进入工作台' : '
         <RouterLink :class="{ 'public-site-link-active': active === 'home' }" to="/">首页</RouterLink>
         <RouterLink :class="{ 'public-site-link-active': active === 'projects' }" to="/projects">挑战项目</RouterLink>
         <RouterLink :class="{ 'public-site-link-active': active === 'activities' }" to="/activities">学校活动</RouterLink>
+        <RouterLink :class="{ 'public-site-link-active': active === 'registration' }" to="/school-registration">学校入驻</RouterLink>
       </nav>
       <RouterLink class="secondary-button public-site-login" :to="accountLink">{{ accountLabel }}</RouterLink>
     </header>
