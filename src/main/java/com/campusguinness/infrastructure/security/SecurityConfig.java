@@ -97,6 +97,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/schools").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/school-registrations").permitAll()
                 .requestMatchers(HttpMethod.GET,
+                        "/api/v1/public/rankings",
+                        "/api/v1/public/rankings/*"
+                ).permitAll()
+                .requestMatchers(HttpMethod.GET,
                         "/api/v1/challenge-projects/governance",
                         "/api/v1/challenge-projects/governance/*"
                 ).hasRole("SUPER_ADMIN")
@@ -110,7 +114,9 @@ public class SecurityConfig {
                         "/api/v1/school-admin/appeals",
                         "/api/v1/school-admin/appeals/*",
                         "/api/v1/school-admin/feedback",
-                        "/api/v1/school-admin/feedback/*"
+                        "/api/v1/school-admin/feedback/*",
+                        "/api/v1/school-admin/rankings",
+                        "/api/v1/school-admin/rankings/*"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/activities", "/api/v1/activities/*").permitAll()
                 .requestMatchers(HttpMethod.GET,
@@ -183,7 +189,9 @@ public class SecurityConfig {
                         "/api/v1/student/appeals",
                         "/api/v1/student/appeals/*",
                         "/api/v1/student/feedback",
-                        "/api/v1/student/feedback/*"
+                        "/api/v1/student/feedback/*",
+                        "/api/v1/student/rankings",
+                        "/api/v1/student/rankings/*"
                 ).hasRole("STUDENT")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-registrations/*/withdraw",

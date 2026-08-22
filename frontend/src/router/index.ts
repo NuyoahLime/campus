@@ -38,6 +38,8 @@ import SchoolAdminAppealsView from '../views/SchoolAdminAppealsView.vue';
 import SchoolAdminAppealDetailView from '../views/SchoolAdminAppealDetailView.vue';
 import SchoolAdminFeedbackView from '../views/SchoolAdminFeedbackView.vue';
 import SchoolAdminFeedbackDetailView from '../views/SchoolAdminFeedbackDetailView.vue';
+import RankingListView from '../views/RankingListView.vue';
+import RankingDetailView from '../views/RankingDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -88,6 +90,18 @@ const router = createRouter({
       path: '/school-registration',
       name: 'public-school-registration',
       component: PublicSchoolRegistrationView
+    },
+    {
+      path: '/rankings',
+      name: 'public-rankings',
+      component: RankingListView,
+      props: { mode: 'public' }
+    },
+    {
+      path: '/rankings/:id',
+      name: 'public-ranking-detail',
+      component: RankingDetailView,
+      props: { mode: 'public' }
     },
     {
       path: '/student/application/rejected',
@@ -153,6 +167,20 @@ const router = createRouter({
       path: '/school-admin/feedback/:id',
       name: 'school-admin-feedback-detail',
       component: SchoolAdminFeedbackDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/rankings',
+      name: 'school-admin-rankings',
+      component: RankingListView,
+      props: { mode: 'school-admin' },
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/rankings/:id',
+      name: 'school-admin-ranking-detail',
+      component: RankingDetailView,
+      props: { mode: 'school-admin' },
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {
@@ -255,6 +283,20 @@ const router = createRouter({
       path: '/student/feedback/:id',
       name: 'student-feedback-detail',
       component: StudentFeedbackDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/rankings',
+      name: 'student-rankings',
+      component: RankingListView,
+      props: { mode: 'student' },
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/rankings/:id',
+      name: 'student-ranking-detail',
+      component: RankingDetailView,
+      props: { mode: 'student' },
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
     },
     {
