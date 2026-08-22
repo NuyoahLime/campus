@@ -311,6 +311,40 @@ These flows remain unresolved under the current three-role identity model and mu
 | Teacher feedback submitter or processor role | DEFERRED_BY_CURRENT_IDENTITY_MODEL | Feedback supports client `submitterId` and `handlerId`-style debt |
 | Teacher project favorites or teacher workspace | DEFERRED_BY_CURRENT_IDENTITY_MODEL | Historical UI/spec flow, no current formal role |
 
+## Stage 24 Current-Baseline Addendum
+
+The older audit snapshot above is retained as historical evidence. For current
+runtime decisions, the following Stage 24 baseline supersedes its stale baseline
+SHA and unresolved Teacher wording:
+
+- Current master: `d11d47fcd2600ab02056baa934184b20ec2a5b72`
+- Runtime roles: `SUPER_ADMIN`, `SCHOOL_ADMIN`, `STUDENT`
+- `TEACHER`: `NOT_A_RUNTIME_ROLE`
+- `ActivityApplication` student operations are self-scoped; school-admin review is
+  same-school; SuperAdmin does not perform school application operations.
+- `ActivityApplication` student identity and school scope are derived from
+  `CurrentActor` and the unique active student membership. Client
+  `studentId`, `schoolId` and `applicantId` are not authorization inputs; the
+  service loads the Activity and checks its school against the current student.
+- Score write responsibility is resolved to same-school `SCHOOL_ADMIN`;
+  implementation is incomplete and targeted to Stage 26. Student remains
+  read-only and SuperAdmin is not the ordinary school score operator.
+- Ranking read is a published-snapshot read slice. Ranking generation and
+  publication are future production responsibilities; calculation, version
+  generation, preview, publication and final L3 visibility enforcement remain
+  incomplete for Stage 27.
+- Stage 23 public ranking read currently needs a later L3 visibility tightening;
+  Stage 24 does not change the API.
+- Target V1 is deployable, but the current product is not yet
+  production-ready.
+
+The authoritative operational contract is:
+
+`docs/decision/current-three-role-operational-responsibility-baseline-v1.0.md`
+
+Historical migrations, enum values, fixtures and negative tests containing
+`TEACHER` remain compatibility-only and must not be removed in this stage.
+
 ## Validation Expectations
 
 For the Phase 8 PR:
