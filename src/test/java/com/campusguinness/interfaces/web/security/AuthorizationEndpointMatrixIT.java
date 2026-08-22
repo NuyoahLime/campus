@@ -80,7 +80,7 @@ class AuthorizationEndpointMatrixIT {
     @Test
     void endpointMatrixRows() throws Exception {
         var rows = matrix();
-        assertThat(rows).hasSize(58);
+        assertThat(rows).hasSize(64);
         for (Row row : rows) {
             assertRow(row);
         }
@@ -239,7 +239,13 @@ class AuthorizationEndpointMatrixIT {
                 row(55, "POST", "/api/v1/feedbacks", Allowed.STUDENT, feedbackSubmit),
                 row(56, "POST", "/api/v1/feedbacks/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
                 row(57, "POST", "/api/v1/feedbacks/" + id + "/resolve", Allowed.SCHOOL_ADMIN, "{\"reply\":\"phase11\"}"),
-                row(58, "POST", "/api/v1/feedbacks/" + id + "/close", Allowed.STUDENT, reason)
+                row(58, "POST", "/api/v1/feedbacks/" + id + "/close", Allowed.STUDENT, reason),
+                row(59, "GET", "/api/v1/public/rankings", Allowed.PUBLIC),
+                row(60, "GET", "/api/v1/public/rankings/" + id, Allowed.PUBLIC),
+                row(61, "GET", "/api/v1/student/rankings", Allowed.STUDENT),
+                row(62, "GET", "/api/v1/student/rankings/" + id, Allowed.STUDENT),
+                row(63, "GET", "/api/v1/school-admin/rankings", Allowed.SCHOOL_ADMIN),
+                row(64, "GET", "/api/v1/school-admin/rankings/" + id, Allowed.SCHOOL_ADMIN)
         );
     }
 
