@@ -44,9 +44,9 @@ management UI.
 | ChallengeProject resource library/governance | COMPLETE_VERTICAL_SLICE | Lifecycle, rule versions, public/governance queries, persistence, API/UI, UAT | Activity linkage/resources outside accepted scope | Preserve Stage 16 |
 | Activity | COMPLETE_VERTICAL_SLICE | Domain, public read, school-admin management query/detail/create/edit/publish, persistence, API/UI, tests and UAT | ActivityApplication linkage is a separate line | Preserve Stage 18-19 |
 | ActivityApplication | BACKEND_PARTIAL | State machine, persistence, review commands, negative API boundary | Student query/self-scope/withdraw and workflow API missing | Stage 25 |
-| Score write | DEFERRED_BY_IDENTITY_MODEL | Value types, state/domain, persistence, denial tests | School-admin operator, confirmation and correction workflow missing | Stage 26 |
+| Score write | BACKEND_PARTIAL | Value types, state/domain, persistence, denial tests | Decision resolved; SCHOOL_ADMIN create/edit, explicit confirm/review, same-school authorization and correction coordinator missing | Stage 26 |
 | Score appeal | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and UAT | Correction remains a score-write concern | Preserve Stage 21 |
-| Ranking | COMPLETE_VERTICAL_SLICE | Published snapshot persistence, scoped read API, public/student/school-admin frontend and tests | Generation/publication absent; public L3 filtering follow-up | Stage 27 |
+| Ranking published snapshot read | COMPLETE_VERTICAL_SLICE | Published snapshot persistence, scoped read API, public/student/school-admin frontend and tests | Ranking Production is not implemented: calculation, version generation, preview, publication and final L3 visibility enforcement | Stage 27 |
 | L3 authorization | BACKEND_PARTIAL | Domain, commands, persistence, partial API | Full query/detail/reject/suspend workflow absent | Later governance stage |
 | Media | DEFERRED_BY_IDENTITY_MODEL | Lifecycle domain, persistence, review commands | Uploader/reviewer/publication contract unresolved after Teacher removal | Later product decision |
 | Activity result | BACKEND_PARTIAL | Domain, persistence, publish command/API | Create/read/review/public query and frontend absent | Stage 28 |
@@ -64,12 +64,16 @@ all historical screenshot features exist.
 
 ## 5. Deferred and Partial Lines
 
-ActivityApplication, Score Write, L3 ranking production and ActivityResult remain
-partial implementation lines. Stage 24 has now defined their target identity,
+ActivityApplication, Score Write, Ranking Production, L3 authorization and ActivityResult
+remain partial implementation lines. Stage 24 has now resolved their target identity,
 school scope, review ownership and separation-of-duties contract. Media upload and
 publication remain `DEFERRED_BY_IDENTITY_MODEL` because its uploader, school reviewer
 and platform reviewer model is still unresolved. The removed Teacher role cannot be
 recreated or silently replaced with `SCHOOL_ADMIN`.
+
+Score Write is no longer identity-deferred. Its responsibility is resolved to
+`SCHOOL_ADMIN` with same-school scope; implementation remains incomplete and is
+targeted for Stage 26.
 
 ## 6. Roadmap After Stage 23
 
@@ -95,6 +99,10 @@ Stage 24 change set.
 Ranking read is a complete vertical slice for public, student and school-admin
 clients. It reads enabled definitions with published current versions and does not
 calculate rankings during reads. Ranking generation and publication remain absent.
+
+`RANKING_READ: COMPLETE_VERTICAL_SLICE` does not imply that Ranking Production is
+complete. Calculation, version generation, preview, publication and final L3
+visibility enforcement remain `NOT_IMPLEMENTED` or `BACKEND_PARTIAL` for Stage 27.
 
 The current public query is broader than the final L3-only publication rule and must
 be narrowed in the Ranking production stage. This is a documented follow-up, not a

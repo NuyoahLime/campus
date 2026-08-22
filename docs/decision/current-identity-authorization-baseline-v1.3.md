@@ -322,12 +322,21 @@ SHA and unresolved Teacher wording:
 - `TEACHER`: `NOT_A_RUNTIME_ROLE`
 - `ActivityApplication` student operations are self-scoped; school-admin review is
   same-school; SuperAdmin does not perform school application operations.
-- Score write is a future same-school SchoolAdmin responsibility; student is
+- `ActivityApplication` student identity and school scope are derived from
+  `CurrentActor` and the unique active student membership. Client
+  `studentId`, `schoolId` and `applicantId` are not authorization inputs; the
+  service loads the Activity and checks its school against the current student.
+- Score write responsibility is resolved to same-school `SCHOOL_ADMIN`;
+  implementation is incomplete and targeted to Stage 26. Student remains
   read-only and SuperAdmin is not the ordinary school score operator.
 - Ranking read is a published-snapshot read slice. Ranking generation and
-  publication are future production responsibilities.
+  publication are future production responsibilities; calculation, version
+  generation, preview, publication and final L3 visibility enforcement remain
+  incomplete for Stage 27.
 - Stage 23 public ranking read currently needs a later L3 visibility tightening;
   Stage 24 does not change the API.
+- Target V1 is deployable, but the current product is not yet
+  production-ready.
 
 The authoritative operational contract is:
 

@@ -12,9 +12,11 @@ retirement of the Teacher role. It is a product and authorization contract for
 Stages 25-30. It does not implement endpoints, migrations, UI, or workflow
 changes.
 
-The current product is a deployable three-role school platform. Historical
-Teacher records and specifications are compatibility evidence only and must not
-be treated as permission to restore a Teacher workspace.
+Target V1 is a deployable three-role school platform. The current product is not
+yet production-ready because ActivityApplication closure, Score Write, Ranking
+Production and production-readiness work remain incomplete. Historical Teacher
+records and specifications are compatibility evidence only and must not be
+treated as permission to restore a Teacher workspace.
 
 ## 2. Runtime Roles
 
@@ -57,12 +59,17 @@ migrations.
 | `SUPER_ADMIN` | No school application day-to-day processing | Platform governance only |
 | Teacher | None | Not a runtime role |
 
-The server must derive `applicantId` from `CurrentActor`. The submitted
-`schoolId` is a target resource and must be checked against the student's active
-membership and the activity's school. The activity must be in an application
-allowed state. Duplicate application rules, withdraw states, and
-approve/reject transitions must be enforced by the application service and
-domain.
+The student's identity must come from `CurrentActor` and one unique active
+`STUDENT` membership. The server derives both `studentId` and `schoolId` from
+that membership. Client-supplied `studentId`, `schoolId` and `applicantId` are
+not authorization inputs. The submit request target is `activityId` plus the
+actual business fields required by the application contract. The service loads
+the Activity and verifies `activity.schoolId == currentStudent.schoolId`.
+If an existing request still contains `schoolId`, it is
+`CURRENT_IMPLEMENTATION_DEBT`, not part of the Stage 25 authorization contract.
+The activity must be in an application allowed state. Duplicate application
+rules, withdraw states, and approve/reject transitions must be enforced by the
+application service and domain.
 
 ### Current implementation evidence
 
