@@ -192,10 +192,10 @@ Legend for current rule:
 | 33 | GET | `/api/v1/activities` | authenticated | ANONYMOUS | PUBLIC | N/A | Result schoolId | N/A | Public read currently requires login | AUTHZ-08-PUBLIC-READ |
 | 34 | POST | `/api/v1/activities` | authenticated | SCHOOL_ADMIN | SAME_SCHOOL | Request body createdBy | Request body schoolId | 403 | `createdBy` and school scope are client-forgeable | AUTHZ-08-ACTIVITY |
 | 35 | POST | `/api/v1/activities/{id}/publish` | authenticated | SCHOOL_ADMIN | SAME_SCHOOL | SecurityContext target | Target activity | 403 | Same-school check absent at controller boundary | AUTHZ-08-ACTIVITY |
-| 36 | POST | `/api/v1/activity-applications` | authenticated | DEFERRED / DENY | SAME_SCHOOL | Request body applicantId | Request body schoolId | 403 | Depends on formal TEACHER flow; `applicantId` forgeable | AUTHZ-08-DEFERRED-TEACHER |
+| 36 | POST | `/api/v1/activity-applications` | authenticated | DEFERRED / DENY | SAME_SCHOOL | Request body applicantId | Request body schoolId | 403 | Legacy activity-creation application; no current runtime submitter | AUTHZ-08-DEFERRED-TEACHER |
 | 37 | POST | `/api/v1/activity-applications/{id}/approve` | authenticated | SCHOOL_ADMIN | SAME_SCHOOL | Request body reviewerId | Target application | 403 | `reviewerId` is client-forgeable | AUTHZ-08-ACTIVITY-APPLICATION |
 | 38 | POST | `/api/v1/activity-applications/{id}/reject` | authenticated | SCHOOL_ADMIN | SAME_SCHOOL | Request body reviewerId | Target application | 403 | `reviewerId` is client-forgeable | AUTHZ-08-ACTIVITY-APPLICATION |
-| 39 | POST | `/api/v1/activity-applications/{id}/withdraw` | authenticated | DEFERRED / DENY | SAME_SCHOOL | SecurityContext target | Target application | 403 | Depends on formal TEACHER applicant model | AUTHZ-08-DEFERRED-TEACHER |
+| 39 | POST | `/api/v1/activity-applications/{id}/withdraw` | authenticated | DEFERRED / DENY | SAME_SCHOOL | SecurityContext target | Target application | 403 | Legacy activity-creation application; no current runtime submitter | AUTHZ-08-DEFERRED-TEACHER |
 | 40 | POST | `/api/v1/activity-results/{id}/publish` | authenticated | SCHOOL_ADMIN | SAME_SCHOOL | SecurityContext target | Target activity result | 403 | Same-school check absent at controller boundary | AUTHZ-08-RESULT |
 | 41 | POST | `/api/v1/score-attempts` | authenticated | DEFERRED / DENY | SAME_SCHOOL | Request body studentId and enteredBy | Request body schoolId | 403 | Score entry depends on teacher/admin decision; identity fields forgeable | AUTHZ-08-DEFERRED-TEACHER |
 | 42 | POST | `/api/v1/score-appeals` | authenticated | STUDENT | SELF | Request body studentId | Request body schoolId and score attempt target | 403 or 404 | `studentId` is client-forgeable | AUTHZ-08-APPEAL |
@@ -257,7 +257,7 @@ The following table records the 13 declared DTOs that contain one of the explici
 | 9 | `SubmitScoreRequest` | `studentId` | LEGITIMATE_TARGET_ID | Target student id, but caller authority and same-school scope must be checked from principal/resource |
 | 10 | `SubmitScoreAppealRequest` | `studentId` | MUST_REMOVE | Student appeal submitter must be the authenticated student; score attempt may identify the target |
 | 11 | `SubmitFeedbackRequest` | `submitterId` | MUST_REMOVE | Feedback submitter must be the authenticated user |
-| 12 | `SubmitActivityApplicationRequest` | `applicantId` | MUST_REMOVE | Activity applicant must be the authenticated actor after the teacher/student/admin product decision |
+| 12 | `SubmitActivityApplicationRequest` | `applicantId` | LEGACY_DEFERRED | Historical activity-creation application; no current runtime submitter. Do not reinterpret as student enrollment |
 | 13 | `RegisterMediaRequest` | `uploaderId` | MUST_REMOVE | Media uploader must come from `CurrentActor`; school and activity scope must be resource-validated |
 
 Same-family fields observed outside the requested field set:
@@ -317,15 +317,18 @@ The older audit snapshot above is retained as historical evidence. For current
 runtime decisions, the following Stage 24 baseline supersedes its stale baseline
 SHA and unresolved Teacher wording:
 
-- Current master: `d11d47fcd2600ab02056baa934184b20ec2a5b72`
+- Current master: `9989295d6b782f431c43f1dfd43c241d37bed5d8`
 - Runtime roles: `SUPER_ADMIN`, `SCHOOL_ADMIN`, `STUDENT`
 - `TEACHER`: `NOT_A_RUNTIME_ROLE`
-- `ActivityApplication` student operations are self-scoped; school-admin review is
-  same-school; SuperAdmin does not perform school application operations.
-- `ActivityApplication` student identity and school scope are derived from
-  `CurrentActor` and the unique active student membership. Client
-  `studentId`, `schoolId` and `applicantId` are not authorization inputs; the
-  service loads the Activity and checks its school against the current student.
+- `ActivityApplication` is a legacy/frozen activity-creation application
+  aggregate. It is not a student enrollment model and is not an active V1
+  student operation.
+- The current V1 student participation contract is `Participant Scope`; it is
+  not implemented by this baseline and must be designed as an independent
+  capability if enabled later.
+- `SCHOOL_ADMIN` may directly create and manage same-school Activity resources.
+- No current runtime role submits the historical Teacher-era
+  `ActivityApplication` flow; `TEACHER` remains excluded.
 - Score write responsibility is resolved to same-school `SCHOOL_ADMIN`;
   implementation is incomplete and targeted to Stage 26. Student remains
   read-only and SuperAdmin is not the ordinary school score operator.

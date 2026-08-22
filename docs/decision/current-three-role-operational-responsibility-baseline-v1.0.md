@@ -1,5 +1,10 @@
 # Current Three-Role Operational Responsibility Baseline v1.0
 
+> **Superseded:** This historical Stage 24 baseline is superseded by
+> `current-three-role-operational-responsibility-baseline-v1.1.md` because its
+> ActivityApplication responsibility section incorrectly described student
+> enrollment. The historical document is retained for decision history.
+
 > Status: Stage 24 decision baseline
 > Baseline master: `d11d47fcd2600ab02056baa934184b20ec2a5b72`
 > Runtime roles: `SUPER_ADMIN`, `SCHOOL_ADMIN`, `STUDENT`
@@ -290,10 +295,10 @@ remain outside Stage 24 implementation.
 
 | Capability | Current state | Target stage | Role | Object scope |
 | --- | --- | --- | --- | --- |
-| ActivityApplication submit | Endpoint denied; service derives actor | Stage 25 | STUDENT | Own student, same school |
-| ActivityApplication list/detail | No query endpoint | Stage 25 | STUDENT | Own applications |
-| ActivityApplication withdraw | Endpoint denied; ownership gap | Stage 25 | STUDENT | Own application |
-| ActivityApplication review | Approve/reject endpoint and same-school service check | Stage 25 | SCHOOL_ADMIN | Same-school application |
+| ActivityApplication submit | Legacy activity-creation application; endpoint denied | Frozen for V1 | No runtime submitter | Historical flow only |
+| ActivityApplication list/detail | Legacy activity-creation application; no active query contract | Frozen for V1 | No runtime student operation | Historical flow only |
+| ActivityApplication withdraw | Legacy activity-creation application; endpoint denied | Frozen for V1 | No runtime submitter | Historical flow only |
+| ActivityApplication review | Historical approve/reject boundary | Frozen for V1 | SCHOOL_ADMIN | Same-school historical application |
 | Score draft/create/edit | Domain supports draft; write endpoint denied | Stage 26 | SCHOOL_ADMIN | Same-school activity/project |
 | Score submit/confirm | No approval API | Stage 26 | SCHOOL_ADMIN | Same-school score |
 | Score approved read | Student read slice exists | Preserved | STUDENT | Own approved scores |
@@ -315,7 +320,7 @@ For all future write endpoints:
 
 The accepted implementation order is:
 
-1. Stage 25: Student ActivityApplication closure.
+1. Stage 25: Activity Participant Scope closure.
 2. Stage 26: SchoolAdmin Score Write closure.
 3. Stage 27: Ranking calculation, version and publication.
 4. Stage 28: ActivityResult closure.
@@ -324,6 +329,10 @@ The accepted implementation order is:
 
 Stage 24 itself does not implement any of these capabilities and does not add
 business endpoints, migrations, or frontend pages.
+
+The existing `activity_participants` table is persistence evidence only. Until a
+complete participant-scope domain, authorization contract, API, frontend and
+UAT exist, `Activity Participant Scope` remains `NOT_IMPLEMENTED`.
 
 ## 16. Compatibility and Non-Goals
 
