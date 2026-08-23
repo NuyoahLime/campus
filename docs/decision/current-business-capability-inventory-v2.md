@@ -21,7 +21,7 @@ their historical screens are not counted as missing frontend work to be implemen
 | Capability lines audited | 18 |
 | COMPLETE_VERTICAL_SLICE | 11 |
 | BACKEND_READY_FRONTEND_MISSING | 0 |
-| BACKEND_PARTIAL | 4 |
+| BACKEND_PARTIAL | 3 |
 | DOMAIN_READY_API_MISSING | 1 |
 | DEFERRED_BY_IDENTITY_MODEL | 1 |
 | PRODUCT_DECISION_REQUIRED flags | 0 |
