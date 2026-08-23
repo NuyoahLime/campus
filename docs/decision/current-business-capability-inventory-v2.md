@@ -1,7 +1,7 @@
 # Current Business Capability Inventory v2
 
 > Stage 24 refresh
-> Baseline: `d11d47fcd2600ab02056baa934184b20ec2a5b72`
+> Baseline: `9989295d6b782f431c43f1dfd43c241d37bed5d8`
 > Evidence: current source, controllers, frontend routes, tests, and accepted browser UAT through Stage 23
 
 ## 1. Completion Rule
@@ -21,7 +21,7 @@ their historical screens are not counted as missing frontend work to be implemen
 | Capability lines audited | 18 |
 | COMPLETE_VERTICAL_SLICE | 11 |
 | BACKEND_READY_FRONTEND_MISSING | 0 |
-| BACKEND_PARTIAL | 4 |
+| BACKEND_PARTIAL | 3 |
 | DOMAIN_READY_API_MISSING | 1 |
 | DEFERRED_BY_IDENTITY_MODEL | 1 |
 | PRODUCT_DECISION_REQUIRED flags | 0 |
@@ -43,7 +43,7 @@ management UI.
 | Student identity application | COMPLETE_VERTICAL_SLICE | Registration/resubmit/review/rollback, profile/membership persistence, API/UI, UAT | Student profile management is separate | Preserve |
 | ChallengeProject resource library/governance | COMPLETE_VERTICAL_SLICE | Lifecycle, rule versions, public/governance queries, persistence, API/UI, UAT | Activity linkage/resources outside accepted scope | Preserve Stage 16 |
 | Activity | COMPLETE_VERTICAL_SLICE | Domain, public read, school-admin management query/detail/create/edit/publish, persistence, API/UI, tests and UAT | ActivityApplication linkage is a separate line | Preserve Stage 18-19 |
-| ActivityApplication | BACKEND_PARTIAL | State machine, persistence, review commands, negative API boundary | Student query/self-scope/withdraw and workflow API missing | Stage 25 |
+| ActivityApplication | LEGACY_FROZEN / DEFERRED_FOR_V1 | Independent activity-creation application aggregate, persistence, review commands and negative API boundary | No current runtime role submits this legacy flow; historical Teacher responsibility is frozen | No V1 implementation |
 | Score write | BACKEND_PARTIAL | Value types, state/domain, persistence, denial tests | Decision resolved; SCHOOL_ADMIN create/edit, explicit confirm/review, same-school authorization and correction coordinator missing | Stage 26 |
 | Score appeal | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and UAT | Correction remains a score-write concern | Preserve Stage 21 |
 | Ranking published snapshot read | COMPLETE_VERTICAL_SLICE | Published snapshot persistence, scoped read API, public/student/school-admin frontend and tests | Ranking Production is not implemented: calculation, version generation, preview, publication and final L3 visibility enforcement | Stage 27 |
@@ -64,12 +64,15 @@ all historical screenshot features exist.
 
 ## 5. Deferred and Partial Lines
 
-ActivityApplication, Score Write, Ranking Production, L3 authorization and ActivityResult
-remain partial implementation lines. Stage 24 has now resolved their target identity,
-school scope, review ownership and separation-of-duties contract. Media upload and
-publication remain `DEFERRED_BY_IDENTITY_MODEL` because its uploader, school reviewer
-and platform reviewer model is still unresolved. The removed Teacher role cannot be
-recreated or silently replaced with `SCHOOL_ADMIN`.
+ActivityApplication remains a legacy/frozen line for V1: it represents an activity
+creation application and is not a student enrollment model. Its historical Teacher
+submitter is not a runtime role. Score Write, Ranking Production, L3 authorization
+and ActivityResult remain partial implementation lines. Stage 24 has resolved the
+target identity, school scope, review ownership and separation-of-duties contract
+for the capabilities that remain in the active roadmap. Media upload and
+publication remain `DEFERRED_BY_IDENTITY_MODEL` because its uploader, school
+reviewer and platform reviewer model is still unresolved. The removed Teacher role
+cannot be recreated or silently replaced with `SCHOOL_ADMIN`.
 
 Score Write is no longer identity-deferred. Its responsibility is resolved to
 `SCHOOL_ADMIN` with same-school scope; implementation remains incomplete and is
@@ -84,7 +87,7 @@ targeted for Stage 26.
 5. Stage 22: public school registration frontend. SEALED.
 6. Stage 23: published ranking snapshot read/publicization. SEALED.
 7. Stage 24: three-role operational responsibility baseline. Current documentation stage.
-8. Stage 25: Student ActivityApplication closure.
+8. Stage 25: Activity Participant Scope closure.
 9. Stage 26: SCHOOL_ADMIN Score Write closure.
 10. Stage 27: Ranking calculation, version and publication.
 11. Stage 28: ActivityResult closure.
@@ -93,6 +96,10 @@ targeted for Stage 26.
 
 This roadmap is a decision baseline, not permission to implement later stages in the
 Stage 24 change set.
+
+The existing `activity_participants` table is persistence evidence only. Until a
+complete participant-scope domain, authorization contract, API, frontend and UAT
+exist, `Activity Participant Scope` remains `NOT_IMPLEMENTED`.
 
 ## 7. Stage 23 Read Boundary
 

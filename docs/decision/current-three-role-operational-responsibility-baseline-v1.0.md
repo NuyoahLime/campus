@@ -1,5 +1,10 @@
 # Current Three-Role Operational Responsibility Baseline v1.0
 
+> **Superseded:** This historical Stage 24 baseline is superseded by
+> `current-three-role-operational-responsibility-baseline-v1.1.md` because its
+> ActivityApplication responsibility section incorrectly described student
+> enrollment. The historical document is retained for decision history.
+
 > Status: Stage 24 decision baseline
 > Baseline master: `d11d47fcd2600ab02056baa934184b20ec2a5b72`
 > Runtime roles: `SUPER_ADMIN`, `SCHOOL_ADMIN`, `STUDENT`
