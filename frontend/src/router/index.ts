@@ -26,8 +26,11 @@ import SuperAdminProjectListView from '../views/SuperAdminProjectListView.vue';
 import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vue';
 import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vue';
 import SchoolAdminActivityDetailView from '../views/SchoolAdminActivityDetailView.vue';
+import SchoolAdminActivityParticipantsView from '../views/SchoolAdminActivityParticipantsView.vue';
 import StudentScoresView from '../views/StudentScoresView.vue';
 import StudentScoreDetailView from '../views/StudentScoreDetailView.vue';
+import StudentActivitiesView from '../views/StudentActivitiesView.vue';
+import StudentActivityDetailView from '../views/StudentActivityDetailView.vue';
 import StudentAppealsView from '../views/StudentAppealsView.vue';
 import StudentAppealCreateView from '../views/StudentAppealCreateView.vue';
 import StudentAppealDetailView from '../views/StudentAppealDetailView.vue';
@@ -140,6 +143,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {
+      path: '/school-admin/activities/:id/participants',
+      name: 'school-admin-activity-participants',
+      component: SchoolAdminActivityParticipantsView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
       path: '/school-admin/activities/:id',
       name: 'school-admin-activity-detail',
       component: SchoolAdminActivityDetailView,
@@ -247,6 +256,18 @@ const router = createRouter({
       path: '/student/scores/:id',
       name: 'student-score-detail',
       component: StudentScoreDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/activities',
+      name: 'student-activities',
+      component: StudentActivitiesView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
+    },
+    {
+      path: '/student/activities/:id',
+      name: 'student-activity-detail',
+      component: StudentActivityDetailView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_STUDENT' }
     },
     {
