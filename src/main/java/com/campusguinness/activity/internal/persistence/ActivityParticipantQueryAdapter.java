@@ -1,5 +1,6 @@
 package com.campusguinness.activity.internal.persistence;
 
+import com.campusguinness.activity.application.exception.ActivityParticipantAlreadyAssignedException;
 import com.campusguinness.activity.application.port.ActivityParticipantPort;
 import com.campusguinness.activity.application.query.model.ActivityDetailResult;
 import com.campusguinness.activity.application.query.model.ActivityListResult;
@@ -7,12 +8,14 @@ import com.campusguinness.activity.application.query.model.ActivityParticipantRe
 import com.campusguinness.activity.application.query.model.ActivityProjectResult;
 import com.campusguinness.activity.internal.domain.ActivityParticipant;
 import com.campusguinness.project.application.query.model.QueryPage;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -102,11 +105,18 @@ class ActivityParticipantQueryAdapter implements ActivityParticipantPort {
     @Override
     @Transactional
     public void save(ActivityParticipant participant) {
-        jdbc.update("""
-                INSERT INTO activity_participants(id, activity_id, student_membership_id, created_at)
-                VALUES (?, ?, ?, ?)
-                """, participant.id(), participant.activityId(), participant.studentMembershipId(),
-                participant.createdAt());
+        try {
+            jdbc.update("""
+                    INSERT INTO activity_participants(id, activity_id, student_membership_id, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """, participant.id(), participant.activityId(), participant.studentMembershipId(),
+                    Timestamp.from(participant.createdAt()));
+        } catch (DataIntegrityViolationException ex) {
+            if (isParticipantDuplicate(ex)) {
+                throw new ActivityParticipantAlreadyAssignedException();
+            }
+            throw ex;
+        }
     }
 
     @Override
@@ -209,5 +219,23 @@ class ActivityParticipantQueryAdapter implements ActivityParticipantPort {
     private Instant instant(ResultSet rs, String column) throws SQLException {
         var timestamp = rs.getTimestamp(column);
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    private boolean isParticipantDuplicate(DataIntegrityViolationException ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof SQLException sqlException
+                    && "23505".equals(sqlException.getSQLState())
+                    && containsConstraintName(sqlException)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean containsConstraintName(SQLException exception) {
+        return exception.getMessage() != null
+                && exception.getMessage().contains("uq_activity_participant");
     }
 }
