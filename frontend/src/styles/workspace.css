@@ -1872,6 +1872,8 @@
   .project-card-grid, .activity-card-grid, .ranking-card-grid, .project-detail-grid, .project-form-grid { grid-template-columns: 1fr; }
   .project-rule-section, .project-form-wide { grid-column: auto; }
   .project-admin-toolbar, .project-detail-toolbar { align-items: flex-start; flex-direction: column; }
+  .participant-section-heading { align-items: stretch; flex-direction: column; }
+  .participant-search { min-width: 0; width: 100%; }
   .project-admin-toolbar .primary-button { width: 100%; }
   .project-admin-filter { align-items: stretch; flex-direction: column; }
   .project-filter-bar label { min-width: 0; width: 100%; }

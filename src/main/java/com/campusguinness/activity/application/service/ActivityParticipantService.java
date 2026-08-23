@@ -1,5 +1,6 @@
 package com.campusguinness.activity.application.service;
 
+import com.campusguinness.activity.application.exception.ActivityParticipantAlreadyAssignedException;
 import com.campusguinness.activity.application.port.ActivityParticipantPort;
 import com.campusguinness.activity.application.query.model.ActivityDetailResult;
 import com.campusguinness.activity.application.query.model.ActivityParticipantResult;
@@ -55,7 +56,7 @@ public class ActivityParticipantService {
                         "STUDENT_SCOPE_DENIED",
                         "The target must have an active STUDENT membership in this school."));
         if (participants.exists(activityId, membershipId)) {
-            throw new IllegalArgumentException("Participant already exists");
+            throw new ActivityParticipantAlreadyAssignedException();
         }
         participants.save(ActivityParticipant.assign(activityId, membershipId, Instant.now()));
     }

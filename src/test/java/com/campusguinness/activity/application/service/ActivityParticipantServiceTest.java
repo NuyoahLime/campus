@@ -1,5 +1,6 @@
 package com.campusguinness.activity.application.service;
 
+import com.campusguinness.activity.application.exception.ActivityParticipantAlreadyAssignedException;
 import com.campusguinness.activity.application.port.ActivityParticipantPort;
 import com.campusguinness.activity.application.query.model.ActivityDetailResult;
 import com.campusguinness.activity.application.query.model.ActivityListResult;
@@ -99,8 +100,8 @@ class ActivityParticipantServiceTest {
         when(participants.exists(activityId, studentMembershipId)).thenReturn(true);
 
         assertThatThrownBy(() -> service.assign(activityId, studentId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Participant already exists");
+                .isInstanceOf(ActivityParticipantAlreadyAssignedException.class)
+                .hasMessage("Student is already assigned to this activity.");
         verify(participants, never()).save(any());
     }
 
