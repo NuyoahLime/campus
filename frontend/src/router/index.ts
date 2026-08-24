@@ -27,6 +27,7 @@ import SuperAdminProjectDetailView from '../views/SuperAdminProjectDetailView.vu
 import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vue';
 import SchoolAdminActivityDetailView from '../views/SchoolAdminActivityDetailView.vue';
 import SchoolAdminActivityParticipantsView from '../views/SchoolAdminActivityParticipantsView.vue';
+import SchoolAdminActivityScoresView from '../views/SchoolAdminActivityScoresView.vue';
 import StudentScoresView from '../views/StudentScoresView.vue';
 import StudentScoreDetailView from '../views/StudentScoreDetailView.vue';
 import StudentActivitiesView from '../views/StudentActivitiesView.vue';
@@ -146,6 +147,12 @@ const router = createRouter({
       path: '/school-admin/activities/:id/participants',
       name: 'school-admin-activity-participants',
       component: SchoolAdminActivityParticipantsView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/activities/:id/scores',
+      name: 'school-admin-activity-scores',
+      component: SchoolAdminActivityScoresView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {
