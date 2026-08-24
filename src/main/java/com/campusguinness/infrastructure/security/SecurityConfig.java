@@ -111,6 +111,16 @@ public class SecurityConfig {
                         "/api/v1/activities/management/*"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.GET,
+                        "/api/v1/school-admin/activities/*/participants",
+                        "/api/v1/school-admin/activities/*/participant-candidates"
+                ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/v1/school-admin/activities/*/participants"
+                ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.DELETE,
+                        "/api/v1/school-admin/activities/*/participants/*"
+                ).hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.GET,
                         "/api/v1/school-admin/appeals",
                         "/api/v1/school-admin/appeals/*",
                         "/api/v1/school-admin/feedback",
@@ -186,6 +196,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,
                         "/api/v1/student/scores",
                         "/api/v1/student/scores/*",
+                        "/api/v1/student/activities",
+                        "/api/v1/student/activities/*",
                         "/api/v1/student/appeals",
                         "/api/v1/student/appeals/*",
                         "/api/v1/student/feedback",

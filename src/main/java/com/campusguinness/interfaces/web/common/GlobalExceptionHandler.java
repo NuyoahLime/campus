@@ -1,5 +1,6 @@
 package com.campusguinness.interfaces.web.common;
 
+import com.campusguinness.activity.application.exception.ActivityParticipantAlreadyAssignedException;
 import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
@@ -104,6 +105,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiErrorResponse.of("AUTHENTICATION_REQUIRED", "Authentication is required.", req.getRequestURI()));
+    }
+
+    @ExceptionHandler(ActivityParticipantAlreadyAssignedException.class)
+    public ResponseEntity<ApiErrorResponse> handleActivityParticipantAlreadyAssigned(
+            ActivityParticipantAlreadyAssignedException ex,
+            HttpServletRequest req
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        "ACTIVITY_PARTICIPANT_ALREADY_ASSIGNED",
+                        ex.getMessage(),
+                        req.getRequestURI()
+                ));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
