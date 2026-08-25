@@ -38,7 +38,7 @@ public final class ScoreAttempt {
     private final int attemptNumber;
     private final ScoreStorageType scoreStorageType;
     private ScoreValue scoreValue;
-    private final Instant scoreBusinessTime;
+    private Instant scoreBusinessTime;
     private final String timeSource;
     private boolean currentEffective;
     private final UUID replacesId;
@@ -119,6 +119,11 @@ public final class ScoreAttempt {
         if (newValue == null) throw new IllegalArgumentException("scoreValue required");
         validateScoreConsistency(scoreStorageType, newValue);
         this.scoreValue = newValue;
+    }
+
+    public void updateScoreBusinessTime(Instant value) {
+        if (status != AttemptStatus.DRAFT) throw new InvalidScoreAttemptStateTransitionException(status, "update score business time");
+        this.scoreBusinessTime = value;
     }
 
     // ── State transitions ──

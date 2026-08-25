@@ -1,6 +1,7 @@
 package com.campusguinness.interfaces.web.common;
 
 import com.campusguinness.activity.application.exception.ActivityParticipantAlreadyAssignedException;
+import com.campusguinness.score.application.exception.ScoreWriteException;
 import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
@@ -118,6 +119,17 @@ public class GlobalExceptionHandler {
                         ex.getMessage(),
                         req.getRequestURI()
                 ));
+    }
+
+    @ExceptionHandler(ScoreWriteException.class)
+    public ResponseEntity<ApiErrorResponse> handleScoreWrite(ScoreWriteException ex, HttpServletRequest req) {
+        HttpStatus status = switch (ex.code()) {
+            case "SCORE_ACTIVITY_NOT_FOUND", "SCORE_ACTIVITY_PROJECT_NOT_FOUND", "SCORE_ATTEMPT_NOT_FOUND", "SCORE_STUDENT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "SCORE_SCOPE_DENIED" -> HttpStatus.FORBIDDEN;
+            case "SCORE_INVALID_VALUE" -> HttpStatus.BAD_REQUEST;
+            default -> HttpStatus.CONFLICT;
+        };
+        return ResponseEntity.status(status).body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

@@ -25,6 +25,7 @@ final class ScoreAttemptPersistenceMapper {
         e.setScoreValue(null); e.setScoreDurationMs(null); e.setScoreGrade(null);
         mapScoreValueToEntity(domain.scoreValue(), e);
         e.setCurrentEffective(domain.isCurrentEffective());
+        e.setScoreBusinessTime(domain.scoreBusinessTime()); e.setTimeSource(domain.timeSource());
         e.setReplacesId(domain.replacesId());
         e.setScoreStatus(domain.status().name());
         e.setSubmittedAt(domain.submittedAt());
