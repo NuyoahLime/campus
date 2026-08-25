@@ -148,6 +148,15 @@ public final class ScoreAttempt {
         domainEvents.add(new ScoreAttemptApproved(id));
     }
 
+    /** Review-only approval; effective score selection remains a separate concern. */
+    public void approveForReview() {
+        if (status != AttemptStatus.PENDING_REVIEW) {
+            throw new InvalidScoreAttemptStateTransitionException(status, "approve for review");
+        }
+        this.status = AttemptStatus.APPROVED;
+        domainEvents.add(new ScoreAttemptApproved(id));
+    }
+
     /** CG-SCORE-003: PENDING_REVIEW → REJECTED. Reason is mandatory. */
     public void reject(String reason) {
         if (status != AttemptStatus.PENDING_REVIEW) {
