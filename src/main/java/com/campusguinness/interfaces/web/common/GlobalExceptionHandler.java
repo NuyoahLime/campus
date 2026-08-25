@@ -126,7 +126,7 @@ public class GlobalExceptionHandler {
         HttpStatus status = switch (ex.code()) {
             case "SCORE_ACTIVITY_NOT_FOUND", "SCORE_ACTIVITY_PROJECT_NOT_FOUND", "SCORE_ATTEMPT_NOT_FOUND", "SCORE_STUDENT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "SCORE_SCOPE_DENIED" -> HttpStatus.FORBIDDEN;
-            case "SCORE_INVALID_VALUE" -> HttpStatus.BAD_REQUEST;
+            case "SCORE_INVALID_VALUE", "SCORE_REVIEW_REASON_REQUIRED" -> HttpStatus.BAD_REQUEST;
             default -> HttpStatus.CONFLICT;
         };
         return ResponseEntity.status(status).body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));

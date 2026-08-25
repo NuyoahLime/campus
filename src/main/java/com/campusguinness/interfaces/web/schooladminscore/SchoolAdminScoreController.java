@@ -2,6 +2,7 @@ package com.campusguinness.interfaces.web.schooladminscore;
 
 import com.campusguinness.score.application.port.ScoreWriteContextPort;
 import com.campusguinness.score.application.service.SchoolAdminScoreDraftService;
+import com.campusguinness.score.application.service.SchoolAdminScoreLifecycleService;
 import com.campusguinness.score.internal.domain.ScoreAttempt;
 import com.campusguinness.score.internal.domain.ScoreValue;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -29,9 +30,12 @@ import java.util.UUID;
 @PreAuthorize("hasRole('SCHOOL_ADMIN')")
 public class SchoolAdminScoreController {
     private final SchoolAdminScoreDraftService service;
+    private final SchoolAdminScoreLifecycleService lifecycleService;
 
-    public SchoolAdminScoreController(SchoolAdminScoreDraftService service) {
+    public SchoolAdminScoreController(SchoolAdminScoreDraftService service,
+                                      SchoolAdminScoreLifecycleService lifecycleService) {
         this.service = service;
+        this.lifecycleService = lifecycleService;
     }
 
     @GetMapping("/activities/{activityId}/scores")
@@ -70,6 +74,22 @@ public class SchoolAdminScoreController {
                 request.decimalValue(), request.durationMs(), request.grade(), request.scoreBusinessTime()));
     }
 
+    @PostMapping("/score-attempts/{scoreAttemptId}/submit")
+    public ScoreAttemptResponse submit(@PathVariable UUID scoreAttemptId) {
+        return ScoreAttemptResponse.from(lifecycleService.submit(scoreAttemptId));
+    }
+
+    @PostMapping("/score-attempts/{scoreAttemptId}/reject")
+    public ScoreAttemptResponse reject(@PathVariable UUID scoreAttemptId,
+                                       @Valid @RequestBody RejectScoreAttemptRequest request) {
+        return ScoreAttemptResponse.from(lifecycleService.reject(scoreAttemptId, request.reason()));
+    }
+
+    @PostMapping("/score-attempts/{scoreAttemptId}/return-to-draft")
+    public ScoreAttemptResponse returnToDraft(@PathVariable UUID scoreAttemptId) {
+        return ScoreAttemptResponse.from(lifecycleService.returnToDraft(scoreAttemptId));
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = false)
     public record CreateScoreDraftRequest(@NotNull UUID studentId, Long integerValue,
                                           BigDecimal decimalValue, Long durationMs, String grade,
@@ -78,6 +98,9 @@ public class SchoolAdminScoreController {
     @JsonIgnoreProperties(ignoreUnknown = false)
     public record UpdateScoreDraftRequest(Long integerValue, BigDecimal decimalValue,
                                           Long durationMs, String grade, Instant scoreBusinessTime) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+    public record RejectScoreAttemptRequest(@jakarta.validation.constraints.NotBlank String reason) {}
 
     public record ActivityScoresResponse(UUID activityId, String activityTitle, String activityStatus,
                                          List<ScoreAttemptResponse> scores) {}
