@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -227,6 +228,133 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
                         .content(scoreCreateBody(studentA, 5L, Instant.parse("2026-08-25T01:00:00Z"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+    }
+
+    @Test
+    void sameSchoolAdminCanSubmitRejectAndReturnDraftWithReviewHistory() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_REVIEW"));
+
+        Map<String, Object> submitted = jdbc.queryForMap(
+                "SELECT score_status, submitted_at, is_current_effective, entered_by "
+                        + "FROM score_attempts WHERE id = ?", scoreId);
+        assertThat(submitted.get("score_status")).isEqualTo("PENDING_REVIEW");
+        assertThat(submitted.get("submitted_at")).isNotNull();
+        assertThat(submitted.get("is_current_effective")).isEqualTo(false);
+        assertThat(submitted.get("entered_by")).isEqualTo(adminA);
+        entityManager.flush();
+        Map<String, Object> submissionAudit = jdbc.queryForMap(
+                "SELECT actor_id, action, target_type, target_id FROM audit_records "
+                        + "WHERE action = 'SCORE_ATTEMPT_SUBMITTED' AND target_id = ?", scoreId);
+        assertThat(submissionAudit.get("actor_id")).isEqualTo(adminA);
+        assertThat(submissionAudit.get("action")).isEqualTo("SCORE_ATTEMPT_SUBMITTED");
+        assertThat(submissionAudit.get("target_type")).isEqualTo("SCORE_ATTEMPT");
+        assertThat(submissionAudit.get("target_id")).isEqualTo(scoreId);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/reject", scoreId)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Needs evidence\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+
+        Map<String, Object> review = jdbc.queryForMap(
+                "SELECT reviewer_id, review_result, reject_reason "
+                        + "FROM score_review_records WHERE score_attempt_id = ?", scoreId);
+        assertThat(review.get("reviewer_id")).isEqualTo(adminA);
+        assertThat(review.get("review_result")).isEqualTo("REJECTED");
+        assertThat(review.get("reject_reason")).isEqualTo("Needs evidence");
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/return-to-draft", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        Map<String, Object> returned = jdbc.queryForMap(
+                "SELECT score_status, submitted_at, is_current_effective "
+                        + "FROM score_attempts WHERE id = ?", scoreId);
+        assertThat(returned.get("score_status")).isEqualTo("DRAFT");
+        assertThat(returned.get("submitted_at")).isNull();
+        assertThat(returned.get("is_current_effective")).isEqualTo(false);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_review_records WHERE score_attempt_id = ?",
+                Integer.class, scoreId)).isEqualTo(1);
+    }
+
+    @Test
+    void lifecycleRejectsDuplicateAndInvalidTransitions() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/return-to-draft", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_INVALID_STATE_TRANSITION"));
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_INVALID_STATE_TRANSITION"));
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/reject", scoreId)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void lifecycleEnforcesAuthenticationRoleAndSchoolScope() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId).with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        for (String role : List.of("STUDENT", "SUPER_ADMIN", "TEACHER")) {
+            mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                            .with(principal(UUID.randomUUID(), null, null, role)).with(csrf()))
+                    .andExpect(status().isForbidden());
+        }
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(principal(adminB, schoolB, adminBMembership, "SCHOOL_ADMIN")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+
+        UUID inactiveAdmin = insertUser("lifecycle-inactive-admin", null);
+        UUID inactiveMembership = insertMembership(inactiveAdmin, schoolA, "SCHOOL_ADMIN", "ENDED");
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(principal(inactiveAdmin, schoolA, inactiveMembership, "SCHOOL_ADMIN")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+
+        UUID ambiguousAdmin = insertUser("lifecycle-ambiguous-admin", null);
+        UUID ambiguousMembership = insertMembership(ambiguousAdmin, schoolA, "SCHOOL_ADMIN");
+        insertMembership(ambiguousAdmin, schoolB, "SCHOOL_ADMIN");
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(principal(ambiguousAdmin, schoolA, ambiguousMembership, "SCHOOL_ADMIN")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+    }
+
+    private UUID createDraft(RequestPostProcessor admin, UUID studentId) throws Exception {
+        mvc.perform(post("/api/v1/school-admin/activity-projects/{id}/score-attempts", activityProjectA)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scoreCreateBody(studentId, 7L, Instant.parse("2026-08-25T01:00:00Z"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+        return findScoreAttempt(activityProjectA, studentId);
     }
 
     private RequestPostProcessor principal(UUID userId, UUID schoolId, UUID membershipId, String role) {
