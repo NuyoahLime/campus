@@ -62,3 +62,18 @@ export interface SchoolAdminScoreDraftRequest {
 export type SchoolAdminScoreDraftUpdateRequest = Omit<SchoolAdminScoreDraftRequest, 'studentId'>;
 
 export interface SchoolAdminScoreDetail extends SchoolAdminScoreListItem {}
+
+export interface SchoolAdminScoreReview {
+  reviewId: string;
+  result: 'APPROVED' | 'REJECTED' | string;
+  reviewerId: string;
+  reviewerUsername: string;
+  reviewComment: string | null;
+  rejectReason: string | null;
+  reviewedAt: string;
+}
+
+export interface SchoolAdminScoreReviewHistoryResponse {
+  scoreAttemptId: string;
+  reviews: SchoolAdminScoreReview[];
+}

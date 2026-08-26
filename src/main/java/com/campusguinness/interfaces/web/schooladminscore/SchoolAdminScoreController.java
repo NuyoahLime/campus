@@ -3,6 +3,8 @@ package com.campusguinness.interfaces.web.schooladminscore;
 import com.campusguinness.score.application.port.ScoreWriteContextPort;
 import com.campusguinness.score.application.service.SchoolAdminScoreDraftService;
 import com.campusguinness.score.application.service.SchoolAdminScoreLifecycleService;
+import com.campusguinness.score.application.service.SchoolAdminScoreReviewHistoryService;
+import com.campusguinness.score.application.query.model.ScoreReviewHistoryEntry;
 import com.campusguinness.score.internal.domain.ScoreAttempt;
 import com.campusguinness.score.internal.domain.ScoreValue;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -31,11 +33,14 @@ import java.util.UUID;
 public class SchoolAdminScoreController {
     private final SchoolAdminScoreDraftService service;
     private final SchoolAdminScoreLifecycleService lifecycleService;
+    private final SchoolAdminScoreReviewHistoryService reviewHistoryService;
 
     public SchoolAdminScoreController(SchoolAdminScoreDraftService service,
-                                      SchoolAdminScoreLifecycleService lifecycleService) {
+                                      SchoolAdminScoreLifecycleService lifecycleService,
+                                      SchoolAdminScoreReviewHistoryService reviewHistoryService) {
         this.service = service;
         this.lifecycleService = lifecycleService;
+        this.reviewHistoryService = reviewHistoryService;
     }
 
     @GetMapping("/activities/{activityId}/scores")
@@ -65,6 +70,14 @@ public class SchoolAdminScoreController {
     @GetMapping("/score-attempts/{scoreAttemptId}")
     public ScoreAttemptResponse detail(@PathVariable UUID scoreAttemptId) {
         return ScoreAttemptResponse.from(service.scoreDetail(scoreAttemptId));
+    }
+
+    @GetMapping("/score-attempts/{scoreAttemptId}/reviews")
+    public ScoreReviewHistoryResponse reviews(@PathVariable UUID scoreAttemptId) {
+        return new ScoreReviewHistoryResponse(scoreAttemptId,
+                reviewHistoryService.history(scoreAttemptId).stream()
+                        .map(ScoreReviewResponse::from)
+                        .toList());
     }
 
     @PatchMapping("/score-attempts/{scoreAttemptId}")
@@ -109,6 +122,17 @@ public class SchoolAdminScoreController {
 
     public record ActivityScoresResponse(UUID activityId, String activityTitle, String activityStatus,
                                          List<ScoreAttemptResponse> scores) {}
+
+    public record ScoreReviewHistoryResponse(UUID scoreAttemptId, List<ScoreReviewResponse> reviews) {}
+
+    public record ScoreReviewResponse(UUID reviewId, String result, UUID reviewerId,
+                                      String reviewerUsername, String reviewComment,
+                                      String rejectReason, Instant reviewedAt) {
+        static ScoreReviewResponse from(ScoreReviewHistoryEntry review) {
+            return new ScoreReviewResponse(review.reviewId(), review.result(), review.reviewerId(),
+                    review.reviewerUsername(), review.reviewComment(), review.rejectReason(), review.reviewedAt());
+        }
+    }
 
     public record ScoreAttemptResponse(UUID scoreAttemptId, UUID activityId, String activityTitle,
                                        UUID activityProjectId, String projectName, UUID studentId,
