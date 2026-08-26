@@ -131,6 +131,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-admin/score-attempts/*/submit",
                         "/api/v1/school-admin/score-attempts/*/reject",
+                        "/api/v1/school-admin/score-attempts/*/approve",
                         "/api/v1/school-admin/score-attempts/*/return-to-draft"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/activities", "/api/v1/activities/*").permitAll()

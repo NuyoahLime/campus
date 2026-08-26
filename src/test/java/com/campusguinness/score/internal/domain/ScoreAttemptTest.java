@@ -245,6 +245,16 @@ class ScoreAttemptTest {
         }
 
         @Test
+        @DisplayName("review-only approval changes status without selecting effective score")
+        void shouldApproveForReviewWithoutChangingEffectiveFlag() {
+            var s = createSubmitted();
+            s.approveForReview();
+            assertThat(s.status()).isEqualTo(AttemptStatus.APPROVED);
+            assertThat(s.isCurrentEffective()).isFalse();
+            assertThat(s.domainEvents()).anyMatch(e -> e instanceof ScoreAttemptApproved);
+        }
+
+        @Test
         @DisplayName("CG-SCORE-003: PENDING_REVIEW → REJECTED")
         void shouldRejectFromPendingReview() {
             var s = createSubmitted();
@@ -297,6 +307,8 @@ class ScoreAttemptTest {
             var s = createDraft();
             assertThatThrownBy(s::approve)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
+            assertThatThrownBy(s::approveForReview)
+                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
         }
 
         @Test
@@ -317,6 +329,8 @@ class ScoreAttemptTest {
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
             assertThatThrownBy(s::approve)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
+            assertThatThrownBy(s::approveForReview)
+                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
         }
 
         @Test
@@ -325,6 +339,17 @@ class ScoreAttemptTest {
             var s = createSubmitted();
             s.approve();
             assertThatThrownBy(() -> s.reject("reason"))
+                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
+            assertThatThrownBy(s::approveForReview)
+                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
+        }
+
+        @Test
+        @DisplayName("REJECTED -> APPROVED is rejected for review-only approval")
+        void shouldRejectReviewApprovalFromRejected() {
+            var s = createSubmitted();
+            s.reject("needs revision");
+            assertThatThrownBy(s::approveForReview)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
         }
 

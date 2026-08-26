@@ -85,6 +85,11 @@ public class SchoolAdminScoreController {
         return ScoreAttemptResponse.from(lifecycleService.reject(scoreAttemptId, request.reason()));
     }
 
+    @PostMapping("/score-attempts/{scoreAttemptId}/approve")
+    public ScoreAttemptResponse approve(@PathVariable UUID scoreAttemptId) {
+        return ScoreAttemptResponse.from(lifecycleService.approve(scoreAttemptId));
+    }
+
     @PostMapping("/score-attempts/{scoreAttemptId}/return-to-draft")
     public ScoreAttemptResponse returnToDraft(@PathVariable UUID scoreAttemptId) {
         return ScoreAttemptResponse.from(lifecycleService.returnToDraft(scoreAttemptId));

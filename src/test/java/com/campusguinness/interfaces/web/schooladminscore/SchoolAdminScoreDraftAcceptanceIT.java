@@ -17,6 +17,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -345,6 +348,178 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
                         .with(principal(ambiguousAdmin, schoolA, ambiguousMembership, "SCHOOL_ADMIN")).with(csrf()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+    }
+
+    @Test
+    void sameSchoolAdminCanApproveAndPersistReviewWithoutSelectingEffectiveScore() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_REVIEW"));
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+
+        Map<String, Object> score = jdbc.queryForMap(
+                "SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", scoreId);
+        assertThat(score.get("score_status")).isEqualTo("APPROVED");
+        assertThat(score.get("is_current_effective")).isEqualTo(false);
+
+        Map<String, Object> review = jdbc.queryForMap(
+                "SELECT reviewer_id, review_result, reviewed_at, review_comment, reject_reason "
+                        + "FROM score_review_records WHERE score_attempt_id = ?", scoreId);
+        assertThat(review.get("reviewer_id")).isEqualTo(adminA);
+        assertThat(review.get("review_result")).isEqualTo("APPROVED");
+        assertThat(review.get("reviewed_at")).isNotNull();
+        assertThat(review.get("review_comment")).isNull();
+        assertThat(review.get("reject_reason")).isNull();
+    }
+
+    @Test
+    void approveEnforcesAuthenticationRoleAndSchoolScope() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId).with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        for (String role : List.of("STUDENT", "SUPER_ADMIN", "TEACHER")) {
+            mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                            .with(principal(UUID.randomUUID(), null, null, role)).with(csrf()))
+                    .andExpect(status().isForbidden());
+        }
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(principal(adminB, schoolB, adminBMembership, "SCHOOL_ADMIN")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+
+        UUID inactiveAdmin = insertUser("approve-inactive-admin", null);
+        UUID inactiveMembership = insertMembership(inactiveAdmin, schoolA, "SCHOOL_ADMIN", "ENDED");
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(principal(inactiveAdmin, schoolA, inactiveMembership, "SCHOOL_ADMIN")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+
+        UUID ambiguousAdmin = insertUser("approve-ambiguous-admin", null);
+        UUID ambiguousMembership = insertMembership(ambiguousAdmin, schoolA, "SCHOOL_ADMIN");
+        insertMembership(ambiguousAdmin, schoolB, "SCHOOL_ADMIN");
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(principal(ambiguousAdmin, schoolA, ambiguousMembership, "SCHOOL_ADMIN")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+    }
+
+    @Test
+    void approveRejectsEveryNonPendingStateWithConflict() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+
+        UUID draft = createDraft(admin, studentA);
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", draft)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_INVALID_STATE_TRANSITION"));
+
+        UUID rejected = createDraft(admin, studentA);
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", rejected)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/reject", rejected)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Needs revision\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", rejected)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_INVALID_STATE_TRANSITION"));
+
+        UUID approved = createDraft(admin, studentA);
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", approved)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", approved)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", approved)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_INVALID_STATE_TRANSITION"));
+
+        UUID invalidated = createDraft(admin, studentA);
+        setScoreStatus(invalidated, "INVALIDATED");
+        entityManager.clear();
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", invalidated)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_INVALID_STATE_TRANSITION"));
+    }
+
+    @Test
+    void concurrentApprovalsAllowOneSuccessAndOneConflict() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        var start = new CountDownLatch(1);
+        try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                var first = executor.submit(() -> approveStatus(admin, scoreId, start));
+                var second = executor.submit(() -> approveStatus(admin, scoreId, start));
+                start.countDown();
+                assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(200, 409);
+            }
+
+            Map<String, Object> score = jdbc.queryForMap(
+                    "SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", scoreId);
+            assertThat(score.get("score_status")).isEqualTo("APPROVED");
+            assertThat(score.get("is_current_effective")).isEqualTo(false);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_review_records WHERE score_attempt_id = ?",
+                    Integer.class, scoreId)).isEqualTo(1);
+        } finally {
+            cleanupCommittedFixture();
+        }
+    }
+
+    private int approveStatus(RequestPostProcessor admin, UUID scoreId, CountDownLatch start) throws Exception {
+        start.await();
+        return mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(admin).with(csrf())).andReturn().getResponse().getStatus();
+    }
+
+    private void cleanupCommittedFixture() {
+        jdbc.update("DELETE FROM score_review_records WHERE score_attempt_id IN "
+                + "(SELECT id FROM score_attempts WHERE school_id IN (?, ?))", schoolA, schoolB);
+        jdbc.update("DELETE FROM audit_records WHERE school_id IN (?, ?)", schoolA, schoolB);
+        jdbc.update("DELETE FROM score_attempts WHERE school_id IN (?, ?)", schoolA, schoolB);
+        jdbc.update("DELETE FROM activity_participants WHERE activity_id IN (?, ?)", activityA, activityB);
+        jdbc.update("DELETE FROM activity_projects WHERE activity_id IN (?, ?)", activityA, activityB);
+        jdbc.update("DELETE FROM activities WHERE id IN (?, ?)", activityA, activityB);
+        jdbc.update("UPDATE challenge_projects SET current_rule_version_id = NULL WHERE id IN (?, ?)",
+                projectA, projectB);
+        jdbc.update("DELETE FROM project_rule_versions WHERE id IN (?, ?)", ruleA, ruleB);
+        jdbc.update("DELETE FROM challenge_projects WHERE id IN (?, ?)", projectA, projectB);
+        jdbc.update("DELETE FROM student_profiles WHERE membership_id IN (?, ?, ?)",
+                studentAMembership, studentBMembership, studentCMembership);
+        jdbc.update("DELETE FROM school_memberships WHERE id IN (?, ?, ?, ?, ?)",
+                adminAMembership, adminBMembership, studentAMembership,
+                studentBMembership, studentCMembership);
+        jdbc.update("DELETE FROM users WHERE id IN (?, ?, ?, ?, ?)",
+                adminA, adminB, studentA, studentB, studentC);
+        jdbc.update("DELETE FROM schools WHERE id IN (?, ?)", schoolA, schoolB);
     }
 
     private UUID createDraft(RequestPostProcessor admin, UUID studentId) throws Exception {

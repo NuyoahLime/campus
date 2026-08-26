@@ -60,6 +60,15 @@ public class SchoolAdminScoreLifecycleService {
         return score;
     }
 
+    public ScoreAttempt approve(UUID scoreAttemptId) {
+        UUID reviewerId = actor.requireUserId();
+        ScoreAttempt score = loadInSchool(scoreAttemptId);
+        transition(score, "approve", score::approveForReview);
+        attempts.save(score);
+        reviews.append(score.id().value(), reviewerId, "APPROVED", null);
+        return score;
+    }
+
     public ScoreAttempt returnToDraft(UUID scoreAttemptId) {
         actor.requireUserId();
         ScoreAttempt score = loadInSchool(scoreAttemptId);
