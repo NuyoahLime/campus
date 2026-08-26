@@ -68,6 +68,9 @@ const lifecycleDialog = ref<LifecycleDialog | null>(null);
 const rejectReason = ref('');
 const rejectReasonError = ref('');
 const pendingAction = ref<PendingAction | null>(null);
+let loadRequestId = 0;
+let lifecycleRequestId = 0;
+let saveRequestId = 0;
 
 const candidateRows = computed<CandidateRow[]>(() =>
   candidates.value.flatMap((candidate) =>
@@ -184,6 +187,8 @@ function emptyEditor(candidate: CandidateRow): DraftEditor {
 }
 
 async function loadAll(clearMessage = true) {
+  const requestId = ++loadRequestId;
+  const requestedPath = route.fullPath;
   loading.value = true;
   error.value = '';
   if (clearMessage) message.value = '';
@@ -192,16 +197,18 @@ async function loadAll(clearMessage = true) {
       getSchoolAdminScores(activityId()),
       getSchoolAdminScoreCandidates(activityId())
     ]);
+    if (requestId !== loadRequestId || requestedPath !== route.fullPath) return;
     activityTitle.value = scoreResult.activityTitle || candidateResult.activityTitle;
     activityStatus.value = scoreResult.activityStatus || candidateResult.activityStatus;
     scores.value = scoreResult.scores;
     candidates.value = candidateResult.candidates;
   } catch (value) {
+    if (requestId !== loadRequestId || requestedPath !== route.fullPath) return;
     error.value = value instanceof ApiError && value.status === 403
       ? '当前账号没有本校成绩管理权限。'
       : '成绩管理数据加载失败，请稍后重试。';
   } finally {
-    loading.value = false;
+    if (requestId === loadRequestId && requestedPath === route.fullPath) loading.value = false;
   }
 }
 
@@ -216,12 +223,15 @@ async function openCreate(candidate: CandidateRow) {
 }
 
 async function openEdit(scoreAttemptId: string) {
+  const requestedPath = route.fullPath;
   error.value = '';
   message.value = '';
   try {
     const detail = await getSchoolAdminScoreDetail(scoreAttemptId);
+    if (requestedPath !== route.fullPath) return;
     editor.value = buildEditor(detail, 'edit');
   } catch (value) {
+    if (requestedPath !== route.fullPath) return;
     error.value = value instanceof ApiError && value.status === 404
       ? '草稿未找到，请刷新后再试。'
       : '草稿加载失败，请稍后重试。';
@@ -290,9 +300,13 @@ async function confirmLifecycleAction() {
 
   const attemptId = dialog.score.scoreAttemptId;
   pendingAction.value = { attemptId, action: dialog.action };
+  const requestId = ++lifecycleRequestId;
+  const requestedPath = route.fullPath;
   rejectReasonError.value = '';
   error.value = '';
   message.value = '';
+
+  const requestIsCurrent = () => requestId === lifecycleRequestId && requestedPath === route.fullPath;
 
   try {
     switch (dialog.action) {
@@ -309,17 +323,21 @@ async function confirmLifecycleAction() {
         await returnScoreAttemptToDraft(attemptId);
         break;
     }
+    if (!requestIsCurrent()) return;
     closeLifecycleDialog(true);
     await loadAll(false);
+    if (!requestIsCurrent()) return;
     message.value = actionSuccessMessage(dialog.action);
   } catch (value) {
+    if (!requestIsCurrent()) return;
     const isConflict = value instanceof ApiError && value.status === 409;
     if (isConflict) {
       await loadAll(false);
+      if (!requestIsCurrent()) return;
     }
     error.value = lifecycleErrorMessage(value);
   } finally {
-    pendingAction.value = null;
+    if (requestIsCurrent()) pendingAction.value = null;
   }
 }
 
@@ -370,6 +388,9 @@ function buildUpdatePayload(current: DraftEditor): SchoolAdminScoreDraftUpdateRe
 
 async function saveEditor() {
   if (!editor.value) return;
+  const requestId = ++saveRequestId;
+  const requestedPath = route.fullPath;
+  const requestIsCurrent = () => requestId === saveRequestId && requestedPath === route.fullPath;
   saving.value = true;
   error.value = '';
   message.value = '';
@@ -378,16 +399,23 @@ async function saveEditor() {
     const payload = buildRequestPayload(current);
     if (current.mode === 'create') {
       const created = await createSchoolAdminScoreDraft(current.activityProjectId, payload);
+      if (!requestIsCurrent()) return;
       await loadAll(false);
+      if (!requestIsCurrent()) return;
       await openEdit(created.scoreAttemptId);
+      if (!requestIsCurrent()) return;
       message.value = '成绩草稿已创建。';
     } else {
       const updated = await updateSchoolAdminScoreDraft(current.scoreAttemptId!, buildUpdatePayload(current));
+      if (!requestIsCurrent()) return;
       await loadAll(false);
+      if (!requestIsCurrent()) return;
       await openEdit(updated.scoreAttemptId);
+      if (!requestIsCurrent()) return;
       message.value = '成绩草稿已保存。';
     }
   } catch (value) {
+    if (!requestIsCurrent()) return;
     if (value instanceof ApiError) {
       if (value.status === 403) {
         error.value = value.code === 'SCORE_SCOPE_DENIED'
@@ -410,13 +438,19 @@ async function saveEditor() {
       error.value = '成绩草稿保存失败，请稍后重试。';
     }
   } finally {
-    saving.value = false;
+    if (requestIsCurrent()) saving.value = false;
   }
 }
 
 watch(() => route.fullPath, () => {
+  saveRequestId += 1;
+  lifecycleRequestId += 1;
   closeLifecycleDialog(true);
   closeEditor();
+  saving.value = false;
+  pendingAction.value = null;
+  error.value = '';
+  message.value = '';
   void loadAll();
 });
 onMounted(() => void loadAll());
