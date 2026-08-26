@@ -414,7 +414,11 @@ async function saveEditor() {
   }
 }
 
-watch(() => route.fullPath, () => void loadAll());
+watch(() => route.fullPath, () => {
+  closeLifecycleDialog(true);
+  closeEditor();
+  void loadAll();
+});
 onMounted(() => void loadAll());
 </script>
 
@@ -665,7 +669,7 @@ onMounted(() => void loadAll());
             {{ lifecycleDialog.action === 'submit'
               ? '确认将这条成绩提交审核吗？'
               : lifecycleDialog.action === 'approve'
-                ? '确认通过这条成绩的审核吗？这只表示审核通过，不代表有效成绩或排名成绩。'
+                ? '确认通过这条成绩的审核吗？'
                 : lifecycleDialog.action === 'return-to-draft'
                   ? '确认将这条被驳回的成绩退回草稿吗？'
                   : '请填写驳回原因，确认后这条成绩将进入已驳回状态。' }}
