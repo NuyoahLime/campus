@@ -5,9 +5,13 @@ import WorkspaceShell from '../components/WorkspaceShell.vue';
 import { ApiError } from '../api/http';
 import {
   createSchoolAdminScoreDraft,
+  approveScoreAttempt,
   getSchoolAdminScoreCandidates,
   getSchoolAdminScoreDetail,
   getSchoolAdminScores,
+  rejectScoreAttempt,
+  returnScoreAttemptToDraft,
+  submitScoreAttempt,
   updateSchoolAdminScoreDraft
 } from '../api/schoolAdminScore';
 import { schoolAdminNavigation as navigation } from '../router/schoolAdminNavigation';
@@ -20,6 +24,15 @@ import type {
 } from '../types/schoolAdminScore';
 
 type DraftMode = 'create' | 'edit';
+type LifecycleAction = 'submit' | 'approve' | 'reject' | 'return-to-draft';
+type LifecycleDialog = {
+  action: LifecycleAction;
+  score: SchoolAdminScoreListItem;
+};
+type PendingAction = {
+  attemptId: string;
+  action: LifecycleAction;
+};
 type DraftEditor = {
   mode: DraftMode;
   scoreAttemptId: string | null;
@@ -51,6 +64,13 @@ const activityStatus = ref('');
 const scores = ref<SchoolAdminScoreListItem[]>([]);
 const candidates = ref<SchoolAdminScoreCandidate[]>([]);
 const editor = ref<DraftEditor | null>(null);
+const lifecycleDialog = ref<LifecycleDialog | null>(null);
+const rejectReason = ref('');
+const rejectReasonError = ref('');
+const pendingAction = ref<PendingAction | null>(null);
+let loadRequestId = 0;
+let lifecycleRequestId = 0;
+let saveRequestId = 0;
 
 const candidateRows = computed<CandidateRow[]>(() =>
   candidates.value.flatMap((candidate) =>
@@ -167,6 +187,8 @@ function emptyEditor(candidate: CandidateRow): DraftEditor {
 }
 
 async function loadAll(clearMessage = true) {
+  const requestId = ++loadRequestId;
+  const requestedPath = route.fullPath;
   loading.value = true;
   error.value = '';
   if (clearMessage) message.value = '';
@@ -175,16 +197,18 @@ async function loadAll(clearMessage = true) {
       getSchoolAdminScores(activityId()),
       getSchoolAdminScoreCandidates(activityId())
     ]);
+    if (requestId !== loadRequestId || requestedPath !== route.fullPath) return;
     activityTitle.value = scoreResult.activityTitle || candidateResult.activityTitle;
     activityStatus.value = scoreResult.activityStatus || candidateResult.activityStatus;
     scores.value = scoreResult.scores;
     candidates.value = candidateResult.candidates;
   } catch (value) {
+    if (requestId !== loadRequestId || requestedPath !== route.fullPath) return;
     error.value = value instanceof ApiError && value.status === 403
       ? '当前账号没有本校成绩管理权限。'
       : '成绩管理数据加载失败，请稍后重试。';
   } finally {
-    loading.value = false;
+    if (requestId === loadRequestId && requestedPath === route.fullPath) loading.value = false;
   }
 }
 
@@ -199,12 +223,15 @@ async function openCreate(candidate: CandidateRow) {
 }
 
 async function openEdit(scoreAttemptId: string) {
+  const requestedPath = route.fullPath;
   error.value = '';
   message.value = '';
   try {
     const detail = await getSchoolAdminScoreDetail(scoreAttemptId);
+    if (requestedPath !== route.fullPath) return;
     editor.value = buildEditor(detail, 'edit');
   } catch (value) {
+    if (requestedPath !== route.fullPath) return;
     error.value = value instanceof ApiError && value.status === 404
       ? '草稿未找到，请刷新后再试。'
       : '草稿加载失败，请稍后重试。';
@@ -213,6 +240,105 @@ async function openEdit(scoreAttemptId: string) {
 
 function closeEditor() {
   editor.value = null;
+}
+
+function isActionPending(scoreAttemptId: string): boolean {
+  return pendingAction.value?.attemptId === scoreAttemptId;
+}
+
+function actionLabel(action: LifecycleAction): string {
+  return {
+    submit: '提交审核',
+    approve: '审核通过',
+    reject: '驳回',
+    'return-to-draft': '退回草稿'
+  }[action];
+}
+
+function actionSuccessMessage(action: LifecycleAction): string {
+  return {
+    submit: '成绩已提交审核。',
+    approve: '审核已通过。',
+    reject: '成绩已驳回。',
+    'return-to-draft': '成绩已退回草稿。'
+  }[action];
+}
+
+function openLifecycleDialog(action: LifecycleAction, score: SchoolAdminScoreListItem) {
+  if (isActionPending(score.scoreAttemptId)) return;
+  rejectReason.value = '';
+  rejectReasonError.value = '';
+  lifecycleDialog.value = { action, score };
+}
+
+function closeLifecycleDialog(force = false) {
+  if (!force && lifecycleDialog.value && isActionPending(lifecycleDialog.value.score.scoreAttemptId)) return;
+  lifecycleDialog.value = null;
+  rejectReason.value = '';
+  rejectReasonError.value = '';
+}
+
+function lifecycleErrorMessage(value: unknown): string {
+  if (!(value instanceof ApiError)) return '操作失败，请稍后重试。';
+  if (value.status === 400) return '请求数据不合法，请检查后重试。';
+  if (value.status === 401) return '登录状态已失效，请重新登录。';
+  if (value.status === 403) return '当前账号无权执行此操作。';
+  if (value.status === 404) return '成绩记录不存在或已不可用。';
+  if (value.status === 409) return '成绩状态已发生变化，请查看最新状态。';
+  return '操作失败，请稍后重试。';
+}
+
+async function confirmLifecycleAction() {
+  const dialog = lifecycleDialog.value;
+  if (!dialog || isActionPending(dialog.score.scoreAttemptId)) return;
+
+  const reason = rejectReason.value.trim();
+  if (dialog.action === 'reject' && !reason) {
+    rejectReasonError.value = '请输入驳回原因。';
+    return;
+  }
+
+  const attemptId = dialog.score.scoreAttemptId;
+  pendingAction.value = { attemptId, action: dialog.action };
+  const requestId = ++lifecycleRequestId;
+  const requestedPath = route.fullPath;
+  rejectReasonError.value = '';
+  error.value = '';
+  message.value = '';
+
+  const requestIsCurrent = () => requestId === lifecycleRequestId && requestedPath === route.fullPath;
+
+  try {
+    switch (dialog.action) {
+      case 'submit':
+        await submitScoreAttempt(attemptId);
+        break;
+      case 'approve':
+        await approveScoreAttempt(attemptId);
+        break;
+      case 'reject':
+        await rejectScoreAttempt(attemptId, reason);
+        break;
+      case 'return-to-draft':
+        await returnScoreAttemptToDraft(attemptId);
+        break;
+    }
+    if (!requestIsCurrent()) return;
+    closeLifecycleDialog(true);
+    await loadAll(false);
+    if (!requestIsCurrent()) return;
+    message.value = actionSuccessMessage(dialog.action);
+  } catch (value) {
+    if (!requestIsCurrent()) return;
+    const isConflict = value instanceof ApiError && value.status === 409;
+    if (isConflict) {
+      await loadAll(false);
+      if (!requestIsCurrent()) return;
+    }
+    error.value = lifecycleErrorMessage(value);
+  } finally {
+    if (requestIsCurrent()) pendingAction.value = null;
+  }
 }
 
 function parseInteger(value: string | number): number | null {
@@ -262,6 +388,9 @@ function buildUpdatePayload(current: DraftEditor): SchoolAdminScoreDraftUpdateRe
 
 async function saveEditor() {
   if (!editor.value) return;
+  const requestId = ++saveRequestId;
+  const requestedPath = route.fullPath;
+  const requestIsCurrent = () => requestId === saveRequestId && requestedPath === route.fullPath;
   saving.value = true;
   error.value = '';
   message.value = '';
@@ -270,16 +399,23 @@ async function saveEditor() {
     const payload = buildRequestPayload(current);
     if (current.mode === 'create') {
       const created = await createSchoolAdminScoreDraft(current.activityProjectId, payload);
+      if (!requestIsCurrent()) return;
       await loadAll(false);
+      if (!requestIsCurrent()) return;
       await openEdit(created.scoreAttemptId);
+      if (!requestIsCurrent()) return;
       message.value = '成绩草稿已创建。';
     } else {
       const updated = await updateSchoolAdminScoreDraft(current.scoreAttemptId!, buildUpdatePayload(current));
+      if (!requestIsCurrent()) return;
       await loadAll(false);
+      if (!requestIsCurrent()) return;
       await openEdit(updated.scoreAttemptId);
+      if (!requestIsCurrent()) return;
       message.value = '成绩草稿已保存。';
     }
   } catch (value) {
+    if (!requestIsCurrent()) return;
     if (value instanceof ApiError) {
       if (value.status === 403) {
         error.value = value.code === 'SCORE_SCOPE_DENIED'
@@ -302,11 +438,21 @@ async function saveEditor() {
       error.value = '成绩草稿保存失败，请稍后重试。';
     }
   } finally {
-    saving.value = false;
+    if (requestIsCurrent()) saving.value = false;
   }
 }
 
-watch(() => route.fullPath, () => void loadAll());
+watch(() => route.fullPath, () => {
+  saveRequestId += 1;
+  lifecycleRequestId += 1;
+  closeLifecycleDialog(true);
+  closeEditor();
+  saving.value = false;
+  pendingAction.value = null;
+  error.value = '';
+  message.value = '';
+  void loadAll();
+});
 onMounted(() => void loadAll());
 </script>
 
@@ -414,19 +560,56 @@ onMounted(() => void loadAll());
                   <td><strong>{{ score.studentDisplay || score.studentId }}</strong></td>
                   <td>{{ score.projectName }}</td>
                   <td>#{{ score.attemptNumber }}</td>
-                  <td>{{ labelForScoreStatus(score.status) }}</td>
+                  <td><span class="score-status" :data-status="score.status">{{ labelForScoreStatus(score.status) }}</span></td>
                   <td>{{ displayScore(score) }}</td>
                   <td>{{ score.scoreBusinessTime ? new Date(score.scoreBusinessTime).toLocaleString() : '未记录' }}</td>
-                  <td>
+                  <td class="score-row-actions">
                     <button
                       v-if="score.status === 'DRAFT'"
                       class="secondary-button"
                       type="button"
-                      :disabled="saving"
+                      :disabled="saving || isActionPending(score.scoreAttemptId)"
                       @click="openEdit(score.scoreAttemptId)"
                     >
                       编辑草稿
                     </button>
+                    <button
+                      v-if="score.status === 'DRAFT'"
+                      class="primary-button"
+                      type="button"
+                      :disabled="saving || isActionPending(score.scoreAttemptId)"
+                      @click="openLifecycleDialog('submit', score)"
+                    >
+                      提交审核
+                    </button>
+                    <button
+                      v-if="score.status === 'PENDING_REVIEW'"
+                      class="primary-button"
+                      type="button"
+                      :disabled="saving || isActionPending(score.scoreAttemptId)"
+                      @click="openLifecycleDialog('approve', score)"
+                    >
+                      审核通过
+                    </button>
+                    <button
+                      v-if="score.status === 'PENDING_REVIEW'"
+                      class="secondary-button danger-outline"
+                      type="button"
+                      :disabled="saving || isActionPending(score.scoreAttemptId)"
+                      @click="openLifecycleDialog('reject', score)"
+                    >
+                      驳回
+                    </button>
+                    <button
+                      v-if="score.status === 'REJECTED'"
+                      class="secondary-button"
+                      type="button"
+                      :disabled="saving || isActionPending(score.scoreAttemptId)"
+                      @click="openLifecycleDialog('return-to-draft', score)"
+                    >
+                      退回草稿
+                    </button>
+                    <span v-if="isActionPending(score.scoreAttemptId)" class="score-action-pending" role="status">处理中...</span>
                   </td>
                 </tr>
               </tbody>
@@ -511,6 +694,48 @@ onMounted(() => void loadAll());
           </form>
         </section>
       </template>
+
+      <div v-if="lifecycleDialog" class="project-modal-backdrop" @click.self="closeLifecycleDialog()">
+        <section class="project-modal score-lifecycle-modal" role="dialog" aria-modal="true" aria-labelledby="score-lifecycle-title">
+          <p class="eyebrow">SCORE LIFECYCLE</p>
+          <h2 id="score-lifecycle-title">{{ actionLabel(lifecycleDialog.action) }}</h2>
+          <p class="modal-copy">
+            {{ lifecycleDialog.action === 'submit'
+              ? '确认将这条成绩提交审核吗？'
+              : lifecycleDialog.action === 'approve'
+                ? '确认通过这条成绩的审核吗？'
+                : lifecycleDialog.action === 'return-to-draft'
+                  ? '确认将这条被驳回的成绩退回草稿吗？'
+                  : '请填写驳回原因，确认后这条成绩将进入已驳回状态。' }}
+          </p>
+          <div class="score-lifecycle-summary">
+            <strong>{{ lifecycleDialog.score.studentDisplay || lifecycleDialog.score.studentId }}</strong>
+            <span>{{ lifecycleDialog.score.projectName }} · #{{ lifecycleDialog.score.attemptNumber }}</span>
+          </div>
+          <label v-if="lifecycleDialog.action === 'reject'" class="score-reject-field">
+            <span>驳回原因</span>
+            <textarea
+              v-model="rejectReason"
+              rows="4"
+              maxlength="500"
+              :disabled="Boolean(pendingAction)"
+              aria-describedby="score-reject-error"
+            ></textarea>
+            <small id="score-reject-error" v-if="rejectReasonError" class="field-error">{{ rejectReasonError }}</small>
+          </label>
+          <div class="project-modal-actions">
+            <button class="secondary-button" type="button" :disabled="Boolean(pendingAction)" @click="closeLifecycleDialog()">取消</button>
+            <button
+              :class="lifecycleDialog.action === 'reject' ? 'secondary-button danger-outline' : 'primary-button'"
+              type="button"
+              :disabled="Boolean(pendingAction)"
+              @click="confirmLifecycleAction"
+            >
+              {{ pendingAction ? '处理中...' : `确认${actionLabel(lifecycleDialog.action)}` }}
+            </button>
+          </div>
+        </section>
+      </div>
     </section>
   </WorkspaceShell>
 </template>

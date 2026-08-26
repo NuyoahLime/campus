@@ -1755,6 +1755,22 @@
 .project-modal h2 { margin: 6px 0 8px; }
 .project-modal p { color: #637084; font-size: 13px; }
 .project-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.score-table { min-width: 1080px; }
+.score-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.score-status { display: inline-flex; border: 1px solid #d6dce4; border-radius: 999px; padding: 5px 9px; color: #536176; background: #f7f9fb; font-size: 11px; font-weight: 800; }
+.score-status[data-status="DRAFT"] { border-color: #efd8a2; color: #8a5a00; background: #fff8e7; }
+.score-status[data-status="PENDING_REVIEW"] { border-color: #b8d0f4; color: #265d9f; background: #eef5ff; }
+.score-status[data-status="APPROVED"] { border-color: #b9e5d2; color: #08724e; background: #eefaf4; }
+.score-status[data-status="REJECTED"], .score-status[data-status="INVALIDATED"] { border-color: #efc5ca; color: #a92c38; background: #fff0f1; }
+.score-action-pending { color: #718096; font-size: 12px; white-space: nowrap; }
+.score-lifecycle-modal { width: min(100%, 520px); }
+.score-lifecycle-modal > .eyebrow { margin: 0; color: #1769e8; }
+.score-lifecycle-summary { display: grid; gap: 4px; margin-top: 18px; border: 1px solid #e5e9ef; border-radius: 6px; padding: 12px 14px; color: #536176; font-size: 13px; }
+.score-lifecycle-summary span { color: #718096; font-size: 12px; }
+.score-reject-field { display: grid; gap: 7px; margin-top: 18px; color: #536176; font-size: 12px; font-weight: 750; }
+.score-reject-field textarea { width: 100%; min-height: 112px; border: 1px solid #d6dce4; border-radius: 7px; padding: 10px 12px; color: #202b3c; background: #fff; font: inherit; font-weight: 400; line-height: 1.6; resize: vertical; }
+.score-reject-field textarea:focus { border-color: #1769e8; outline: 0; box-shadow: 0 0 0 3px rgba(23, 105, 232, .1); }
+.score-reject-field .field-error { color: #a92c38; font-size: 12px; }
 .activity-management-panel .project-admin-table { min-width: 980px; }
   .activity-admin-table td small { display: block; color: #718096; font-size: 11px; margin-top: 4px; }
   .activity-row-actions { display: flex; flex-wrap: wrap; gap: 10px; }

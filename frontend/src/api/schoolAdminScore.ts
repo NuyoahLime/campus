@@ -33,3 +33,28 @@ export function updateSchoolAdminScoreDraft(scoreAttemptId: string, body: School
     body: JSON.stringify(body)
   });
 }
+
+export function submitScoreAttempt(scoreAttemptId: string) {
+  return apiRequest<SchoolAdminScoreListItem>(`/school-admin/score-attempts/${encodeURIComponent(scoreAttemptId)}/submit`, {
+    method: 'POST'
+  });
+}
+
+export function rejectScoreAttempt(scoreAttemptId: string, reason: string) {
+  return apiRequest<SchoolAdminScoreListItem>(`/school-admin/score-attempts/${encodeURIComponent(scoreAttemptId)}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: reason.trim() })
+  });
+}
+
+export function returnScoreAttemptToDraft(scoreAttemptId: string) {
+  return apiRequest<SchoolAdminScoreListItem>(`/school-admin/score-attempts/${encodeURIComponent(scoreAttemptId)}/return-to-draft`, {
+    method: 'POST'
+  });
+}
+
+export function approveScoreAttempt(scoreAttemptId: string) {
+  return apiRequest<SchoolAdminScoreListItem>(`/school-admin/score-attempts/${encodeURIComponent(scoreAttemptId)}/approve`, {
+    method: 'POST'
+  });
+}
