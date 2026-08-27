@@ -21,6 +21,7 @@ import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -492,6 +494,117 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
         } finally {
             cleanupCommittedFixture();
         }
+    }
+
+    @Test
+    void sameSchoolAdminCanReadChronologicalReviewHistoryWithoutMutation() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/reject", scoreId)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Needs evidence\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/return-to-draft", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+
+        Instant rejectedAt = Instant.parse("2026-08-25T01:00:00Z");
+        Instant approvedAt = Instant.parse("2026-08-25T02:00:00Z");
+        jdbc.update("UPDATE score_review_records SET reviewed_at = ? WHERE score_attempt_id = ? AND review_result = 'REJECTED'",
+                Timestamp.from(rejectedAt), scoreId);
+        jdbc.update("UPDATE score_review_records SET reviewed_at = ? WHERE score_attempt_id = ? AND review_result = 'APPROVED'",
+                Timestamp.from(approvedAt), scoreId);
+        int reviewCountBefore = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM score_review_records WHERE score_attempt_id = ?", Integer.class, scoreId);
+        String reviewerUsername = jdbc.queryForObject("SELECT username FROM users WHERE id = ?", String.class, adminA);
+
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId).with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scoreAttemptId").value(scoreId.toString()))
+                .andExpect(jsonPath("$.reviews.length()").value(2))
+                .andExpect(jsonPath("$.reviews[0].result").value("REJECTED"))
+                .andExpect(jsonPath("$.reviews[0].reviewerId").value(adminA.toString()))
+                .andExpect(jsonPath("$.reviews[0].reviewerUsername").value(reviewerUsername))
+                .andExpect(jsonPath("$.reviews[0].rejectReason").value("Needs evidence"))
+                .andExpect(jsonPath("$.reviews[0].reviewComment").value(nullValue()))
+                .andExpect(jsonPath("$.reviews[1].result").value("APPROVED"))
+                .andExpect(jsonPath("$.reviews[1].rejectReason").value(nullValue()))
+                .andExpect(jsonPath("$.reviews[1].reviewerUsername").value(reviewerUsername))
+                .andExpect(jsonPath("$.reviews[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.reviews[0].accountStatus").doesNotExist());
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_review_records WHERE score_attempt_id = ?",
+                Integer.class, scoreId)).isEqualTo(reviewCountBefore);
+        Map<String, Object> score = jdbc.queryForMap(
+                "SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", scoreId);
+        assertThat(score.get("score_status")).isEqualTo("APPROVED");
+        assertThat(score.get("is_current_effective")).isEqualTo(false);
+    }
+
+    @Test
+    void validScoreAttemptWithoutReviewsReturnsEmptyHistory() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId).with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scoreAttemptId").value(scoreId.toString()))
+                .andExpect(jsonPath("$.reviews.length()").value(0));
+    }
+
+    @Test
+    void reviewHistoryEnforcesAuthenticationRoleAndSchoolScope() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID scoreId = createDraft(admin, studentA);
+
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId))
+                .andExpect(status().isUnauthorized());
+
+        for (String role : List.of("STUDENT", "SUPER_ADMIN", "TEACHER")) {
+            mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId)
+                            .with(principal(UUID.randomUUID(), null, null, role)))
+                    .andExpect(status().isForbidden());
+        }
+
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId)
+                        .with(principal(adminB, schoolB, adminBMembership, "SCHOOL_ADMIN")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SCORE_ATTEMPT_NOT_FOUND"));
+
+        UUID inactiveAdmin = insertUser("history-inactive-admin", null);
+        UUID inactiveMembership = insertMembership(inactiveAdmin, schoolA, "SCHOOL_ADMIN", "ENDED");
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId)
+                        .with(principal(inactiveAdmin, schoolA, inactiveMembership, "SCHOOL_ADMIN")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+
+        UUID ambiguousAdmin = insertUser("history-ambiguous-admin", null);
+        UUID ambiguousMembership = insertMembership(ambiguousAdmin, schoolA, "SCHOOL_ADMIN");
+        insertMembership(ambiguousAdmin, schoolB, "SCHOOL_ADMIN");
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", scoreId)
+                        .with(principal(ambiguousAdmin, schoolA, ambiguousMembership, "SCHOOL_ADMIN")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+    }
+
+    @Test
+    void reviewHistoryReturnsNotFoundForUnknownAttempt() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+
+        mvc.perform(get("/api/v1/school-admin/score-attempts/{id}/reviews", UUID.randomUUID()).with(admin))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SCORE_ATTEMPT_NOT_FOUND"));
     }
 
     private int approveStatus(RequestPostProcessor admin, UUID scoreId, CountDownLatch start) throws Exception {

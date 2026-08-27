@@ -5,7 +5,8 @@ import type {
   SchoolAdminScoreDraftRequest,
   SchoolAdminScoreDraftUpdateRequest,
   SchoolAdminScoreListItem,
-  SchoolAdminScoresResponse
+  SchoolAdminScoresResponse,
+  SchoolAdminScoreReviewHistoryResponse
 } from '../types/schoolAdminScore';
 
 export function getSchoolAdminScores(activityId: string) {
@@ -57,4 +58,10 @@ export function approveScoreAttempt(scoreAttemptId: string) {
   return apiRequest<SchoolAdminScoreListItem>(`/school-admin/score-attempts/${encodeURIComponent(scoreAttemptId)}/approve`, {
     method: 'POST'
   });
+}
+
+export function getScoreAttemptReviews(scoreAttemptId: string) {
+  return apiRequest<SchoolAdminScoreReviewHistoryResponse>(
+    `/school-admin/score-attempts/${encodeURIComponent(scoreAttemptId)}/reviews`
+  );
 }

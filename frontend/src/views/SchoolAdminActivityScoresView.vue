@@ -9,6 +9,7 @@ import {
   getSchoolAdminScoreCandidates,
   getSchoolAdminScoreDetail,
   getSchoolAdminScores,
+  getScoreAttemptReviews,
   rejectScoreAttempt,
   returnScoreAttemptToDraft,
   submitScoreAttempt,
@@ -20,7 +21,8 @@ import type {
   SchoolAdminScoreCandidateProject,
   SchoolAdminScoreDraftRequest,
   SchoolAdminScoreDraftUpdateRequest,
-  SchoolAdminScoreListItem
+  SchoolAdminScoreListItem,
+  SchoolAdminScoreReview
 } from '../types/schoolAdminScore';
 
 type DraftMode = 'create' | 'edit';
@@ -68,9 +70,14 @@ const lifecycleDialog = ref<LifecycleDialog | null>(null);
 const rejectReason = ref('');
 const rejectReasonError = ref('');
 const pendingAction = ref<PendingAction | null>(null);
+const reviewHistoryDialog = ref<SchoolAdminScoreListItem | null>(null);
+const reviewHistory = ref<SchoolAdminScoreReview[]>([]);
+const reviewHistoryLoading = ref(false);
+const reviewHistoryError = ref('');
 let loadRequestId = 0;
 let lifecycleRequestId = 0;
 let saveRequestId = 0;
+let reviewHistoryRequestId = 0;
 
 const candidateRows = computed<CandidateRow[]>(() =>
   candidates.value.flatMap((candidate) =>
@@ -278,6 +285,47 @@ function closeLifecycleDialog(force = false) {
   rejectReasonError.value = '';
 }
 
+function reviewResultLabel(result: string): string {
+  return result === 'APPROVED' ? '审核通过' : result === 'REJECTED' ? '已驳回' : result;
+}
+
+function formatReviewDate(value: string): string {
+  return new Date(value).toLocaleString();
+}
+
+function closeReviewHistory() {
+  reviewHistoryRequestId += 1;
+  reviewHistoryDialog.value = null;
+  reviewHistory.value = [];
+  reviewHistoryLoading.value = false;
+  reviewHistoryError.value = '';
+}
+
+async function openReviewHistory(score: SchoolAdminScoreListItem) {
+  const requestId = ++reviewHistoryRequestId;
+  const requestedPath = route.fullPath;
+  reviewHistoryDialog.value = score;
+  reviewHistory.value = [];
+  reviewHistoryError.value = '';
+  reviewHistoryLoading.value = true;
+  try {
+    const result = await getScoreAttemptReviews(score.scoreAttemptId);
+    if (requestId !== reviewHistoryRequestId || requestedPath !== route.fullPath) return;
+    reviewHistory.value = result.reviews;
+  } catch (value) {
+    if (requestId !== reviewHistoryRequestId || requestedPath !== route.fullPath) return;
+    reviewHistoryError.value = value instanceof ApiError && value.status === 403
+      ? '当前账号没有查看本校审核记录的权限。'
+      : value instanceof ApiError && value.status === 404
+        ? '成绩记录不存在或已不可用。'
+        : '审核记录加载失败，请稍后重试。';
+  } finally {
+    if (requestId === reviewHistoryRequestId && requestedPath === route.fullPath) {
+      reviewHistoryLoading.value = false;
+    }
+  }
+}
+
 function lifecycleErrorMessage(value: unknown): string {
   if (!(value instanceof ApiError)) return '操作失败，请稍后重试。';
   if (value.status === 400) return '请求数据不合法，请检查后重试。';
@@ -446,6 +494,7 @@ watch(() => route.fullPath, () => {
   saveRequestId += 1;
   lifecycleRequestId += 1;
   closeLifecycleDialog(true);
+  closeReviewHistory();
   closeEditor();
   saving.value = false;
   pendingAction.value = null;
@@ -564,6 +613,14 @@ onMounted(() => void loadAll());
                   <td>{{ displayScore(score) }}</td>
                   <td>{{ score.scoreBusinessTime ? new Date(score.scoreBusinessTime).toLocaleString() : '未记录' }}</td>
                   <td class="score-row-actions">
+                    <button
+                      class="secondary-button"
+                      type="button"
+                      :disabled="saving"
+                      @click="openReviewHistory(score)"
+                    >
+                      审核记录
+                    </button>
                     <button
                       v-if="score.status === 'DRAFT'"
                       class="secondary-button"
@@ -733,6 +790,42 @@ onMounted(() => void loadAll());
             >
               {{ pendingAction ? '处理中...' : `确认${actionLabel(lifecycleDialog.action)}` }}
             </button>
+          </div>
+        </section>
+      </div>
+
+      <div v-if="reviewHistoryDialog" class="project-modal-backdrop" @click.self="closeReviewHistory">
+        <section class="project-modal score-review-history-modal" role="dialog" aria-modal="true" aria-labelledby="score-review-history-title">
+          <p class="eyebrow">REVIEW HISTORY</p>
+          <h2 id="score-review-history-title">审核记录</h2>
+          <div class="score-lifecycle-summary">
+            <strong>{{ reviewHistoryDialog.studentDisplay || reviewHistoryDialog.studentId }}</strong>
+            <span>{{ reviewHistoryDialog.projectName }} · #{{ reviewHistoryDialog.attemptNumber }}</span>
+          </div>
+          <div v-if="reviewHistoryLoading" class="project-state score-review-history-state" role="status">
+            正在加载审核记录...
+          </div>
+          <div v-else-if="reviewHistoryError" class="project-inline-error score-review-history-error" role="alert">
+            {{ reviewHistoryError }}
+          </div>
+          <div v-else-if="!reviewHistory.length" class="project-state score-review-history-state">
+            暂无审核记录
+          </div>
+          <ol v-else class="score-review-timeline">
+            <li v-for="review in reviewHistory" :key="review.reviewId" class="score-review-entry">
+              <div class="score-review-entry-heading">
+                <span class="score-status" :data-status="review.result">{{ reviewResultLabel(review.result) }}</span>
+                <time :datetime="review.reviewedAt">{{ formatReviewDate(review.reviewedAt) }}</time>
+              </div>
+              <strong>{{ review.reviewerUsername }}</strong>
+              <p v-if="review.reviewComment" class="score-review-detail">{{ review.reviewComment }}</p>
+              <p v-if="review.result === 'REJECTED' && review.rejectReason" class="score-review-reason">
+                驳回原因：{{ review.rejectReason }}
+              </p>
+            </li>
+          </ol>
+          <div class="project-modal-actions">
+            <button class="secondary-button" type="button" @click="closeReviewHistory">关闭</button>
           </div>
         </section>
       </div>
