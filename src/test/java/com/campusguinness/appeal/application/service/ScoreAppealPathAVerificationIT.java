@@ -134,6 +134,35 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
                 Integer.class, oldAttemptId)).isZero();
     }
 
+    @Test @DisplayName("correcting a non-current attempt replaces the prior current effective score")
+    void correctionOfNonCurrentAttemptStillMakesReplacementCurrent() {
+        UUID priorCurrentId = UUID.randomUUID();
+        jdbc.update("UPDATE score_attempts SET is_current_effective = false WHERE id = ?", oldAttemptId);
+        jdbc.update("""
+                INSERT INTO score_attempts(
+                    id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,
+                    score_value,is_current_effective,score_status,entered_by,version)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                """, priorCurrentId, schoolId, apId, studentId, 3, "INTEGER",
+                80, true, "APPROVED", enteredById, 1);
+
+        var tt = new TransactionTemplate(txManager);
+        tt.executeWithoutResult(status ->
+                svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), "fixed", enteredById));
+
+        assertThat(jdbc.queryForObject("SELECT score_status FROM score_attempts WHERE id = ?",
+                String.class, oldAttemptId)).isEqualTo("INVALIDATED");
+        assertThat(jdbc.queryForObject("SELECT is_current_effective FROM score_attempts WHERE id = ?",
+                Boolean.class, priorCurrentId)).isFalse();
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ? AND is_current_effective = true
+                """, Integer.class, studentId, apId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT is_current_effective FROM score_attempts WHERE replaces_id = ?
+                """, Boolean.class, oldAttemptId)).isTrue();
+    }
+
     @Test @DisplayName("repeated request fails — no duplicate correction")
     void repeatedRequestFails() {
         var tt = new TransactionTemplate(txManager);

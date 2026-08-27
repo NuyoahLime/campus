@@ -21,7 +21,7 @@ class ActivityProjectLockAdapter implements ActivityProjectLockPort {
                        rv.effective_score_rule, rv.score_storage_type,
                        rv.comparison_direction, rv.grade_order, rv.allow_tie
                 FROM activity_projects ap
-                JOIN project_rule_versions rv
+                LEFT JOIN project_rule_versions rv
                   ON rv.id = ap.rule_version_id AND rv.project_id = ap.project_id
                 WHERE ap.id = ?
                 FOR UPDATE OF ap

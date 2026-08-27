@@ -602,6 +602,37 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
     }
 
     @Test
+    void concurrentAdminDesignationUsesCasAndLeavesOneEffectiveScore() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        jdbc.update("UPDATE project_rule_versions SET effective_score_rule = 'ADMIN_DESIGNATED' WHERE id = ?", ruleA);
+        UUID first = createDraft(admin, studentA, 7L);
+        UUID second = createDraft(admin, studentA, 9L);
+        submit(admin, first);
+        submit(admin, second);
+        approve(admin, first);
+        approve(admin, second);
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        var start = new CountDownLatch(1);
+        try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                var firstResult = executor.submit(() -> designateStatus(admin, first, null, start));
+                var secondResult = executor.submit(() -> designateStatus(admin, second, null, start));
+                start.countDown();
+                assertThat(List.of(firstResult.get(), secondResult.get())).containsExactlyInAnyOrder(200, 409);
+            }
+            assertThat(jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM score_attempts
+                    WHERE activity_project_id = ? AND student_id = ? AND is_current_effective = true
+                    """, Integer.class, activityProjectA, studentA)).isEqualTo(1);
+        } finally {
+            cleanupCommittedFixture();
+        }
+    }
+
+    @Test
     void sameSchoolAdminCanReadChronologicalReviewHistoryWithoutMutation() throws Exception {
         RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
         UUID scoreId = createDraft(admin, studentA);
@@ -716,6 +747,19 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
         start.await();
         return mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
                         .with(admin).with(csrf())).andReturn().getResponse().getStatus();
+    }
+
+    private int designateStatus(RequestPostProcessor admin, UUID scoreId, UUID expectedCurrentEffectiveAttemptId,
+                                CountDownLatch start) throws Exception {
+        start.await();
+        String expected = expectedCurrentEffectiveAttemptId == null
+                ? "null"
+                : "\"" + expectedCurrentEffectiveAttemptId + "\"";
+        return mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", scoreId)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedCurrentEffectiveAttemptId\":" + expected + "}"))
+                .andReturn().getResponse().getStatus();
     }
 
     private void submit(RequestPostProcessor admin, UUID scoreId) throws Exception {

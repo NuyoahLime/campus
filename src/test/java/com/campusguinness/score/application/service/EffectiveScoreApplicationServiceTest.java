@@ -123,6 +123,56 @@ class EffectiveScoreApplicationServiceTest {
     }
 
     @Test
+    void approvalRejectsDuplicateHistoricalGrades() {
+        ScoreAttempt target = pending(1, new ScoreValue.GradeScore("GOLD"));
+        register(target);
+        lock(scope("BEST", "GRADE", "GRADE_ORDER", "GOLD,GOLD,SILVER"));
+
+        assertThatThrownBy(() -> service.approve(target.id().value()))
+                .isInstanceOf(ScoreWriteException.class)
+                .extracting(ex -> ((ScoreWriteException) ex).code())
+                .isEqualTo("SCORE_RULE_INVALID");
+    }
+
+    @Test
+    void approvalRejectsMalformedHistoricalGradeOrderJson() {
+        ScoreAttempt target = pending(1, new ScoreValue.GradeScore("GOLD"));
+        register(target);
+        lock(scope("BEST", "GRADE", "GRADE_ORDER", "[\"GOLD\","));
+
+        assertThatThrownBy(() -> service.approve(target.id().value()))
+                .isInstanceOf(ScoreWriteException.class)
+                .extracting(ex -> ((ScoreWriteException) ex).code())
+                .isEqualTo("SCORE_RULE_INVALID");
+    }
+
+    @Test
+    void approvalRejectsGradeAbsentFromHistoricalOrderEvenWhenItIsTheOnlyCandidate() {
+        ScoreAttempt target = pending(1, new ScoreValue.GradeScore("PLATINUM"));
+        register(target);
+        lock(scope("BEST", "GRADE", "GRADE_ORDER", "[\"GOLD\",\"SILVER\"]"));
+
+        assertThatThrownBy(() -> service.approve(target.id().value()))
+                .isInstanceOf(ScoreWriteException.class)
+                .extracting(ex -> ((ScoreWriteException) ex).code())
+                .isEqualTo("SCORE_RULE_INVALID");
+    }
+
+    @Test
+    void approvalRejectsMissingHistoricalRuleVersion() {
+        ScoreAttempt target = pending(1, new ScoreValue.IntegerScore(10));
+        register(target);
+        when(projects.lock(eq(activityProjectId))).thenReturn(Optional.of(
+                new ActivityProjectLockPort.Scope(activityProjectId, UUID.randomUUID(), null,
+                        null, null, null, null, false)));
+
+        assertThatThrownBy(() -> service.approve(target.id().value()))
+                .isInstanceOf(ScoreWriteException.class)
+                .extracting(ex -> ((ScoreWriteException) ex).code())
+                .isEqualTo("SCORE_RULE_INVALID");
+    }
+
+    @Test
     void lastUsesHighestServerGeneratedAttemptNumber() {
         ScoreAttempt previous = approved(4, new ScoreValue.DecimalScore(new BigDecimal("99.9")));
         previous.markCurrentEffective();
@@ -195,6 +245,35 @@ class EffectiveScoreApplicationServiceTest {
         assertThat(old.status()).isEqualTo(AttemptStatus.INVALIDATED);
         assertThat(old.isCurrentEffective()).isFalse();
         assertThat(fallback.isCurrentEffective()).isTrue();
+    }
+
+    @Test
+    void invalidatingCurrentLastRecalculatesHighestRemainingAttemptNumber() {
+        ScoreAttempt earlier = approved(1, new ScoreValue.IntegerScore(100));
+        ScoreAttempt current = approved(2, new ScoreValue.IntegerScore(50));
+        current.markCurrentEffective();
+        register(earlier, current);
+        lock(scope("LAST", "INTEGER", "HIGHER_BETTER", null));
+
+        service.invalidate(current.id().value(), UUID.randomUUID());
+
+        assertThat(current.status()).isEqualTo(AttemptStatus.INVALIDATED);
+        assertThat(current.isCurrentEffective()).isFalse();
+        assertThat(earlier.isCurrentEffective()).isTrue();
+    }
+
+    @Test
+    void invalidatingNonEffectiveAttemptPreservesCurrentEffectiveScore() {
+        ScoreAttempt current = approved(1, new ScoreValue.IntegerScore(100));
+        current.markCurrentEffective();
+        ScoreAttempt target = approved(2, new ScoreValue.IntegerScore(50));
+        register(current, target);
+        lock(scope("BEST", "INTEGER", "HIGHER_BETTER", null));
+
+        service.invalidate(target.id().value(), UUID.randomUUID());
+
+        assertThat(target.status()).isEqualTo(AttemptStatus.INVALIDATED);
+        assertThat(current.isCurrentEffective()).isTrue();
     }
 
     @Test

@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Owns every application-level mutation of ScoreAttempt.currentEffective. */
@@ -180,15 +182,35 @@ public class EffectiveScoreApplicationService {
     }
 
     private ScoreAttempt best(ActivityProjectLockPort.Scope scope, List<ScoreAttempt> approved) {
-        if ("NO_RANKING".equals(scope.comparisonDirection())) {
-            throw conflict("SCORE_RULE_INVALID", "BEST requires a historical comparison direction.");
-        }
-        if ("GRADE".equals(scope.scoreStorageType()) != "GRADE_ORDER".equals(scope.comparisonDirection())) {
-            throw conflict("SCORE_RULE_INVALID", "Historical score type and comparison direction are incompatible.");
-        }
-        Comparator<ScoreAttempt> valueComparator = Comparator.comparing(a -> comparableValue(scope, a.scoreValue()));
-        if ("LOWER_BETTER".equals(scope.comparisonDirection())) valueComparator = valueComparator.reversed();
+        Comparator<ScoreAttempt> valueComparator = switch (scope.scoreStorageType()) {
+            case "INTEGER", "DECIMAL", "DURATION" -> numericBestComparator(scope, approved);
+            case "GRADE" -> gradeBestComparator(scope, approved);
+            default -> throw conflict("SCORE_RULE_INVALID", "Historical score storage type is invalid.");
+        };
         return approved.stream().max(valueComparator.thenComparingInt(ScoreAttempt::attemptNumber)).orElseThrow();
+    }
+
+    private Comparator<ScoreAttempt> numericBestComparator(ActivityProjectLockPort.Scope scope,
+                                                            List<ScoreAttempt> approved) {
+        if (!"HIGHER_BETTER".equals(scope.comparisonDirection())
+                && !"LOWER_BETTER".equals(scope.comparisonDirection())) {
+            throw conflict("SCORE_RULE_INVALID", "Numeric BEST requires a historical comparison direction.");
+        }
+        // Validate every approved candidate before stream comparison so a single candidate is not skipped.
+        approved.forEach(attempt -> comparableValue(scope, attempt.scoreValue()));
+        Comparator<ScoreAttempt> comparator = Comparator.comparing(a -> comparableValue(scope, a.scoreValue()));
+        return "LOWER_BETTER".equals(scope.comparisonDirection()) ? comparator.reversed() : comparator;
+    }
+
+    private Comparator<ScoreAttempt> gradeBestComparator(ActivityProjectLockPort.Scope scope,
+                                                          List<ScoreAttempt> approved) {
+        if (!"GRADE_ORDER".equals(scope.comparisonDirection())) {
+            throw conflict("SCORE_RULE_INVALID", "GRADE BEST requires a historical grade order.");
+        }
+        List<String> grades = parseGradeOrder(scope.gradeOrder());
+        // Validate every approved candidate before stream comparison so a single candidate is not skipped.
+        approved.forEach(attempt -> gradeRank(grades, attempt.scoreValue()));
+        return Comparator.comparing(a -> BigDecimal.valueOf(gradeRank(grades, a.scoreValue())));
     }
 
     private BigDecimal comparableValue(ActivityProjectLockPort.Scope scope, ScoreValue value) {
@@ -202,8 +224,12 @@ public class EffectiveScoreApplicationService {
     }
 
     private Integer gradeRank(String gradeOrder, ScoreValue value) {
-        if (!(value instanceof ScoreValue.GradeScore grade)) return invalidRuleValue();
         List<String> grades = parseGradeOrder(gradeOrder);
+        return gradeRank(grades, value);
+    }
+
+    private Integer gradeRank(List<String> grades, ScoreValue value) {
+        if (!(value instanceof ScoreValue.GradeScore grade)) return invalidRuleValue();
         int rank = grades.indexOf(grade.grade());
         if (rank < 0) throw conflict("SCORE_RULE_INVALID", "Approved grade is absent from the historical grade order.");
         return grades.size() - rank;
@@ -211,8 +237,9 @@ public class EffectiveScoreApplicationService {
 
     private List<String> parseGradeOrder(String raw) {
         if (raw == null || raw.isBlank()) throw conflict("SCORE_RULE_INVALID", "Historical grade order is required.");
+        String normalized = raw.trim();
         try {
-            JsonNode node = JSON.readTree(raw);
+            JsonNode node = JSON.readTree(normalized);
             if (node.isArray()) {
                 List<String> result = new ArrayList<>();
                 for (JsonNode item : node) {
@@ -224,19 +251,33 @@ public class EffectiveScoreApplicationService {
                 if (result.isEmpty()) {
                     throw conflict("SCORE_RULE_INVALID", "Historical grade order is required.");
                 }
-                return result;
+                return requireDistinctGrades(result);
             }
+            throw conflict("SCORE_RULE_INVALID", "Historical grade order JSON must be an array.");
         } catch (ScoreWriteException ex) {
             throw ex;
         } catch (Exception ignored) {
             // Existing project forms also persist comma-, semicolon-, or newline-delimited orders.
         }
-        List<String> result = java.util.Arrays.stream(raw.split("[,;\\r\\n]+"))
+        if (normalized.startsWith("[") || normalized.startsWith("{") || normalized.startsWith("\"")) {
+            throw conflict("SCORE_RULE_INVALID", "Historical grade order JSON is malformed.");
+        }
+        List<String> result = java.util.Arrays.stream(normalized.split("[,;\\r\\n]+"))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
                 .toList();
         if (result.isEmpty()) throw conflict("SCORE_RULE_INVALID", "Historical grade order is required.");
-        return result;
+        return requireDistinctGrades(result);
+    }
+
+    private List<String> requireDistinctGrades(List<String> grades) {
+        Set<String> seen = new HashSet<>();
+        for (String grade : grades) {
+            if (!seen.add(grade)) {
+                throw conflict("SCORE_RULE_INVALID", "Historical grade order contains duplicate grades.");
+            }
+        }
+        return grades;
     }
 
     private boolean isAutomatic(ActivityProjectLockPort.Scope scope) {
@@ -266,8 +307,13 @@ public class EffectiveScoreApplicationService {
     }
 
     private ActivityProjectLockPort.Scope lock(UUID activityProjectId) {
-        return projects.lock(activityProjectId)
+        ActivityProjectLockPort.Scope scope = projects.lock(activityProjectId)
                 .orElseThrow(() -> conflict("SCORE_ACTIVITY_PROJECT_NOT_FOUND", "Activity project not found."));
+        if (scope.ruleVersionId() == null || scope.effectiveScoreRule() == null
+                || scope.scoreStorageType() == null || scope.comparisonDirection() == null) {
+            throw conflict("SCORE_RULE_INVALID", "Historical activity-project rule version is unavailable.");
+        }
+        return scope;
     }
 
     private UUID requireSchool() {
