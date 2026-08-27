@@ -53,12 +53,13 @@ class StudentScoreQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
                 activity, schoolA, "Score Read Activity", "PUBLISHED", "PUBLIC", enteredBy);
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
                 activityProjectA, activity, project, ruleV1);
-        insertScore(approvedA, studentA, enteredBy, "APPROVED", 1, "10");
-        insertScore(UUID.randomUUID(), studentA, enteredBy, "DRAFT", 2, "20");
-        insertScore(UUID.randomUUID(), studentA, enteredBy, "PENDING_REVIEW", 3, "30");
-        insertScore(UUID.randomUUID(), studentA, enteredBy, "REJECTED", 4, "40");
-        insertScore(UUID.randomUUID(), studentA, enteredBy, "INVALIDATED", 5, "50");
-        insertScore(UUID.randomUUID(), studentB, enteredBy, "APPROVED", 6, "60");
+        insertScore(approvedA, studentA, enteredBy, "APPROVED", true, 1, "10");
+        insertScore(UUID.randomUUID(), studentA, enteredBy, "APPROVED", false, 2, "20");
+        insertScore(UUID.randomUUID(), studentA, enteredBy, "DRAFT", false, 3, "30");
+        insertScore(UUID.randomUUID(), studentA, enteredBy, "PENDING_REVIEW", false, 4, "40");
+        insertScore(UUID.randomUUID(), studentA, enteredBy, "REJECTED", false, 5, "50");
+        insertScore(UUID.randomUUID(), studentA, enteredBy, "INVALIDATED", false, 6, "60");
+        insertScore(UUID.randomUUID(), studentB, enteredBy, "APPROVED", true, 7, "70");
     }
 
     @Test
@@ -85,9 +86,11 @@ class StudentScoreQueryAdapterIT extends PostgreSqlIntegrationTestSupport {
                 id, project, version, "INTEGER", "NUMERIC", "HIGHER_BETTER", "次", "BEST", text, studentA);
     }
 
-    private void insertScore(UUID id, UUID student, UUID enteredBy, String status, int attempt, String value) {
-        jdbc.update("INSERT INTO score_attempts(id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,score_value,score_status,entered_by,score_business_time) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                id, schoolA, activityProjectA, student, attempt, "INTEGER", new java.math.BigDecimal(value), status, enteredBy,
+    private void insertScore(UUID id, UUID student, UUID enteredBy, String status, boolean currentEffective,
+                             int attempt, String value) {
+        jdbc.update("INSERT INTO score_attempts(id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,score_value,score_status,is_current_effective,entered_by,score_business_time) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                id, schoolA, activityProjectA, student, attempt, "INTEGER", new java.math.BigDecimal(value),
+                status, currentEffective, enteredBy,
                 java.sql.Timestamp.from(Instant.now().minusSeconds(attempt)));
     }
 }

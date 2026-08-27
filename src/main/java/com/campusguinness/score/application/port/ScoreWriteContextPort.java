@@ -17,7 +17,8 @@ public interface ScoreWriteContextPort {
                     UUID activityProjectId, String projectName, UUID studentId,
                     String studentDisplay, String studentNumber, int attemptNumber,
                     String status, String scoreStorageType, java.math.BigDecimal numericValue,
-                    Long durationMs, String grade, java.time.Instant scoreBusinessTime) {}
+                    Long durationMs, String grade, java.time.Instant scoreBusinessTime,
+                    boolean currentEffective) {}
 
     Optional<Activity> findActivity(UUID activityId);
     Optional<Context> findContext(UUID activityProjectId);

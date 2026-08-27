@@ -64,6 +64,13 @@ class ScoreAttemptTest {
         }
 
         @Test
+        @DisplayName("manual makeup flag is retained from the creation command")
+        void shouldRetainManualMakeupFlag() {
+            var s = ScoreAttempt.create(validBuilder().manualMakeup(true));
+            assertThat(s.isManualMakeup()).isTrue();
+        }
+
+        @Test
         @DisplayName("CG-SCORE-010: null id rejected")
         void shouldRejectNullId() {
             assertThatThrownBy(() -> ScoreAttempt.create(validBuilder().id(null)))
@@ -235,12 +242,12 @@ class ScoreAttemptTest {
         }
 
         @Test
-        @DisplayName("CG-SCORE-002: PENDING_REVIEW → APPROVED (sets isCurrentEffective)")
+        @DisplayName("CG-SCORE-002: PENDING_REVIEW → APPROVED")
         void shouldApproveFromPendingReview() {
             var s = createSubmitted();
-            s.approve();
+            s.approveForReview();
             assertThat(s.status()).isEqualTo(AttemptStatus.APPROVED);
-            assertThat(s.isCurrentEffective()).isTrue();
+            assertThat(s.isCurrentEffective()).isFalse();
             assertThat(s.domainEvents()).anyMatch(e -> e instanceof ScoreAttemptApproved);
         }
 
@@ -288,7 +295,8 @@ class ScoreAttemptTest {
         @DisplayName("CG-SCORE-005: APPROVED → INVALIDATED (terminal, clears isCurrentEffective)")
         void shouldInvalidateFromApproved() {
             var s = createSubmitted();
-            s.approve();
+            s.approveForReview();
+            s.markCurrentEffective();
             UUID replacementId = UUID.randomUUID();
             s.invalidate(replacementId);
             assertThat(s.status()).isEqualTo(AttemptStatus.INVALIDATED);
@@ -305,8 +313,6 @@ class ScoreAttemptTest {
         @DisplayName("CG-SCORE-006: DRAFT → APPROVED rejected")
         void shouldRejectDirectApproveFromDraft() {
             var s = createDraft();
-            assertThatThrownBy(s::approve)
-                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
             assertThatThrownBy(s::approveForReview)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
         }
@@ -323,11 +329,9 @@ class ScoreAttemptTest {
         @DisplayName("CG-SCORE-008: INVALIDATED → any rejected")
         void shouldRejectTransitionFromInvalidated() {
             var s = createSubmitted();
-            s.approve();
+            s.approveForReview();
             s.invalidate(UUID.randomUUID());
             assertThatThrownBy(s::submit)
-                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
-            assertThatThrownBy(s::approve)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
             assertThatThrownBy(s::approveForReview)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
@@ -337,7 +341,7 @@ class ScoreAttemptTest {
         @DisplayName("CG-SCORE-009: APPROVED → REJECTED rejected")
         void shouldRejectRejectFromApproved() {
             var s = createSubmitted();
-            s.approve();
+            s.approveForReview();
             assertThatThrownBy(() -> s.reject("reason"))
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
             assertThatThrownBy(s::approveForReview)
@@ -357,7 +361,7 @@ class ScoreAttemptTest {
         @DisplayName("APPROVED → DRAFT rejected")
         void shouldRejectReturnToDraftFromApproved() {
             var s = createSubmitted();
-            s.approve();
+            s.approveForReview();
             assertThatThrownBy(s::returnToDraft)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
         }
@@ -375,6 +379,14 @@ class ScoreAttemptTest {
         void shouldRejectInvalidateFromDraft() {
             var s = createDraft();
             assertThatThrownBy(() -> s.invalidate(UUID.randomUUID()))
+                    .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
+        }
+
+        @Test
+        @DisplayName("only APPROVED attempts can become current effective")
+        void shouldRequireApprovedStatusForEffectiveFlag() {
+            var draft = createDraft();
+            assertThatThrownBy(draft::markCurrentEffective)
                     .isInstanceOf(InvalidScoreAttemptStateTransitionException.class);
         }
     }

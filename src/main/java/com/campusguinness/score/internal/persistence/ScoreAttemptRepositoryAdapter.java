@@ -8,6 +8,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
+import java.util.List;
+import java.util.UUID;
 
 @Component
 class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
@@ -27,11 +29,21 @@ class ScoreAttemptRepositoryAdapter implements ScoreAttemptRepository {
                 throw new ScoreWriteException("SCORE_ATTEMPT_CONFLICT",
                         "Another score attempt was created at the same time.");
             }
+            if (hasConstraint(ex, "uq_effective_score")) {
+                throw new ScoreWriteException("SCORE_EFFECTIVE_CONFLICT",
+                        "The effective score changed at the same time.");
+            }
             throw ex;
         }
     }
     @Override @Transactional(readOnly = true) public Optional<ScoreAttempt> findById(ScoreAttemptId id) {
         return jpaRepository.findById(id.value()).map(ScoreAttemptPersistenceMapper::toDomain);
+    }
+
+    @Override @Transactional(readOnly = true)
+    public List<ScoreAttempt> findByStudentAndActivityProject(UUID studentId, UUID activityProjectId) {
+        return jpaRepository.findByStudentIdAndActivityProjectIdOrderByAttemptNumberAscIdAsc(studentId, activityProjectId)
+                .stream().map(ScoreAttemptPersistenceMapper::toDomain).toList();
     }
 
     private boolean hasConstraint(Throwable error, String expected) {

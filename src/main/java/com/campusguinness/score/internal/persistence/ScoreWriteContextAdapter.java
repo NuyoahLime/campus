@@ -131,7 +131,8 @@ class ScoreWriteContextAdapter implements ScoreWriteContextPort {
                        ap.id AS activity_project_id, p.name AS project_name, sa.student_id,
                        u.username AS student_display, sp.student_number, sa.attempt_number,
                        sa.score_status, sa.score_storage_type, sa.score_value,
-                       sa.score_duration_ms, sa.score_grade, sa.score_business_time
+                       sa.score_duration_ms, sa.score_grade, sa.score_business_time,
+                       sa.is_current_effective
                 FROM score_attempts sa
                 JOIN activity_projects ap ON ap.id = sa.activity_project_id
                 JOIN activities a ON a.id = ap.activity_id AND a.school_id = sa.school_id
@@ -162,7 +163,8 @@ class ScoreWriteContextAdapter implements ScoreWriteContextPort {
                        ap.id AS activity_project_id, p.name AS project_name, sa.student_id,
                        u.username AS student_display, sp.student_number, sa.attempt_number,
                        sa.score_status, sa.score_storage_type, sa.score_value,
-                       sa.score_duration_ms, sa.score_grade, sa.score_business_time
+                       sa.score_duration_ms, sa.score_grade, sa.score_business_time,
+                       sa.is_current_effective
                 FROM score_attempts sa
                 JOIN activity_projects ap ON ap.id = sa.activity_project_id
                 JOIN activities a ON a.id = ap.activity_id AND a.school_id = sa.school_id
@@ -186,6 +188,6 @@ class ScoreWriteContextAdapter implements ScoreWriteContextPort {
                 rs.getString("student_number"), rs.getInt("attempt_number"),
                 rs.getString("score_status"), rs.getString("score_storage_type"),
                 rs.getBigDecimal("score_value"), (Long) rs.getObject("score_duration_ms"),
-                rs.getString("score_grade"), businessTime);
+                rs.getString("score_grade"), businessTime, rs.getBoolean("is_current_effective"));
     }
 }

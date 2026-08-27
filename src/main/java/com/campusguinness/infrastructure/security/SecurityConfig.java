@@ -130,9 +130,10 @@ public class SecurityConfig {
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-admin/score-attempts/*/submit",
-                        "/api/v1/school-admin/score-attempts/*/reject",
-                        "/api/v1/school-admin/score-attempts/*/approve",
-                        "/api/v1/school-admin/score-attempts/*/return-to-draft"
+                         "/api/v1/school-admin/score-attempts/*/reject",
+                         "/api/v1/school-admin/score-attempts/*/approve",
+                         "/api/v1/school-admin/score-attempts/*/designate-effective",
+                         "/api/v1/school-admin/score-attempts/*/return-to-draft"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/activities", "/api/v1/activities/*").permitAll()
                 .requestMatchers(HttpMethod.GET,

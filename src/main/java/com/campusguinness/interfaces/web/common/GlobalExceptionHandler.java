@@ -84,14 +84,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ApiErrorResponse> handleOptimisticSchoolRegistrationReview(
+    public ResponseEntity<ApiErrorResponse> handleOptimisticConflict(
             ObjectOptimisticLockingFailureException ex,
             HttpServletRequest req
     ) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiErrorResponse.of(
-                        "SCHOOL_REGISTRATION_REVIEW_CONFLICT",
-                        "School registration was updated by another reviewer.",
+                        "CONCURRENT_UPDATE_CONFLICT",
+                        "The resource was updated by another request.",
                         req.getRequestURI()
                 ));
     }

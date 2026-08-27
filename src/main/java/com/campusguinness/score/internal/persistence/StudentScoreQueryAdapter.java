@@ -34,7 +34,8 @@ class StudentScoreQueryAdapter implements StudentScoreQueryPort {
                 + " JOIN activities a ON a.id = ap.activity_id"
                 + " JOIN challenge_projects p ON p.id = ap.project_id"
                 + " JOIN project_rule_versions rv ON rv.id = ap.rule_version_id AND rv.project_id = ap.project_id"
-                + " WHERE sa.student_id = ? AND sa.school_id = ? AND sa.score_status = ?";
+                + " WHERE sa.student_id = ? AND sa.school_id = ? AND sa.score_status = ?"
+                + " AND sa.is_current_effective = true";
         String select = "SELECT sa.id, sa.activity_project_id, ap.activity_id, a.title AS activity_name,"
                 + " p.name AS project_name, sa.attempt_number, sa.score_storage_type, sa.score_value,"
                 + " sa.score_duration_ms, sa.score_grade, rv.score_unit, sa.score_business_time, sa.score_status"
@@ -57,7 +58,8 @@ class StudentScoreQueryAdapter implements StudentScoreQueryPort {
                 + " JOIN activities a ON a.id = ap.activity_id"
                 + " JOIN challenge_projects p ON p.id = ap.project_id"
                 + " JOIN project_rule_versions rv ON rv.id = ap.rule_version_id AND rv.project_id = ap.project_id"
-                + " WHERE sa.id = ? AND sa.student_id = ? AND sa.school_id = ? AND sa.score_status = ?";
+                + " WHERE sa.id = ? AND sa.student_id = ? AND sa.school_id = ? AND sa.score_status = ?"
+                + " AND sa.is_current_effective = true";
         return jdbc.query(sql, this::mapDetail, scoreAttemptId, studentId, schoolId, VISIBLE_STATUS)
                 .stream().findFirst();
     }

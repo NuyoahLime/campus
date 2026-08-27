@@ -3,6 +3,7 @@ package com.campusguinness.appeal.application.service;
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
+import com.campusguinness.score.application.service.EffectiveScoreApplicationService;
 import com.campusguinness.score.internal.domain.*;
 
 import org.springframework.stereotype.Service;
@@ -22,10 +23,13 @@ public class ScoreAppealCorrectionService {
 
     private final ScoreAppealRepository appealRepo;
     private final ScoreAttemptRepository attemptRepo;
+    private final EffectiveScoreApplicationService effectiveScores;
 
-    public ScoreAppealCorrectionService(ScoreAppealRepository appealRepo, ScoreAttemptRepository attemptRepo) {
+    public ScoreAppealCorrectionService(ScoreAppealRepository appealRepo, ScoreAttemptRepository attemptRepo,
+                                        EffectiveScoreApplicationService effectiveScores) {
         this.appealRepo = appealRepo;
         this.attemptRepo = attemptRepo;
+        this.effectiveScores = effectiveScores;
     }
 
     /**
@@ -72,16 +76,8 @@ public class ScoreAppealCorrectionService {
                 .enteredBy(actorId)
                 .manualMakeup(true));
 
-        // 6. Approve replacement through normal pipeline
-        newAttempt.submit();
-        newAttempt.approve();
-
-        // 7. Invalidate old attempt (clears isCurrentEffective)
-        oldAttempt.invalidate(newAttemptId);
-        attemptRepo.save(oldAttempt);
-
-        // 8. Persist new attempt (now current effective)
-        attemptRepo.save(newAttempt);
+        // 6-8. Review and effective replacement are coordinated atomically.
+        effectiveScores.replaceForCorrection(oldAttempt, newAttempt, resolution, actorId);
 
         // 9. Resolve appeal
         appeal.resolve(resolution);
