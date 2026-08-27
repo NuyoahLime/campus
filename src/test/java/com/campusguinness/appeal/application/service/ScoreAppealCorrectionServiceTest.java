@@ -3,6 +3,7 @@ package com.campusguinness.appeal.application.service;
 import com.campusguinness.appeal.application.port.ScoreAppealRepository;
 import com.campusguinness.appeal.internal.domain.*;
 import com.campusguinness.score.application.port.ScoreAttemptRepository;
+import com.campusguinness.score.application.service.EffectiveScoreApplicationService;
 import com.campusguinness.score.internal.domain.*;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -25,9 +26,10 @@ class ScoreAppealCorrectionServiceTest {
 
     @Mock ScoreAppealRepository appealRepo;
     @Mock ScoreAttemptRepository attemptRepo;
+    @Mock EffectiveScoreApplicationService effectiveScores;
     ScoreAppealCorrectionService svc;
 
-    @BeforeEach void setUp() { svc = new ScoreAppealCorrectionService(appealRepo, attemptRepo); }
+    @BeforeEach void setUp() { svc = new ScoreAppealCorrectionService(appealRepo, attemptRepo, effectiveScores); }
 
     private ScoreAppeal processingAppeal(UUID appealId, UUID attemptId) {
         var a = ScoreAppeal.create(new ScoreAppeal.Builder().id(new ScoreAppealId(appealId))
@@ -43,7 +45,7 @@ class ScoreAppealCorrectionServiceTest {
                 .activityProjectId(UUID.randomUUID()).studentId(UUID.randomUUID())
                 .attemptNumber(1).scoreStorageType(ScoreStorageType.INTEGER)
                 .scoreValue(new ScoreValue.IntegerScore(100)).enteredBy(UUID.randomUUID()));
-        s.submit(); s.approve();
+        s.submit(); s.approveForReview(); s.markCurrentEffective();
         return s;
     }
 
@@ -58,10 +60,8 @@ class ScoreAppealCorrectionServiceTest {
             svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), "corrected", UUID.randomUUID());
 
             assertThat(appeal.status()).isEqualTo(AppealStatus.RESOLVED);
-            assertThat(oldAttempt.status()).isEqualTo(AttemptStatus.INVALIDATED);
-            assertThat(oldAttempt.isCurrentEffective()).isFalse();
-            verify(attemptRepo).save(oldAttempt);
-            verify(attemptRepo, times(2)).save(any(ScoreAttempt.class)); // old + new
+            verify(effectiveScores).replaceForCorrection(eq(oldAttempt), any(ScoreAttempt.class),
+                    eq("corrected"), any(UUID.class));
             verify(appealRepo).save(appeal);
         }
     }

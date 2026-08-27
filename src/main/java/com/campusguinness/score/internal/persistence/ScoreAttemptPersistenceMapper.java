@@ -48,9 +48,13 @@ final class ScoreAttemptPersistenceMapper {
                 .scoreValue(mapScoreValueFromEntity(e, type))
                 .scoreBusinessTime(e.getScoreBusinessTime()).timeSource(e.getTimeSource())
                 .replacesId(e.getReplacesId()).enteredBy(e.getEnteredBy());
+        boolean currentEffective = e.isCurrentEffective();
+        if (currentEffective && !"APPROVED".equals(e.getScoreStatus())) {
+            throw new ScoreValuePersistenceException("Non-approved attempt cannot be current effective: " + e.getId());
+        }
         return ScoreAttempt.reconstitute(b,
                 AttemptStatus.valueOf(e.getScoreStatus()),
-                e.isCurrentEffective(), e.getSubmittedAt(), e.isManualMakeup());
+                currentEffective, e.getSubmittedAt(), e.isManualMakeup());
     }
 
     private static ScoreValue mapScoreValueFromEntity(ScoreAttemptEntity e, ScoreStorageType type) {

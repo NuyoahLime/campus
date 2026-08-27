@@ -24,17 +24,20 @@ public class SchoolAdminScoreLifecycleService {
     private final AuditRecordCommandPort audit;
     private final SchoolResourceAuthorization authorization;
     private final CurrentActor actor;
+    private final EffectiveScoreApplicationService effectiveScores;
 
     public SchoolAdminScoreLifecycleService(ScoreAttemptRepository attempts,
                                             ScoreReviewRecordPort reviews,
                                             AuditRecordCommandPort audit,
                                             SchoolResourceAuthorization authorization,
-                                            CurrentActor actor) {
+                                            CurrentActor actor,
+                                            EffectiveScoreApplicationService effectiveScores) {
         this.attempts = attempts;
         this.reviews = reviews;
         this.audit = audit;
         this.authorization = authorization;
         this.actor = actor;
+        this.effectiveScores = effectiveScores;
     }
 
     public ScoreAttempt submit(UUID scoreAttemptId) {
@@ -61,12 +64,7 @@ public class SchoolAdminScoreLifecycleService {
     }
 
     public ScoreAttempt approve(UUID scoreAttemptId) {
-        UUID reviewerId = actor.requireUserId();
-        ScoreAttempt score = loadInSchool(scoreAttemptId);
-        transition(score, "approve", score::approveForReview);
-        attempts.save(score);
-        reviews.append(score.id().value(), reviewerId, "APPROVED", null);
-        return score;
+        return effectiveScores.approve(scoreAttemptId);
     }
 
     public ScoreAttempt returnToDraft(UUID scoreAttemptId) {

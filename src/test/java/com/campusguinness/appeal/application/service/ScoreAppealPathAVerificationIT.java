@@ -62,6 +62,8 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
         // so JdbcTemplate operations auto-commit immediately.
         jdbc.update("DELETE FROM appeal_records WHERE appeal_id IN (SELECT id FROM score_appeals WHERE school_id = ?)", schoolId);
         jdbc.update("DELETE FROM score_appeals WHERE school_id = ?", schoolId);
+        jdbc.update("DELETE FROM score_correction_records WHERE original_score_id IN (SELECT id FROM score_attempts WHERE school_id = ?)"
+                + " OR new_score_id IN (SELECT id FROM score_attempts WHERE school_id = ?)", schoolId, schoolId);
         jdbc.update("DELETE FROM score_attempts WHERE school_id = ?", schoolId);
         jdbc.update("DELETE FROM activity_projects WHERE activity_id = ?", activityId);
         jdbc.update("DELETE FROM project_rule_versions WHERE id = ?", ruleVerId);
@@ -88,6 +90,15 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
         var count = jdbc.queryForObject("SELECT COUNT(*) FROM score_attempts WHERE student_id = ? AND activity_project_id = ? AND is_current_effective = true",
                 Integer.class, studentId, jdbc.queryForObject("SELECT activity_project_id FROM score_attempts WHERE id = ?", UUID.class, oldAttemptId));
         assertThat(count).isEqualTo(1);
+
+        var replacement = jdbc.queryForMap("SELECT id, replaces_id, score_status, is_current_effective, is_manual_makeup FROM score_attempts WHERE replaces_id = ?",
+                oldAttemptId);
+        assertThat(replacement.get("replaces_id")).isEqualTo(oldAttemptId);
+        assertThat(replacement.get("score_status")).isEqualTo("APPROVED");
+        assertThat(replacement.get("is_current_effective")).isEqualTo(true);
+        assertThat(replacement.get("is_manual_makeup")).isEqualTo(true);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_correction_records WHERE original_score_id = ?",
+                Integer.class, oldAttemptId)).isEqualTo(1);
     }
 
     @Test @DisplayName("transaction rollback: all state unchanged on failure")
@@ -104,6 +115,52 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
         var oldStatus = jdbc.queryForObject("SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", (rs, i) -> new Object[]{rs.getString("score_status"), rs.getBoolean("is_current_effective")}, oldAttemptId);
         assertThat(oldStatus[0]).isEqualTo("APPROVED");
         assertThat(oldStatus[1]).isEqualTo(true);
+    }
+
+    @Test @DisplayName("correction record failure rolls back score and appeal mutations")
+    void correctionRecordFailureRollsBackAllMutations() {
+        var tt = new TransactionTemplate(txManager);
+        assertThatThrownBy(() -> tt.executeWithoutResult(status ->
+                svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), null, enteredById)))
+                .isNotNull();
+
+        assertThat(jdbc.queryForObject("SELECT appeal_status FROM score_appeals WHERE id = ?", String.class, appealId))
+                .isEqualTo("PROCESSING");
+        assertThat(jdbc.queryForObject("SELECT score_status FROM score_attempts WHERE id = ?", String.class, oldAttemptId))
+                .isEqualTo("APPROVED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_attempts WHERE replaces_id = ?",
+                Integer.class, oldAttemptId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_correction_records WHERE original_score_id = ?",
+                Integer.class, oldAttemptId)).isZero();
+    }
+
+    @Test @DisplayName("correcting a non-current attempt replaces the prior current effective score")
+    void correctionOfNonCurrentAttemptStillMakesReplacementCurrent() {
+        UUID priorCurrentId = UUID.randomUUID();
+        jdbc.update("UPDATE score_attempts SET is_current_effective = false WHERE id = ?", oldAttemptId);
+        jdbc.update("""
+                INSERT INTO score_attempts(
+                    id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,
+                    score_value,is_current_effective,score_status,entered_by,version)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                """, priorCurrentId, schoolId, apId, studentId, 3, "INTEGER",
+                80, true, "APPROVED", enteredById, 1);
+
+        var tt = new TransactionTemplate(txManager);
+        tt.executeWithoutResult(status ->
+                svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), "fixed", enteredById));
+
+        assertThat(jdbc.queryForObject("SELECT score_status FROM score_attempts WHERE id = ?",
+                String.class, oldAttemptId)).isEqualTo("INVALIDATED");
+        assertThat(jdbc.queryForObject("SELECT is_current_effective FROM score_attempts WHERE id = ?",
+                Boolean.class, priorCurrentId)).isFalse();
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ? AND is_current_effective = true
+                """, Integer.class, studentId, apId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT is_current_effective FROM score_attempts WHERE replaces_id = ?
+                """, Boolean.class, oldAttemptId)).isTrue();
     }
 
     @Test @DisplayName("repeated request fails — no duplicate correction")

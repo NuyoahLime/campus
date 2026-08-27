@@ -4,6 +4,7 @@ import com.campusguinness.score.application.port.ScoreWriteContextPort;
 import com.campusguinness.score.application.service.SchoolAdminScoreDraftService;
 import com.campusguinness.score.application.service.SchoolAdminScoreLifecycleService;
 import com.campusguinness.score.application.service.SchoolAdminScoreReviewHistoryService;
+import com.campusguinness.score.application.service.EffectiveScoreApplicationService;
 import com.campusguinness.score.application.query.model.ScoreReviewHistoryEntry;
 import com.campusguinness.score.internal.domain.ScoreAttempt;
 import com.campusguinness.score.internal.domain.ScoreValue;
@@ -34,13 +35,16 @@ public class SchoolAdminScoreController {
     private final SchoolAdminScoreDraftService service;
     private final SchoolAdminScoreLifecycleService lifecycleService;
     private final SchoolAdminScoreReviewHistoryService reviewHistoryService;
+    private final EffectiveScoreApplicationService effectiveScoreService;
 
     public SchoolAdminScoreController(SchoolAdminScoreDraftService service,
                                       SchoolAdminScoreLifecycleService lifecycleService,
-                                      SchoolAdminScoreReviewHistoryService reviewHistoryService) {
+                                      SchoolAdminScoreReviewHistoryService reviewHistoryService,
+                                      EffectiveScoreApplicationService effectiveScoreService) {
         this.service = service;
         this.lifecycleService = lifecycleService;
         this.reviewHistoryService = reviewHistoryService;
+        this.effectiveScoreService = effectiveScoreService;
     }
 
     @GetMapping("/activities/{activityId}/scores")
@@ -103,6 +107,13 @@ public class SchoolAdminScoreController {
         return ScoreAttemptResponse.from(lifecycleService.approve(scoreAttemptId));
     }
 
+    @PostMapping("/score-attempts/{scoreAttemptId}/designate-effective")
+    public ScoreAttemptResponse designateEffective(@PathVariable UUID scoreAttemptId,
+                                                   @RequestBody(required = false) DesignateEffectiveRequest request) {
+        UUID expected = request == null ? null : request.expectedCurrentEffectiveAttemptId();
+        return ScoreAttemptResponse.from(effectiveScoreService.designate(scoreAttemptId, expected));
+    }
+
     @PostMapping("/score-attempts/{scoreAttemptId}/return-to-draft")
     public ScoreAttemptResponse returnToDraft(@PathVariable UUID scoreAttemptId) {
         return ScoreAttemptResponse.from(lifecycleService.returnToDraft(scoreAttemptId));
@@ -119,6 +130,9 @@ public class SchoolAdminScoreController {
 
     @JsonIgnoreProperties(ignoreUnknown = false)
     public record RejectScoreAttemptRequest(@jakarta.validation.constraints.NotBlank String reason) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+    public record DesignateEffectiveRequest(UUID expectedCurrentEffectiveAttemptId) {}
 
     public record ActivityScoresResponse(UUID activityId, String activityTitle, String activityStatus,
                                          List<ScoreAttemptResponse> scores) {}
@@ -139,7 +153,7 @@ public class SchoolAdminScoreController {
                                        String studentDisplay, String studentNumber, int attemptNumber,
                                        String status, String scoreStorageType, Long integerValue,
                                        BigDecimal decimalValue, Long durationMs, String grade,
-                                       Instant scoreBusinessTime) {
+                                       Instant scoreBusinessTime, boolean currentEffective) {
         static ScoreAttemptResponse from(ScoreAttempt score) {
             Long integerValue = score.scoreValue() instanceof ScoreValue.IntegerScore value ? value.value() : null;
             BigDecimal decimalValue = score.scoreValue() instanceof ScoreValue.DecimalScore value ? value.value() : null;
@@ -148,7 +162,7 @@ public class SchoolAdminScoreController {
             return new ScoreAttemptResponse(score.id().value(), null, null, score.activityProjectId(), null,
                     score.studentId(), null, null, score.attemptNumber(), score.status().name(),
                     score.scoreStorageType().name(), integerValue, decimalValue, durationMs, grade,
-                    score.scoreBusinessTime());
+                    score.scoreBusinessTime(), score.isCurrentEffective());
         }
 
         static ScoreAttemptResponse from(ScoreWriteContextPort.ScoreRow score) {
@@ -158,7 +172,8 @@ public class SchoolAdminScoreController {
             return new ScoreAttemptResponse(score.scoreAttemptId(), score.activityId(), score.activityTitle(),
                     score.activityProjectId(), score.projectName(), score.studentId(), score.studentDisplay(),
                     score.studentNumber(), score.attemptNumber(), score.status(), score.scoreStorageType(),
-                    integerValue, decimalValue, score.durationMs(), score.grade(), score.scoreBusinessTime());
+                    integerValue, decimalValue, score.durationMs(), score.grade(), score.scoreBusinessTime(),
+                    score.currentEffective());
         }
     }
 }

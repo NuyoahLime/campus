@@ -71,7 +71,7 @@ public final class ScoreAttempt {
     /** Create a new ScoreAttempt in DRAFT status. */
     public static ScoreAttempt create(Builder builder) {
         validate(builder);
-        return new ScoreAttempt(builder, AttemptStatus.DRAFT, false, null, false);
+        return new ScoreAttempt(builder, AttemptStatus.DRAFT, false, null, builder.manualMakeup);
     }
 
     /** Reconstitute from persistence — all fields explicit, no domain events. */
@@ -79,6 +79,9 @@ public final class ScoreAttempt {
             boolean currentEffective, Instant submittedAt, boolean manualMakeup) {
         validate(builder);
         if (status == null) throw new IllegalArgumentException("status required for reconstitute");
+        if (currentEffective && status != AttemptStatus.APPROVED) {
+            throw new IllegalArgumentException("current effective attempt must be APPROVED");
+        }
         return new ScoreAttempt(builder, status, currentEffective, submittedAt, manualMakeup);
     }
 
@@ -138,16 +141,6 @@ public final class ScoreAttempt {
         domainEvents.add(new ScoreAttemptSubmitted(id));
     }
 
-    /** CG-SCORE-002: PENDING_REVIEW → APPROVED. Sets isCurrentEffective=true. */
-    public void approve() {
-        if (status != AttemptStatus.PENDING_REVIEW) {
-            throw new InvalidScoreAttemptStateTransitionException(status, "approve");
-        }
-        this.status = AttemptStatus.APPROVED;
-        this.currentEffective = true;
-        domainEvents.add(new ScoreAttemptApproved(id));
-    }
-
     /** Review-only approval; effective score selection remains a separate concern. */
     public void approveForReview() {
         if (status != AttemptStatus.PENDING_REVIEW) {
@@ -155,6 +148,17 @@ public final class ScoreAttempt {
         }
         this.status = AttemptStatus.APPROVED;
         domainEvents.add(new ScoreAttemptApproved(id));
+    }
+
+    public void markCurrentEffective() {
+        if (status != AttemptStatus.APPROVED) {
+            throw new InvalidScoreAttemptStateTransitionException(status, "mark current effective");
+        }
+        this.currentEffective = true;
+    }
+
+    public void clearCurrentEffective() {
+        this.currentEffective = false;
     }
 
     /** CG-SCORE-003: PENDING_REVIEW → REJECTED. Reason is mandatory. */

@@ -323,8 +323,8 @@ class Stage21AuthorizationIT extends PostgreSqlIntegrationTestSupport {
                 activity, schoolId, "Stage21 Auth Activity " + label, "PUBLISHED", "PUBLIC", enteredBy);
         jdbc.update("INSERT INTO activity_projects(id,activity_id,project_id,rule_version_id) VALUES (?,?,?,?)",
                 activityProject, activity, project, rule);
-        jdbc.update("INSERT INTO score_attempts(id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,score_value,score_status,entered_by,score_business_time) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                score, schoolId, activityProject, studentId, 1, "INTEGER", BigDecimal.TEN, "APPROVED", enteredBy,
+        jdbc.update("INSERT INTO score_attempts(id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,score_value,score_status,is_current_effective,entered_by,score_business_time) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                score, schoolId, activityProject, studentId, 1, "INTEGER", BigDecimal.TEN, "APPROVED", true, enteredBy,
                 java.sql.Timestamp.from(Instant.now()));
         return score;
     }

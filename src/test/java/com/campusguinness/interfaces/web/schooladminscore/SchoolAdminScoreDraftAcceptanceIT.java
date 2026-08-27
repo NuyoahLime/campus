@@ -353,7 +353,7 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
     }
 
     @Test
-    void sameSchoolAdminCanApproveAndPersistReviewWithoutSelectingEffectiveScore() throws Exception {
+    void sameSchoolAdminCanApprovePersistReviewAndSelectBestEffectiveScore() throws Exception {
         RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
         UUID scoreId = createDraft(admin, studentA);
 
@@ -370,7 +370,7 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
         Map<String, Object> score = jdbc.queryForMap(
                 "SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", scoreId);
         assertThat(score.get("score_status")).isEqualTo("APPROVED");
-        assertThat(score.get("is_current_effective")).isEqualTo(false);
+        assertThat(score.get("is_current_effective")).isEqualTo(true);
 
         Map<String, Object> review = jdbc.queryForMap(
                 "SELECT reviewer_id, review_result, reviewed_at, review_comment, reject_reason "
@@ -488,9 +488,145 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
             Map<String, Object> score = jdbc.queryForMap(
                     "SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", scoreId);
             assertThat(score.get("score_status")).isEqualTo("APPROVED");
-            assertThat(score.get("is_current_effective")).isEqualTo(false);
+            assertThat(score.get("is_current_effective")).isEqualTo(true);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM score_review_records WHERE score_attempt_id = ?",
                     Integer.class, scoreId)).isEqualTo(1);
+        } finally {
+            cleanupCommittedFixture();
+        }
+    }
+
+    @Test
+    void concurrentBestApprovalsChooseTheDeterministicBestAndKeepOneEffective() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        UUID lower = createDraft(admin, studentA, 7L);
+        UUID higher = createDraft(admin, studentA, 9L);
+        submit(admin, lower);
+        submit(admin, higher);
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        var start = new CountDownLatch(1);
+        try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                var first = executor.submit(() -> approveStatus(admin, lower, start));
+                var second = executor.submit(() -> approveStatus(admin, higher, start));
+                start.countDown();
+                assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(200, 200);
+            }
+            assertThat(jdbc.queryForObject("""
+                    SELECT id FROM score_attempts
+                    WHERE activity_project_id = ? AND student_id = ? AND is_current_effective = true
+                    """, UUID.class, activityProjectA, studentA)).isEqualTo(higher);
+            assertThat(jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM score_attempts
+                    WHERE activity_project_id = ? AND student_id = ? AND is_current_effective = true
+                    """, Integer.class, activityProjectA, studentA)).isEqualTo(1);
+        } finally {
+            cleanupCommittedFixture();
+        }
+    }
+
+    @Test
+    void concurrentLastApprovalsChooseHighestAttemptNumber() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        jdbc.update("UPDATE project_rule_versions SET effective_score_rule = 'LAST' WHERE id = ?", ruleA);
+        UUID firstAttempt = createDraft(admin, studentA, 99L);
+        UUID lastAttempt = createDraft(admin, studentA, 1L);
+        submit(admin, firstAttempt);
+        submit(admin, lastAttempt);
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        var start = new CountDownLatch(1);
+        try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                var first = executor.submit(() -> approveStatus(admin, firstAttempt, start));
+                var second = executor.submit(() -> approveStatus(admin, lastAttempt, start));
+                start.countDown();
+                assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(200, 200);
+            }
+            assertThat(jdbc.queryForObject("""
+                    SELECT id FROM score_attempts
+                    WHERE activity_project_id = ? AND student_id = ? AND is_current_effective = true
+                    """, UUID.class, activityProjectA, studentA)).isEqualTo(lastAttempt);
+        } finally {
+            cleanupCommittedFixture();
+        }
+    }
+
+    @Test
+    void adminDesignatedEndpointRequiresCasAndSchoolAdminScope() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        jdbc.update("UPDATE project_rule_versions SET effective_score_rule = 'ADMIN_DESIGNATED' WHERE id = ?", ruleA);
+        UUID first = createDraft(admin, studentA, 7L);
+        UUID second = createDraft(admin, studentA, 9L);
+        submit(admin, first);
+        submit(admin, second);
+        approve(admin, first);
+        approve(admin, second);
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", first).with(csrf()))
+                .andExpect(status().isUnauthorized());
+        for (String role : List.of("STUDENT", "SUPER_ADMIN", "TEACHER")) {
+            mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", first)
+                            .with(principal(UUID.randomUUID(), null, null, role)).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"expectedCurrentEffectiveAttemptId\":null}"))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", first)
+                        .with(principal(adminB, schoolB, adminBMembership, "SCHOOL_ADMIN")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"expectedCurrentEffectiveAttemptId\":null}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCORE_SCOPE_DENIED"));
+
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", first)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"expectedCurrentEffectiveAttemptId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentEffective").value(true));
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", second)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedCurrentEffectiveAttemptId\":null}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORE_EFFECTIVE_CONFLICT"));
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", first)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedCurrentEffectiveAttemptId\":\"" + first + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentEffective").value(true));
+    }
+
+    @Test
+    void concurrentAdminDesignationUsesCasAndLeavesOneEffectiveScore() throws Exception {
+        RequestPostProcessor admin = principal(adminA, schoolA, adminAMembership, "SCHOOL_ADMIN");
+        jdbc.update("UPDATE project_rule_versions SET effective_score_rule = 'ADMIN_DESIGNATED' WHERE id = ?", ruleA);
+        UUID first = createDraft(admin, studentA, 7L);
+        UUID second = createDraft(admin, studentA, 9L);
+        submit(admin, first);
+        submit(admin, second);
+        approve(admin, first);
+        approve(admin, second);
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        var start = new CountDownLatch(1);
+        try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                var firstResult = executor.submit(() -> designateStatus(admin, first, null, start));
+                var secondResult = executor.submit(() -> designateStatus(admin, second, null, start));
+                start.countDown();
+                assertThat(List.of(firstResult.get(), secondResult.get())).containsExactlyInAnyOrder(200, 409);
+            }
+            assertThat(jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM score_attempts
+                    WHERE activity_project_id = ? AND student_id = ? AND is_current_effective = true
+                    """, Integer.class, activityProjectA, studentA)).isEqualTo(1);
         } finally {
             cleanupCommittedFixture();
         }
@@ -549,7 +685,7 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
         Map<String, Object> score = jdbc.queryForMap(
                 "SELECT score_status, is_current_effective FROM score_attempts WHERE id = ?", scoreId);
         assertThat(score.get("score_status")).isEqualTo("APPROVED");
-        assertThat(score.get("is_current_effective")).isEqualTo(false);
+        assertThat(score.get("is_current_effective")).isEqualTo(true);
     }
 
     @Test
@@ -613,6 +749,31 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
                         .with(admin).with(csrf())).andReturn().getResponse().getStatus();
     }
 
+    private int designateStatus(RequestPostProcessor admin, UUID scoreId, UUID expectedCurrentEffectiveAttemptId,
+                                CountDownLatch start) throws Exception {
+        start.await();
+        String expected = expectedCurrentEffectiveAttemptId == null
+                ? "null"
+                : "\"" + expectedCurrentEffectiveAttemptId + "\"";
+        return mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/designate-effective", scoreId)
+                        .with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedCurrentEffectiveAttemptId\":" + expected + "}"))
+                .andReturn().getResponse().getStatus();
+    }
+
+    private void submit(RequestPostProcessor admin, UUID scoreId) throws Exception {
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/submit", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    private void approve(RequestPostProcessor admin, UUID scoreId) throws Exception {
+        mvc.perform(post("/api/v1/school-admin/score-attempts/{id}/approve", scoreId)
+                        .with(admin).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
     private void cleanupCommittedFixture() {
         jdbc.update("DELETE FROM score_review_records WHERE score_attempt_id IN "
                 + "(SELECT id FROM score_attempts WHERE school_id IN (?, ?))", schoolA, schoolB);
@@ -636,10 +797,14 @@ class SchoolAdminScoreDraftAcceptanceIT extends PostgreSqlIntegrationTestSupport
     }
 
     private UUID createDraft(RequestPostProcessor admin, UUID studentId) throws Exception {
+        return createDraft(admin, studentId, 7L);
+    }
+
+    private UUID createDraft(RequestPostProcessor admin, UUID studentId, long integerValue) throws Exception {
         mvc.perform(post("/api/v1/school-admin/activity-projects/{id}/score-attempts", activityProjectA)
                         .with(admin).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(scoreCreateBody(studentId, 7L, Instant.parse("2026-08-25T01:00:00Z"))))
+                        .content(scoreCreateBody(studentId, integerValue, Instant.parse("2026-08-25T01:00:00Z"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"));
         return findScoreAttempt(activityProjectA, studentId);
