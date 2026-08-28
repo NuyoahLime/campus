@@ -1,7 +1,7 @@
 import { createWriteStream } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { ChildProcess, spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { FixtureState } from './fixture';
 
@@ -29,7 +29,7 @@ export type RuntimeStartOptions = {
 };
 
 function mavenCommand() {
-  return process.platform === 'win32' ? 'mvnw.cmd' : './mvnw';
+  return process.platform === 'win32' ? 'mvnw.cmd' : 'mvn';
 }
 
 function spawnLogged(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv) {
@@ -44,10 +44,18 @@ function spawnLogged(command: string, args: string[], cwd: string, env: NodeJS.P
     windowsHide: true,
     detached: process.platform !== 'win32'
   });
+  let spawnError: Error | undefined;
+  child.once('error', error => {
+    spawnError = error;
+  });
   const output = createWriteStream(logPath, { flags: 'a' });
   child.stdout?.pipe(output);
   child.stderr?.pipe(output);
-  return { child, logPath };
+  return {
+    child,
+    logPath,
+    getSpawnError: () => spawnError
+  };
 }
 
 async function run(command: string, args: string[], input?: string) {
@@ -81,14 +89,33 @@ async function waitFor(check: () => Promise<boolean>, label: string, timeoutMs =
   throw new Error(`Timed out waiting for ${label}`);
 }
 
-async function waitForHttp(url: string, label: string, timeoutMs?: number) {
+async function waitForHttp(
+  url: string,
+  label: string,
+  timeoutMs?: number,
+  monitoredProcess?: { child: ChildProcess; getSpawnError: () => Error | undefined }
+) {
+  let processExitObservedAt: number | undefined;
+  const processExitGraceMs = process.platform === 'win32' ? 30_000 : 0;
   await waitFor(async () => {
     try {
       const response = await fetch(url);
-      return response.status < 500;
+      if (response.status < 500) return true;
     } catch {
+      // Readiness is unavailable; inspect the monitored process below.
+    }
+    const spawnError = monitoredProcess?.getSpawnError();
+    if (spawnError) {
+      throw new Error(`BACKEND_PROCESS_EXITED_BEFORE_READINESS: ${spawnError.message}`);
+    }
+    if (monitoredProcess?.child.exitCode !== null || monitoredProcess?.child.signalCode !== null) {
+      processExitObservedAt ??= Date.now();
+      if (Date.now() - processExitObservedAt >= processExitGraceMs) {
+        throw new Error('BACKEND_PROCESS_EXITED_BEFORE_READINESS');
+      }
       return false;
     }
+    return false;
   }, label, timeoutMs);
 }
 
@@ -202,7 +229,7 @@ export async function startRuntime(options: RuntimeStartOptions = {}) {
   });
   state.backendPid = backend.child.pid ?? 0;
   await persistState();
-  await waitForHttp('http://127.0.0.1:8080/actuator/health', 'Spring Boot');
+  await waitForHttp('http://127.0.0.1:8080/actuator/health', 'Spring Boot', undefined, backend);
   const fixture = await seedDatabase();
   state.fixture = fixture;
   await persistState();

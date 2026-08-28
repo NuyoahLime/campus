@@ -20,8 +20,8 @@ export default defineConfig({
       ? { executablePath: process.env.STAGE26_CHROMIUM_PATH }
       : undefined,
     trace: 'off',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
+    screenshot: 'off',
+    video: 'off'
   },
   globalSetup: path.resolve(process.cwd(), 'e2e/support/global-setup.ts'),
   globalTeardown: path.resolve(process.cwd(), 'e2e/support/global-teardown.ts')

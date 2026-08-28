@@ -7,6 +7,7 @@ const candidates = [
 ];
 const workflowPath = path.resolve(process.cwd(), '..', '.github', 'workflows', 'stage26-e2e.yml');
 const forbiddenPath = /(?:^|[\\/])(trace(?:\.zip)?|.*\.trace|.*\.har|storage[-_]?state.*|.*\.env|.*credentials.*)(?:$|[\\/])/i;
+const forbiddenVisualPath = /\.(?:png|jpe?g|webp|gif|mp4|webm)$/i;
 const sensitivePatterns = [
   /(?:^|[^\w-])(?:JSESSIONID|SESSION|XSRF-TOKEN)\s*=/i,
   /\b(?:csrf(?:[-_ ]?token)?|xsrf[-_ ]?token)\s*[:=]\s*\S+/i,
@@ -44,6 +45,10 @@ const forbidden = files.filter(file => forbiddenPath.test(path.relative(process.
 if (forbidden.length) {
   throw new Error(`Forbidden E2E artifact files found: ${forbidden.join(', ')}`);
 }
+const visualArtifacts = files.filter(file => forbiddenVisualPath.test(file));
+if (visualArtifacts.length) {
+  throw new Error(`Screenshot/video E2E artifacts must not be uploaded: ${visualArtifacts.join(', ')}`);
+}
 
 for (const file of files) {
   const content = await fs.readFile(file);
@@ -59,4 +64,5 @@ console.log('UPLOAD_REQUIRES_GUARD_SUCCESS=YES');
 console.log('TRACE_FILES=0');
 console.log('HAR_FILES=0');
 console.log('STORAGE_STATE_FILES=0');
+console.log('SCREENSHOT_VIDEO_FILES=0');
 console.log('ARTIFACT_SECRET_SCAN=PASS');
