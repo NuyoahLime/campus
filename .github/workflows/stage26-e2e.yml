@@ -59,6 +59,10 @@ jobs:
         working-directory: frontend
         run: npm run e2e:startup-cleanup
 
+      - name: Verify process-tree cleanup
+        working-directory: frontend
+        run: npm run e2e:process-tree
+
       - name: Verify failed authenticated tests do not create traces
         working-directory: frontend
         run: npm run e2e:trace-guard
@@ -68,12 +72,13 @@ jobs:
         run: npm run e2e
 
       - name: Verify Stage26 evidence artifact safety
+        id: artifact_guard
         if: always()
         working-directory: frontend
         run: npm run e2e:artifact-guard
 
       - name: Upload Stage26 E2E evidence
-        if: always()
+        if: ${{ always() && steps.artifact_guard.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: stage26-e2e-${{ github.run_id }}-${{ github.run_attempt }}

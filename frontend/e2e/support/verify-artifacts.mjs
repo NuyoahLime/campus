@@ -5,6 +5,7 @@ const candidates = [
   path.resolve(process.cwd(), 'playwright-report'),
   path.resolve(process.cwd(), 'test-results', 'stage26-e2e-junit.xml')
 ];
+const workflowPath = path.resolve(process.cwd(), '..', '.github', 'workflows', 'stage26-e2e.yml');
 const forbiddenPath = /(?:^|[\\/])(trace(?:\.zip)?|.*\.trace|.*\.har|storage[-_]?state.*|.*\.env|.*credentials.*)(?:$|[\\/])/i;
 const sensitivePatterns = [
   /(?:^|[^\w-])(?:JSESSIONID|SESSION|XSRF-TOKEN)\s*=/i,
@@ -24,6 +25,20 @@ async function filesAt(target) {
   return nested.flat();
 }
 
+if (!existsSync(workflowPath)) {
+  throw new Error(`Stage26 workflow not found: ${workflowPath}`);
+}
+const workflow = await fs.readFile(workflowPath, 'utf8');
+if (!/id:\s*artifact_guard\b/.test(workflow)) {
+  throw new Error('Artifact guard step must expose id: artifact_guard.');
+}
+if (!/if:\s*\$\{\{\s*always\(\)\s*&&\s*steps\.artifact_guard\.outcome\s*==\s*['"]success['"]\s*\}\}/.test(workflow)) {
+  throw new Error('Artifact upload must require artifact_guard success.');
+}
+if (/frontend\/test-results\/\*\*\*/.test(workflow)) {
+  throw new Error('Workflow must not upload the broad frontend/test-results/** path.');
+}
+
 const files = (await Promise.all(candidates.map(filesAt))).flat();
 const forbidden = files.filter(file => forbiddenPath.test(path.relative(process.cwd(), file)));
 if (forbidden.length) {
@@ -40,6 +55,7 @@ for (const file of files) {
 }
 
 console.log(`ARTIFACT_ALLOWLIST=PASS files=${files.length}`);
+console.log('UPLOAD_REQUIRES_GUARD_SUCCESS=YES');
 console.log('TRACE_FILES=0');
 console.log('HAR_FILES=0');
 console.log('STORAGE_STATE_FILES=0');

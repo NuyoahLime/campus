@@ -12,7 +12,8 @@
     "e2e:headed": "playwright test --headed",
     "e2e:report": "playwright show-report",
     "e2e:startup-cleanup": "npx tsx e2e/support/startup-cleanup-verification.ts",
-    "e2e:trace-guard": "node e2e/support/verify-trace-off.mjs"
+    "e2e:trace-guard": "node e2e/support/verify-trace-off.mjs",
+    "e2e:process-tree": "npx tsx e2e/support/process-tree-cleanup-verification.ts"
   },
   "dependencies": {
     "pinia": "^3.0.3",

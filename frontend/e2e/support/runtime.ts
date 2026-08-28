@@ -41,7 +41,8 @@ function spawnLogged(command: string, args: string[], cwd: string, env: NodeJS.P
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
-    windowsHide: true
+    windowsHide: true,
+    detached: process.platform !== 'win32'
   });
   const output = createWriteStream(logPath, { flags: 'a' });
   child.stdout?.pipe(output);
@@ -102,16 +103,42 @@ async function seedDatabase() {
   return fixture;
 }
 
-async function stopProcess(pid: number | undefined) {
+function processExists(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processExists(pid)) return true;
+    await delay(100);
+  }
+  return !processExists(pid);
+}
+
+export async function terminateProcessTree(pid: number | undefined) {
   if (!pid) return;
   if (process.platform === 'win32') {
     await run('taskkill', ['/PID', String(pid), '/T', '/F']).catch(() => undefined);
   } else {
     try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
+      process.kill(-pid, 'SIGTERM');
+    } catch (error) {
       // Process may already have exited.
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return;
     }
+    if (await waitForProcessExit(pid, 5_000)) return;
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return;
+    }
+    await waitForProcessExit(pid, 2_000);
   }
 }
 
@@ -202,7 +229,7 @@ export async function stopRuntime() {
   } catch {
     // Setup may have failed before the state file was written.
   }
-  await stopProcess(state?.frontendPid);
-  await stopProcess(state?.backendPid);
+  await terminateProcessTree(state?.frontendPid);
+  await terminateProcessTree(state?.backendPid);
   await run('docker', ['rm', '-f', state?.dbContainer ?? dbContainer]).catch(() => undefined);
 }
