@@ -19,7 +19,7 @@ export default defineConfig({
     launchOptions: process.env.STAGE26_CHROMIUM_PATH
       ? { executablePath: process.env.STAGE26_CHROMIUM_PATH }
       : undefined,
-    trace: 'retain-on-failure',
+    trace: 'off',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
   },

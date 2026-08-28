@@ -1,0 +1,46 @@
+import { existsSync, promises as fs } from 'node:fs';
+import path from 'node:path';
+
+const candidates = [
+  path.resolve(process.cwd(), 'playwright-report'),
+  path.resolve(process.cwd(), 'test-results', 'stage26-e2e-junit.xml')
+];
+const forbiddenPath = /(?:^|[\\/])(trace(?:\.zip)?|.*\.trace|.*\.har|storage[-_]?state.*|.*\.env|.*credentials.*)(?:$|[\\/])/i;
+const sensitivePatterns = [
+  /(?:^|[^\w-])(?:JSESSIONID|SESSION|XSRF-TOKEN)\s*=/i,
+  /\b(?:csrf(?:[-_ ]?token)?|xsrf[-_ ]?token)\s*[:=]\s*\S+/i,
+  /\b(?:cookie|set-cookie)\s*:/i,
+  /\bauthorization\s*:\s*(?:bearer|basic)\b/i,
+  /stage26-e2e-password/i,
+  /\b(?:db_password|database_password)\b\s*[:=]\s*\S+/i
+];
+
+async function filesAt(target) {
+  if (!existsSync(target)) return [];
+  const entry = await fs.stat(target);
+  if (entry.isFile()) return [target];
+  const entries = await fs.readdir(target, { withFileTypes: true });
+  const nested = await Promise.all(entries.map(entry => filesAt(path.join(target, entry.name))));
+  return nested.flat();
+}
+
+const files = (await Promise.all(candidates.map(filesAt))).flat();
+const forbidden = files.filter(file => forbiddenPath.test(path.relative(process.cwd(), file)));
+if (forbidden.length) {
+  throw new Error(`Forbidden E2E artifact files found: ${forbidden.join(', ')}`);
+}
+
+for (const file of files) {
+  const content = await fs.readFile(file);
+  const text = content.toString('utf8');
+  const matching = sensitivePatterns.find(pattern => pattern.test(text));
+  if (matching) {
+    throw new Error(`Sensitive E2E artifact content found in ${file}: ${matching}`);
+  }
+}
+
+console.log(`ARTIFACT_ALLOWLIST=PASS files=${files.length}`);
+console.log('TRACE_FILES=0');
+console.log('HAR_FILES=0');
+console.log('STORAGE_STATE_FILES=0');
+console.log('ARTIFACT_SECRET_SCAN=PASS');

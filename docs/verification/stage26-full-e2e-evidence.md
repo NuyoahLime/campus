@@ -15,7 +15,7 @@ This document describes the reproducible Full E2E runtime for the sealed Stage26
 - Node CI baseline: Node `20`
 - Last verified local toolchain: Node `24.19.0`, npm `11.17.0`, Playwright `1.62.1`, Chromium `140.0.7339.16`
 
-The runtime is started and stopped by `frontend/e2e/support/runtime.ts`. It removes only its own named PostgreSQL container and child processes. Existing local validation artifacts are preserved.
+The runtime is started and stopped by `frontend/e2e/support/runtime.ts`. It registers the PostgreSQL container and each child PID immediately after creation, then uses independent best-effort cleanup for frontend, backend, and PostgreSQL if startup fails. Existing local validation artifacts are preserved.
 
 ## Evidence Classes
 
@@ -38,16 +38,17 @@ API and PostgreSQL evidence must not be reported as Browser evidence.
 - Stale lifecycle submit returns a real `409` and refreshes the visible status
 - Unauthenticated School Admin route redirects to login
 - Student current-score list and detail
-- Approved non-effective score remains hidden
-- BEST representative visibility
-- Desktop and 390px mobile action reachability
+- BEST selection through real create, submit, and approve operations: `10` becomes non-effective after `20` is approved
+- LAST selection through real create, submit, and approve operations: attempt `#2 = 1` becomes effective even though attempt `#1 = 100` has a later business time
+- Approved non-effective scores remain hidden from the Student UI
+- Desktop and 390px mobile reject/history dialog reachability with no blocking page-level horizontal overflow
 
 ## API Scenarios
 
 - ADMIN_DESIGNATED selection and stale CAS `409`
 - Review-only approval leaves `currentEffective` false for ADMIN_DESIGNATED
-- Cross-school read/mutation denial
-- Anonymous, Student, Super Admin, and historical Teacher denial
+- Cross-school detail, patch, submit, reject, approve, review-history, return-to-draft, and designation denial
+- Anonymous, Student, Super Admin, inactive School Admin, ambiguous School Admin membership, and historical Teacher denial
 - Non-participant score creation rejection
 
 Teacher remains a historical negative fixture only. It is not granted a runtime authority.
@@ -64,16 +65,21 @@ The E2E backend child process removes the host `DEBUG` environment variable and 
 
 ## Artifacts
 
-Playwright HTML/JUnit reports, failure screenshots, traces, videos, runtime logs, and fixture state are written below ignored `frontend/playwright-report` and `frontend/test-results` paths. CI uploads the report paths with a 14-day retention period.
+Playwright tracing is disabled (`trace: 'off'`) for authenticated Stage26 E2E. A deliberately failing authenticated browser test verifies that no trace, HAR, or storage-state artifact is generated.
+
+CI uploads only an explicit allowlist: the Playwright HTML report and Stage26 JUnit XML. It does not upload `frontend/test-results/**`, runtime logs, fixture state, screenshots, videos, traces, HAR files, storage state, `.env`, or credentials. Before upload, `npm run e2e:artifact-guard` fails on trace/HAR/storage-state paths and scans the actual upload candidates for session, CSRF, cookie, Authorization, fixture-password, and database-password content.
 
 ## Local Execution
 
-The local E2E command runs eight serial Playwright tests against a fresh containerized database.
+The local E2E command runs nine serial Playwright tests against a fresh containerized database.
 
 - Browser tests: 5
-- API E2E tests: 3
+- API E2E tests: 4
 - Last verified local command: `STAGE26_CHROMIUM_PATH=<local Chromium> npm run e2e`
-- Result: 8 passed, 0 failed, 0 retries
+- Result: two consecutive runs, each 9 passed, 0 failed, 0 retries
+- Startup-failure cleanup: `npm run e2e:startup-cleanup` passed with no orphan backend, frontend, or PostgreSQL
+- Trace guard: `npm run e2e:trace-guard` passed with 0 trace/HAR/storage-state artifacts
+- Artifact guard: `npm run e2e:artifact-guard` passed
 - Backend regression: `mvn clean verify` passed
 - Frontend regression: `npm run build` passed
 - Business validator: passed with 0 errors

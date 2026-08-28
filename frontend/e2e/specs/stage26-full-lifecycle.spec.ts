@@ -123,8 +123,12 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     await row.locator('button').first().click();
     const history = page.locator('.score-review-history-modal');
     await expect(history.locator('.score-review-entry')).toHaveCount(1);
+    await expect(history.locator('[data-status="REJECTED"]')).toBeVisible();
     await expect(history).toContainText('e2e-admin-a');
     await expect(history).toContainText('Needs evidence');
+    const rejectedTime = await history.locator('time').getAttribute('datetime');
+    expect(rejectedTime).not.toBeNull();
+    expect(Number.isNaN(Date.parse(rejectedTime!))).toBeFalsy();
     await history.locator('.project-modal-actions button').click();
 
     await row.locator('button').nth(1).click();
@@ -144,6 +148,11 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     const entries = page.locator('.score-review-history-modal .score-review-entry');
     await expect(entries.nth(0)).toContainText('Needs evidence');
     await expect(entries.nth(1)).toContainText('e2e-admin-a');
+    await expect(entries.nth(0).locator('[data-status="REJECTED"]')).toBeVisible();
+    await expect(entries.nth(1).locator('[data-status="APPROVED"]')).toBeVisible();
+    const approvedTime = await entries.nth(1).locator('time').getAttribute('datetime');
+    expect(approvedTime).not.toBeNull();
+    expect(Number.isNaN(Date.parse(approvedTime!))).toBeFalsy();
     await page.locator('.score-review-history-modal .project-modal-actions button').click();
   });
 
@@ -203,7 +212,7 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
       .locator('[data-status="PENDING_REVIEW"]')).toBeVisible();
   });
 
-  test('student sees only current effective scores and mobile score actions remain reachable', async ({ page }) => {
+  test('student sees only current effective scores and mobile review controls remain reachable', async ({ page }) => {
     const ids = await fixture();
     await loginUi(page, actors.studentA);
     await page.goto('/student/scores');
@@ -211,14 +220,13 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
       .filter({ hasText: 'E2E Best Project' }).first();
     const last = page.locator('table.student-score-table tbody tr')
       .filter({ hasText: 'E2E Last Project' }).first();
-    await expect(best.locator('td').nth(2).locator('strong')).toHaveText('20 points');
-    await expect(last.locator('td').nth(2).locator('strong')).toHaveText('7 points');
+    await expect(best).toContainText('20 points');
+    await expect(best).not.toContainText('10 points');
+    await expect(last).toContainText('1 points');
+    await expect(last).not.toContainText('100 points');
     await best.getByRole('link').click();
     await expect(page).toHaveURL(/\/student\/scores\//);
     await expect(page.locator('body')).toContainText('E2E Best Project');
-
-    await page.goto(`/student/scores/${ids.bestOldAttempt}`);
-    await expect(page.locator('.project-state-error')).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.context().clearCookies();
@@ -226,15 +234,45 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     await expect(page).toHaveURL(/\/login(?:$|\?)/);
     await loginUi(page, actors.schoolAdminA);
     await page.goto(`/school-admin/activities/${ids.activityLifecycle}/scores`);
-    const create = page.locator('table.score-table').first().locator('tbody tr')
-      .filter({ hasText: 'E2E Empty History Project' }).first().locator('button').first();
+    const candidate = page.locator('table.score-table').first().locator('tbody tr')
+      .filter({ hasText: 'E2E Empty History Project' }).first();
+    const create = candidate.locator('button').first();
     await expect(create).toBeVisible();
     const tableWrap = create.locator('xpath=ancestor::div[contains(@class, "project-admin-table-wrap")]');
-    expect(await tableWrap.evaluate(element => element.scrollWidth > element.clientWidth)).toBeTruthy();
     await tableWrap.evaluate(element => { element.scrollLeft = element.scrollWidth; });
     const box = await create.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+
+    await create.click();
+    await saveDraft(page, '8');
+    let mobileRow = scoreRow(page, 'E2E Empty History Project').filter({ hasText: '8' }).first();
+    await mobileRow.locator('button.primary-button').click();
+    const lifecycle = page.getByRole('dialog');
+    await expect(lifecycle).toBeVisible();
+    await expect(lifecycle.getByRole('button').last()).toBeVisible();
+    await lifecycle.getByRole('button').last().click();
+    mobileRow = scoreRow(page, 'E2E Empty History Project').filter({ hasText: '8' }).first();
+    await expect(mobileRow.locator('[data-status="PENDING_REVIEW"]')).toBeVisible();
+
+    await mobileRow.locator('button.danger-outline').click();
+    await expect(lifecycle).toBeVisible();
+    const rejectInput = lifecycle.locator('textarea');
+    await expect(rejectInput).toBeVisible();
+    await rejectInput.fill('Mobile review reason');
+    await expect(lifecycle.getByRole('button').last()).toBeVisible();
+    await lifecycle.getByRole('button').last().click();
+    await expect(lifecycle).toHaveCount(0);
+
+    mobileRow = scoreRow(page, 'E2E Empty History Project').filter({ hasText: '8' }).first();
+    await expect(mobileRow.locator('[data-status="REJECTED"]')).toBeVisible();
+    await mobileRow.locator('button.secondary-button').first().click();
+    const history = page.getByRole('dialog');
+    await expect(history).toBeVisible();
+    await expect(history).toContainText('Mobile review reason');
+    await history.getByRole('button').click();
+    await expect(history).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
   });
 });

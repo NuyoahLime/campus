@@ -3,6 +3,8 @@ export const E2E_PASSWORD = 'password';
 export const actors = {
   schoolAdminA: 'e2e-admin-a',
   schoolAdminB: 'e2e-admin-b',
+  inactiveSchoolAdmin: 'e2e-admin-inactive',
+  ambiguousSchoolAdmin: 'e2e-admin-ambiguous',
   studentA: 'e2e-student-a',
   studentB: 'e2e-student-b',
   studentOtherSchool: 'e2e-student-other-school',
@@ -13,6 +15,7 @@ export const actors = {
 export type FixtureState = {
   schoolA: string;
   schoolB: string;
+  studentA: string;
   activityLifecycle: string;
   activityBest: string;
   activityLast: string;
@@ -32,10 +35,6 @@ export type FixtureState = {
   designatedActivityProject: string;
   apiActivityProject: string;
   otherSchoolActivityProject: string;
-  bestOldAttempt: string;
-  bestCurrentAttempt: string;
-  lastOldAttempt: string;
-  lastCurrentAttempt: string;
   designatedFirstAttempt: string;
   designatedSecondAttempt: string;
   apiPendingAttempt: string;

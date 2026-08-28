@@ -8,12 +8,17 @@
 \set student_other '20000000-0000-0000-0000-000000000005'
 \set super_admin '20000000-0000-0000-0000-000000000006'
 \set teacher '20000000-0000-0000-0000-000000000007'
+\set inactive_admin '20000000-0000-0000-0000-000000000008'
+\set ambiguous_admin '20000000-0000-0000-0000-000000000009'
 \set admin_a_membership '30000000-0000-0000-0000-000000000001'
 \set admin_b_membership '30000000-0000-0000-0000-000000000002'
 \set student_a_membership '30000000-0000-0000-0000-000000000003'
 \set student_b_membership '30000000-0000-0000-0000-000000000004'
 \set student_other_membership '30000000-0000-0000-0000-000000000005'
 \set teacher_membership '30000000-0000-0000-0000-000000000006'
+\set inactive_admin_membership '30000000-0000-0000-0000-000000000007'
+\set ambiguous_admin_a_membership '30000000-0000-0000-0000-000000000008'
+\set ambiguous_admin_b_membership '30000000-0000-0000-0000-000000000009'
 \set lifecycle_project '40000000-0000-0000-0000-000000000001'
 \set empty_project '40000000-0000-0000-0000-000000000002'
 \set best_project '40000000-0000-0000-0000-000000000003'
@@ -41,10 +46,6 @@
 \set designated_ap '70000000-0000-0000-0000-000000000005'
 \set api_ap '70000000-0000-0000-0000-000000000006'
 \set other_ap '70000000-0000-0000-0000-000000000007'
-\set best_old '80000000-0000-0000-0000-000000000001'
-\set best_current '80000000-0000-0000-0000-000000000002'
-\set last_old '80000000-0000-0000-0000-000000000003'
-\set last_current '80000000-0000-0000-0000-000000000004'
 \set designated_first '80000000-0000-0000-0000-000000000005'
 \set designated_second '80000000-0000-0000-0000-000000000006'
 \set api_pending '80000000-0000-0000-0000-000000000007'
@@ -57,7 +58,9 @@ INSERT INTO users(id, username, password_hash, account_status, platform_role) VA
 (:'student_b', 'e2e-student-b', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', NULL),
 (:'student_other', 'e2e-student-other-school', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', NULL),
 (:'super_admin', 'e2e-super-admin', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', 'SUPER_ADMIN'),
-(:'teacher', 'e2e-teacher', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', NULL);
+(:'teacher', 'e2e-teacher', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', NULL),
+(:'inactive_admin', 'e2e-admin-inactive', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', NULL),
+(:'ambiguous_admin', 'e2e-admin-ambiguous', '$2b$12$uE94zT9u/dVTn08W8Zu2.u0NOffjc5TyXh4qsauPzXV2duiKgsJsq', 'NORMAL', NULL);
 
 INSERT INTO schools(id, name, unified_code_type, unified_code, internal_code, school_type, region, address, contact_name, contact_phone, contact_email, school_status) VALUES
 (:'school_a', 'E2E School A', 'USCC', 'E2E-SCHOOL-A', 'E2E-A', 'UNIVERSITY', 'E2E', 'E2E', 'E2E', '10000000000', 'a@example.test', 'NORMAL'),
@@ -69,7 +72,10 @@ INSERT INTO school_memberships(id, user_id, school_id, role_in_school, status) V
 (:'student_a_membership', :'student_a', :'school_a', 'STUDENT', 'ACTIVE'),
 (:'student_b_membership', :'student_b', :'school_a', 'STUDENT', 'ACTIVE'),
 (:'student_other_membership', :'student_other', :'school_b', 'STUDENT', 'ACTIVE'),
-(:'teacher_membership', :'teacher', :'school_a', 'TEACHER', 'ACTIVE');
+(:'teacher_membership', :'teacher', :'school_a', 'TEACHER', 'ACTIVE'),
+(:'inactive_admin_membership', :'inactive_admin', :'school_a', 'SCHOOL_ADMIN', 'ENDED'),
+(:'ambiguous_admin_a_membership', :'ambiguous_admin', :'school_a', 'SCHOOL_ADMIN', 'ACTIVE'),
+(:'ambiguous_admin_b_membership', :'ambiguous_admin', :'school_b', 'SCHOOL_ADMIN', 'ACTIVE');
 
 INSERT INTO student_profiles(id, membership_id, grade, class_name, student_number) VALUES
 ('31000000-0000-0000-0000-000000000001', :'student_a_membership', '2026', 'E2E-A', 'E2E-STUDENT-A'),
@@ -132,10 +138,6 @@ INSERT INTO activity_participants(id, activity_id, student_membership_id) VALUES
 ('71000000-0000-0000-0000-000000000106', :'activity_other', :'student_other_membership');
 
 INSERT INTO score_attempts(id, school_id, activity_project_id, student_id, attempt_number, score_storage_type, score_value, score_status, is_current_effective, entered_by, score_business_time) VALUES
-(:'best_old', :'school_a', :'best_ap', :'student_a', 1, 'INTEGER', 10, 'APPROVED', false, :'admin_a', now() - interval '2 minutes'),
-(:'best_current', :'school_a', :'best_ap', :'student_a', 2, 'INTEGER', 20, 'APPROVED', true, :'admin_a', now() - interval '1 minutes'),
-(:'last_old', :'school_a', :'last_ap', :'student_a', 1, 'INTEGER', 5, 'APPROVED', false, :'admin_a', now() - interval '2 minutes'),
-(:'last_current', :'school_a', :'last_ap', :'student_a', 2, 'INTEGER', 7, 'APPROVED', true, :'admin_a', now() - interval '1 minutes'),
 (:'designated_first', :'school_a', :'designated_ap', :'student_a', 1, 'INTEGER', 30, 'APPROVED', false, :'admin_a', now() - interval '2 minutes'),
 (:'designated_second', :'school_a', :'designated_ap', :'student_a', 2, 'INTEGER', 40, 'APPROVED', false, :'admin_a', now() - interval '1 minutes'),
 (:'api_pending', :'school_a', :'api_ap', :'student_a', 1, 'INTEGER', 12, 'PENDING_REVIEW', false, :'admin_a', now()),
@@ -143,6 +145,7 @@ INSERT INTO score_attempts(id, school_id, activity_project_id, student_id, attem
 
 SELECT 'FIXTURE_STATE=' || json_build_object(
   'schoolA', :'school_a', 'schoolB', :'school_b',
+  'studentA', :'student_a',
   'activityLifecycle', :'activity_lifecycle', 'activityBest', :'activity_best',
   'activityLast', :'activity_last', 'activityAdminDesignated', :'activity_designated',
   'activityOtherSchool', :'activity_other', 'activityApi', :'activity_api',
@@ -152,8 +155,6 @@ SELECT 'FIXTURE_STATE=' || json_build_object(
   'emptyHistoryActivityProject', :'empty_ap', 'bestActivityProject', :'best_ap',
   'lastActivityProject', :'last_ap', 'designatedActivityProject', :'designated_ap',
   'apiActivityProject', :'api_ap', 'otherSchoolActivityProject', :'other_ap',
-  'bestOldAttempt', :'best_old', 'bestCurrentAttempt', :'best_current',
-  'lastOldAttempt', :'last_old', 'lastCurrentAttempt', :'last_current',
   'designatedFirstAttempt', :'designated_first', 'designatedSecondAttempt', :'designated_second',
   'apiPendingAttempt', :'api_pending', 'otherSchoolAttempt', :'other_attempt'
 )::text;

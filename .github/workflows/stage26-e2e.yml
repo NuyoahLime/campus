@@ -55,9 +55,22 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Verify startup-failure cleanup
+        working-directory: frontend
+        run: npm run e2e:startup-cleanup
+
+      - name: Verify failed authenticated tests do not create traces
+        working-directory: frontend
+        run: npm run e2e:trace-guard
+
       - name: Run Stage26 Full E2E
         working-directory: frontend
         run: npm run e2e
+
+      - name: Verify Stage26 evidence artifact safety
+        if: always()
+        working-directory: frontend
+        run: npm run e2e:artifact-guard
 
       - name: Upload Stage26 E2E evidence
         if: always()
@@ -66,6 +79,6 @@ jobs:
           name: stage26-e2e-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             frontend/playwright-report/**
-            frontend/test-results/**
+            frontend/test-results/stage26-e2e-junit.xml
           if-no-files-found: ignore
           retention-days: 14

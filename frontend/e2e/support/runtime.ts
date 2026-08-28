@@ -18,7 +18,14 @@ type RuntimeState = {
   dbPort: number;
   backendPid: number;
   frontendPid: number;
-  fixture: FixtureState;
+  fixture?: FixtureState;
+};
+
+export type RuntimeStartOptions = {
+  frontendCommand?: string;
+  frontendArgs?: string[];
+  frontendUrl?: string;
+  frontendStartupTimeoutMs?: number;
 };
 
 function mavenCommand() {
@@ -73,7 +80,7 @@ async function waitFor(check: () => Promise<boolean>, label: string, timeoutMs =
   throw new Error(`Timed out waiting for ${label}`);
 }
 
-async function waitForHttp(url: string, label: string) {
+async function waitForHttp(url: string, label: string, timeoutMs?: number) {
   await waitFor(async () => {
     try {
       const response = await fetch(url);
@@ -81,7 +88,7 @@ async function waitForHttp(url: string, label: string) {
     } catch {
       return false;
     }
-  }, label);
+  }, label, timeoutMs);
 }
 
 async function seedDatabase() {
@@ -108,10 +115,21 @@ async function stopProcess(pid: number | undefined) {
   }
 }
 
-export async function startRuntime() {
+export async function startRuntime(options: RuntimeStartOptions = {}) {
   const { DEBUG: _debug, ...runtimeEnvironment } = process.env;
   await fs.rm(runtimeDir, { recursive: true, force: true });
   await fs.mkdir(runtimeDir, { recursive: true });
+  await fs.rm(runtimeFile, { force: true });
+  const state: RuntimeState = {
+    dbContainer,
+    dbPort: 0,
+    backendPid: 0,
+    frontendPid: 0
+  };
+  const persistState = () => fs.writeFile(runtimeFile, JSON.stringify(state, null, 2));
+  let started = false;
+
+  try {
   await run('docker', ['rm', '-f', dbContainer]).catch(() => undefined);
   await run('docker', [
     'run', '-d', '--name', dbContainer,
@@ -121,9 +139,12 @@ export async function startRuntime() {
     '-p', '127.0.0.1::5432',
     'postgres:18.4'
   ]);
+  await persistState();
   const portText = await run('docker', ['port', dbContainer, '5432/tcp']);
   const dbPort = Number(portText.match(/:(\d+)\s*$/m)?.[1]);
   if (!Number.isInteger(dbPort)) throw new Error(`Could not parse PostgreSQL port: ${portText}`);
+  state.dbPort = dbPort;
+  await persistState();
   await waitFor(async () => {
     const output = await run('docker', [
       'exec', dbContainer, 'pg_isready', '-U', dbUser, '-d', dbName
@@ -152,23 +173,26 @@ export async function startRuntime() {
     DB_USERNAME: dbUser,
     DB_PASSWORD: dbPassword
   });
+  state.backendPid = backend.child.pid ?? 0;
+  await persistState();
   await waitForHttp('http://127.0.0.1:8080/actuator/health', 'Spring Boot');
   const fixture = await seedDatabase();
+  state.fixture = fixture;
+  await persistState();
   const frontend = spawnLogged(
-    process.platform === 'win32' ? 'npm.cmd' : 'npm',
-    ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173'],
+    options.frontendCommand ?? (process.platform === 'win32' ? 'npm.cmd' : 'npm'),
+    options.frontendArgs ?? ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173'],
     process.cwd(),
     process.env
   );
-  await waitForHttp('http://127.0.0.1:5173/', 'Vite');
-
-  await fs.writeFile(runtimeFile, JSON.stringify({
-    dbContainer,
-    dbPort,
-    backendPid: backend.child.pid ?? 0,
-    frontendPid: frontend.child.pid ?? 0,
-    fixture
-  } satisfies RuntimeState, null, 2));
+  state.frontendPid = frontend.child.pid ?? 0;
+  await persistState();
+  await waitForHttp(options.frontendUrl ?? 'http://127.0.0.1:5173/', 'Vite',
+    options.frontendStartupTimeoutMs);
+  started = true;
+  } finally {
+    if (!started) await stopRuntime();
+  }
 }
 
 export async function stopRuntime() {
