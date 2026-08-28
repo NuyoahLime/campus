@@ -108,7 +108,10 @@ async function waitForHttp(
     if (spawnError) {
       throw new Error(`BACKEND_PROCESS_EXITED_BEFORE_READINESS: ${spawnError.message}`);
     }
-    if (monitoredProcess?.child.exitCode !== null || monitoredProcess?.child.signalCode !== null) {
+    const childPid = monitoredProcess?.child.pid;
+    const backendGroupStillRunning = process.platform !== 'win32' && childPid && processGroupExists(childPid);
+    if (monitoredProcess && !backendGroupStillRunning
+      && (monitoredProcess.child.exitCode !== null || monitoredProcess.child.signalCode !== null)) {
       processExitObservedAt ??= Date.now();
       if (Date.now() - processExitObservedAt >= processExitGraceMs) {
         throw new Error('BACKEND_PROCESS_EXITED_BEFORE_READINESS');
@@ -133,6 +136,15 @@ async function seedDatabase() {
 function processExists(pid: number) {
   try {
     process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+function processGroupExists(pid: number) {
+  try {
+    process.kill(-pid, 0);
     return true;
   } catch (error) {
     return (error as NodeJS.ErrnoException).code !== 'ESRCH';
