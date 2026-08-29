@@ -40,7 +40,7 @@ goto fail
 @REM Setup the command line
 set "MAVEN_CMD_LINE_ARGS=%*"
 
-%JAVA_EXE% ^
+"%JAVA_EXE%" ^
   %DEFAULT_JVM_OPTS% ^
   %JAVA_OPTS% ^
   %MAVEN_OPTS% ^
