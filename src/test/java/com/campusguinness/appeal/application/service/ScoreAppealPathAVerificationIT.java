@@ -263,6 +263,65 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
                 """, Integer.class, studentId, apId)).isEqualTo(2);
     }
 
+    @Test @DisplayName("concurrent corrections serialize and leave one complete correction")
+    void concurrentCorrectionsDoNotCreateDuplicateReplacementState() throws Exception {
+        UUID secondAppealId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO score_appeals(
+                    id,school_id,score_attempt_id,student_id,appeal_type,appeal_reason,
+                    appeal_status,handler_id,version)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """, secondAppealId, schoolId, oldAttemptId, studentId, "SCORE",
+                "same score issue", "PROCESSING", handlerId, 1);
+
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Throwable> first = executor.submit(() -> runConcurrent(ready, start, () -> {
+                new TransactionTemplate(txManager).executeWithoutResult(status ->
+                        svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), "fixed-one", enteredById));
+            }));
+            Future<Throwable> second = executor.submit(() -> runConcurrent(ready, start, () -> {
+                new TransactionTemplate(txManager).executeWithoutResult(status ->
+                        svc.correctAndResolve(secondAppealId, new ScoreValue.IntegerScore(300), "fixed-two", enteredById));
+            }));
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            Throwable firstError = first.get(15, TimeUnit.SECONDS);
+            Throwable secondError = second.get(15, TimeUnit.SECONDS);
+            assertThat(firstError == null ^ secondError == null).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ?
+                """, Integer.class, studentId, apId)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ? AND is_current_effective = true
+                """, Integer.class, studentId, apId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_correction_records
+                WHERE original_score_id = ?
+                """, Integer.class, oldAttemptId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_appeals
+                WHERE school_id = ? AND appeal_status IN ('RESOLVED', 'PROCESSING')
+                """, Integer.class, schoolId)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_appeals
+                WHERE school_id = ? AND appeal_status = 'RESOLVED'
+                """, Integer.class, schoolId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_appeals
+                WHERE school_id = ? AND appeal_status = 'PROCESSING'
+                """, Integer.class, schoolId)).isEqualTo(1);
+    }
+
     private Throwable runConcurrent(CountDownLatch ready, CountDownLatch start, Runnable operation) {
         try {
             ready.countDown();
