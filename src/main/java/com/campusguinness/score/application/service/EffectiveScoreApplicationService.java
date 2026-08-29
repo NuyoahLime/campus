@@ -117,20 +117,31 @@ public class EffectiveScoreApplicationService {
         return target;
     }
 
-    /** Atomically approves a correction replacement and makes it effective. */
-    public ScoreAttempt replaceForCorrection(ScoreAttempt oldAttempt, ScoreAttempt replacement,
+    /** Atomically allocates, approves, and makes a correction replacement effective. */
+    public ScoreAttempt replaceForCorrection(ScoreAttempt oldAttempt, ScoreValue correctedValue,
                                              String reason, UUID correctedBy) {
         lock(oldAttempt.activityProjectId());
         ScoreAttempt authoritativeOld = reloadTarget(oldAttempt.id().value());
         if (authoritativeOld.status() != AttemptStatus.APPROVED) {
             throw conflict("SCORE_INVALID_STATE_TRANSITION", "Only approved attempts can be corrected.");
         }
-        if (!authoritativeOld.schoolId().equals(replacement.schoolId())
-                || !authoritativeOld.studentId().equals(replacement.studentId())
-                || !authoritativeOld.activityProjectId().equals(replacement.activityProjectId())
-                || !authoritativeOld.id().value().equals(replacement.replacesId())) {
-            throw conflict("SCORE_CORRECTION_INVALID", "Correction replacement does not match the original score.");
-        }
+        int nextAttemptNumber = loadScope(authoritativeOld.studentId(), authoritativeOld.activityProjectId()).stream()
+                .mapToInt(ScoreAttempt::attemptNumber)
+                .max()
+                .orElse(0) + 1;
+        ScoreAttempt replacement = ScoreAttempt.create(new ScoreAttempt.Builder()
+                .id(new ScoreAttemptId(UUID.randomUUID()))
+                .schoolId(authoritativeOld.schoolId())
+                .activityProjectId(authoritativeOld.activityProjectId())
+                .studentId(authoritativeOld.studentId())
+                .attemptNumber(nextAttemptNumber)
+                .scoreStorageType(authoritativeOld.scoreStorageType())
+                .scoreValue(correctedValue)
+                .scoreBusinessTime(authoritativeOld.scoreBusinessTime())
+                .timeSource(authoritativeOld.timeSource())
+                .replacesId(authoritativeOld.id().value())
+                .enteredBy(correctedBy)
+                .manualMakeup(true));
         try {
             replacement.submit();
             replacement.approveForReview();

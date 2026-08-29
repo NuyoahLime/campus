@@ -80,7 +80,10 @@ class ScoreWriteContextAdapter implements ScoreWriteContextPort {
     }
 
     @Override
+    @Transactional
     public int nextAttemptNumber(UUID activityProjectId, UUID studentId) {
+        jdbc.queryForObject("SELECT id FROM activity_projects WHERE id = ? FOR UPDATE",
+                UUID.class, activityProjectId);
         Integer next = jdbc.queryForObject("""
                 SELECT COALESCE(MAX(attempt_number), 0) + 1
                 FROM score_attempts WHERE activity_project_id = ? AND student_id = ?
