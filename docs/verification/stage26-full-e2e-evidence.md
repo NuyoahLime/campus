@@ -76,7 +76,9 @@ The local E2E command runs nine serial Playwright tests against a fresh containe
 - Browser tests: 5
 - API E2E tests: 4
 - Last verified local command: `STAGE26_CHROMIUM_PATH=<local Chromium> npm run e2e`
-- Result: two consecutive runs, each 9 passed, 0 failed, 0 retries
+- Result: two consecutive runs, each 9 passed, 0 failed, 0 skipped, 0 retries
+- Local repeatability total: 18/18 passed across two independent runs
+- Remote Linux CI suite: 9 passed, 0 failed, 0 skipped, 0 retries
 - Startup-failure cleanup: `npm run e2e:startup-cleanup` passed with no orphan backend, frontend, or PostgreSQL
 - Trace guard: `npm run e2e:trace-guard` passed with 0 trace/HAR/storage-state artifacts
 - Artifact guard: `npm run e2e:artifact-guard` passed
