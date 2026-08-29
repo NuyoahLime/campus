@@ -10,6 +10,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -18,6 +23,7 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
     @Autowired private ScoreAppealCorrectionService svc;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager txManager;
+    @Autowired private com.campusguinness.score.application.port.ScoreWriteContextPort scoreContext;
 
     private UUID schoolId, studentId, oldAttemptId, appealId;
     private UUID enteredById;
@@ -163,6 +169,31 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
                 """, Boolean.class, oldAttemptId)).isTrue();
     }
 
+    @Test @DisplayName("historical correction allocates after the latest existing attempt")
+    void correctionOfHistoricalAttemptAllocatesAfterLatestAttemptNumber() {
+        insertAttempt(UUID.randomUUID(), 2, false, 80);
+
+        runCorrection("fixed");
+
+        assertThat(jdbc.queryForObject("""
+                SELECT attempt_number FROM score_attempts
+                WHERE replaces_id = ?
+                """, Integer.class, oldAttemptId)).isEqualTo(3);
+    }
+
+    @Test @DisplayName("correction with multiple later attempts allocates the next sequence number")
+    void correctionWithMultipleLaterAttemptsAllocatesAfterMaximum() {
+        insertAttempt(UUID.randomUUID(), 2, false, 80);
+        insertAttempt(UUID.randomUUID(), 3, false, 70);
+
+        runCorrection("fixed");
+
+        assertThat(jdbc.queryForObject("""
+                SELECT attempt_number FROM score_attempts
+                WHERE replaces_id = ?
+                """, Integer.class, oldAttemptId)).isEqualTo(4);
+    }
+
     @Test @DisplayName("repeated request fails — no duplicate correction")
     void repeatedRequestFails() {
         var tt = new TransactionTemplate(txManager);
@@ -184,5 +215,77 @@ class ScoreAppealPathAVerificationIT extends PostgreSqlIntegrationTestSupport {
         assertThatThrownBy(() -> tt.executeWithoutResult(status ->
                 svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(300), "stale", enteredById)))
                 .isNotNull();
+    }
+
+    @Test @DisplayName("correction and normal draft allocation share the project serialization lock")
+    void correctionAndDraftAllocationDoNotCollide() throws Exception {
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Throwable> correction = executor.submit(() -> runConcurrent(ready, start, () -> {
+                new TransactionTemplate(txManager).executeWithoutResult(status ->
+                        svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), "fixed", enteredById));
+            }));
+            Future<Throwable> draft = executor.submit(() -> runConcurrent(ready, start, () -> {
+                new TransactionTemplate(txManager).executeWithoutResult(status -> {
+                    int number = scoreContext.nextAttemptNumber(apId, studentId);
+                    jdbc.update("""
+                            INSERT INTO score_attempts(
+                                id,school_id,activity_project_id,student_id,attempt_number,
+                                score_storage_type,score_value,is_current_effective,score_status,entered_by,version)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                            """, UUID.randomUUID(), schoolId, apId, studentId, number,
+                            "INTEGER", 60, false, "DRAFT", enteredById, 1);
+                });
+            }));
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(correction.get(15, TimeUnit.SECONDS)).isNull();
+            assertThat(draft.get(15, TimeUnit.SECONDS)).isNull();
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ?
+                """, Integer.class, studentId, apId)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ? AND is_current_effective = true
+                """, Integer.class, studentId, apId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM score_attempts
+                WHERE student_id = ? AND activity_project_id = ?
+                  AND attempt_number IN (2, 3)
+                """, Integer.class, studentId, apId)).isEqualTo(2);
+    }
+
+    private Throwable runConcurrent(CountDownLatch ready, CountDownLatch start, Runnable operation) {
+        try {
+            ready.countDown();
+            start.await(5, TimeUnit.SECONDS);
+            operation.run();
+            return null;
+        } catch (Throwable error) {
+            return error;
+        }
+    }
+
+    private void runCorrection(String reason) {
+        new TransactionTemplate(txManager).executeWithoutResult(status ->
+                svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), reason, enteredById));
+    }
+
+    private void insertAttempt(UUID id, int number, boolean current, int value) {
+        jdbc.update("""
+                INSERT INTO score_attempts(
+                    id,school_id,activity_project_id,student_id,attempt_number,score_storage_type,
+                    score_value,is_current_effective,score_status,entered_by,version)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                """, id, schoolId, apId, studentId, number, "INTEGER", value,
+                current, "APPROVED", enteredById, 1);
     }
 }

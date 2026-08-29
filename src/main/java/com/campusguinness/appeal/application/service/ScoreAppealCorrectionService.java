@@ -60,24 +60,9 @@ public class ScoreAppealCorrectionService {
         appeal.acceptPendingCorrection();
         appeal.beginScoreCorrecting();
 
-        // 5. Create replacement ScoreAttempt
-        UUID newAttemptId = UUID.randomUUID();
-        var newAttempt = ScoreAttempt.create(new ScoreAttempt.Builder()
-                .id(new ScoreAttemptId(newAttemptId))
-                .schoolId(oldAttempt.schoolId())
-                .activityProjectId(oldAttempt.activityProjectId())
-                .studentId(oldAttempt.studentId())
-                .attemptNumber(oldAttempt.attemptNumber() + 1)
-                .scoreStorageType(oldAttempt.scoreStorageType())
-                .scoreValue(correctedValue)
-                .scoreBusinessTime(oldAttempt.scoreBusinessTime())
-                .timeSource(oldAttempt.timeSource())
-                .replacesId(oldAttempt.id().value())
-                .enteredBy(actorId)
-                .manualMakeup(true));
-
-        // 6-8. Review and effective replacement are coordinated atomically.
-        effectiveScores.replaceForCorrection(oldAttempt, newAttempt, resolution, actorId);
+        // 5-8. The locked score service allocates the replacement number and
+        // coordinates review, effective replacement, and correction persistence.
+        effectiveScores.replaceForCorrection(oldAttempt, correctedValue, resolution, actorId);
 
         // 9. Resolve appeal
         appeal.resolve(resolution);

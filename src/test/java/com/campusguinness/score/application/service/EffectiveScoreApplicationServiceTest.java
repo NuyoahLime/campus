@@ -59,8 +59,8 @@ class EffectiveScoreApplicationServiceTest {
                 attempts, projects, reviews, corrections, authorization, actor);
         attemptsById = new HashMap<>();
         attemptsInScope = new ArrayList<>();
-        when(actor.requireUserId()).thenReturn(reviewerId);
-        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+        lenient().when(actor.requireUserId()).thenReturn(reviewerId);
+        lenient().when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
         when(attempts.findById(any(ScoreAttemptId.class))).thenAnswer(invocation ->
                 Optional.ofNullable(attemptsById.get(invocation.getArgument(0, ScoreAttemptId.class).value())));
     }
@@ -302,6 +302,25 @@ class EffectiveScoreApplicationServiceTest {
 
         assertThat(current.isCurrentEffective()).isFalse();
         assertThat(current.status()).isEqualTo(AttemptStatus.INVALIDATED);
+    }
+
+    @Test
+    void historicalCorrectionAllocatesAfterLatestAttemptNumber() {
+        ScoreAttempt old = approved(1, new ScoreValue.IntegerScore(100));
+        old.markCurrentEffective();
+        ScoreAttempt later = approved(2, new ScoreValue.IntegerScore(90));
+        register(old, later);
+        lock(scope("BEST", "INTEGER", "HIGHER_BETTER", null));
+
+        ScoreAttempt replacement = service.replaceForCorrection(
+                old, new ScoreValue.IntegerScore(200), "corrected", reviewerId);
+
+        assertThat(replacement.attemptNumber()).isEqualTo(3);
+        assertThat(replacement.replacesId()).isEqualTo(old.id().value());
+        assertThat(replacement.status()).isEqualTo(AttemptStatus.APPROVED);
+        assertThat(replacement.isCurrentEffective()).isTrue();
+        assertThat(old.status()).isEqualTo(AttemptStatus.INVALIDATED);
+        verify(corrections).append(old.id().value(), replacement.id().value(), "corrected", reviewerId);
     }
 
     private void lock(ActivityProjectLockPort.Scope scope) {

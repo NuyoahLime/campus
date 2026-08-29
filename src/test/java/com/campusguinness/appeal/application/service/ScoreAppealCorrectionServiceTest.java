@@ -60,7 +60,7 @@ class ScoreAppealCorrectionServiceTest {
             svc.correctAndResolve(appealId, new ScoreValue.IntegerScore(200), "corrected", UUID.randomUUID());
 
             assertThat(appeal.status()).isEqualTo(AppealStatus.RESOLVED);
-            verify(effectiveScores).replaceForCorrection(eq(oldAttempt), any(ScoreAttempt.class),
+            verify(effectiveScores).replaceForCorrection(eq(oldAttempt), eq(new ScoreValue.IntegerScore(200)),
                     eq("corrected"), any(UUID.class));
             verify(appealRepo).save(appeal);
         }
