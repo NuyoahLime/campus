@@ -18,6 +18,7 @@ class RankingDefinitionRepositoryAdapterTest {
     @Test void save() { adapter.save(def()); verify(jpa).save(any()); }
     @Test void findByIdEmpty() { when(jpa.findById(any())).thenReturn(Optional.empty()); assertThat(adapter.findById(new RankingDefinitionId(UUID.randomUUID()))).isEmpty(); }
     @Test void restoresNoEvents() { var e=ent(); when(jpa.findById(e.getId())).thenReturn(Optional.of(e)); assertThat(adapter.findById(new RankingDefinitionId(e.getId())).get().domainEvents()).isEmpty(); }
+    @Test void findByIdForUpdateUsesPessimisticLookup() { var e=ent(); when(jpa.findByIdForUpdate(e.getId())).thenReturn(Optional.of(e)); assertThat(adapter.findByIdForUpdate(new RankingDefinitionId(e.getId()))).isPresent(); }
     private RankingDefinition def() { return RankingDefinition.create(new RankingDefinition.Builder().id(new RankingDefinitionId(UUID.randomUUID())).layer(RankingLayer.L1).name("t").projectId(UUID.randomUUID()).createdBy(UUID.randomUUID())); }
     private RankingDefinitionEntity ent() { var e=new RankingDefinitionEntity(); e.setId(UUID.randomUUID()); e.setLayer("L1"); e.setName("t"); e.setProjectId(UUID.randomUUID()); e.setCreatedBy(UUID.randomUUID()); e.setEnabled(true); return e; }
 }

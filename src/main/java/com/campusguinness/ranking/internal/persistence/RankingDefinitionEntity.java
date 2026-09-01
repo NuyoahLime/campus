@@ -1,6 +1,8 @@
 package com.campusguinness.ranking.internal.persistence;
 
 import jakarta.persistence.*; import java.time.Instant; import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 @Entity @Table(name = "ranking_definitions")
 public class RankingDefinitionEntity {
     @Id @Column(name = "id", nullable = false, updatable = false) private UUID id;
@@ -8,6 +10,7 @@ public class RankingDefinitionEntity {
     @Column(name = "name", nullable = false, length = 200) private String name;
     @Column(name = "school_id") private UUID schoolId;
     @Column(name = "project_id", nullable = false) private UUID projectId;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "dimension_filters", columnDefinition = "jsonb") private String dimensionFilters;
     @Column(name = "tie_break_rule", length = 32) private String tieBreakRule;
     @Column(name = "is_enabled", nullable = false) private boolean enabled;

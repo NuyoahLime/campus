@@ -80,7 +80,7 @@ class AuthorizationEndpointMatrixIT {
     @Test
     void endpointMatrixRows() throws Exception {
         var rows = matrix();
-        assertThat(rows).hasSize(70);
+        assertThat(rows).hasSize(71);
         for (Row row : rows) {
             assertRow(row);
         }
@@ -175,9 +175,11 @@ class AuthorizationEndpointMatrixIT {
         String schoolRegistrationApprove = """
                 {"comment":"phase11","schoolId":"%s"}
                 """.formatted(school);
+        UUID rankingProjectId = UUID.randomUUID();
+        UUID rankingActivityProjectId = UUID.randomUUID();
         String rankingCreate = """
-                {"layer":"L1","name":"phase11","schoolId":"%s","projectId":"%s"}
-                """.formatted(school, UUID.randomUUID());
+                {"layer":"L1","name":"phase11","schoolId":"%s","projectId":"%s","activityProjectId":"%s"}
+                """.formatted(school, rankingProjectId, rankingActivityProjectId);
         String l3Create = """
                 {"schoolId":"%s","projectId":"%s","ruleVersionId":"%s"}
                 """.formatted(school, UUID.randomUUID(), UUID.randomUUID());
@@ -230,29 +232,30 @@ class AuthorizationEndpointMatrixIT {
                 row(46, "POST", "/api/v1/ranking-definitions", Allowed.SCHOOL_ADMIN, rankingCreate),
                 row(47, "POST", "/api/v1/ranking-definitions/" + id + "/enable", Allowed.SCHOOL_ADMIN),
                 row(48, "POST", "/api/v1/ranking-definitions/" + id + "/disable", Allowed.SCHOOL_ADMIN),
-                row(49, "POST", "/api/v1/l3-authorizations", Allowed.SCHOOL_ADMIN, l3Create),
-                row(50, "POST", "/api/v1/l3-authorizations/" + id + "/approve", Allowed.SUPER_ADMIN, body),
-                row(51, "POST", "/api/v1/l3-authorizations/" + id + "/withdraw", Allowed.SCHOOL_ADMIN, reason),
-                row(52, "POST", "/api/v1/media", Allowed.DEFERRED_DENY, mediaRegister()),
-                row(53, "POST", "/api/v1/media/" + id + "/internal-review", Allowed.DEFERRED_DENY),
-                row(54, "POST", "/api/v1/media/" + id + "/internal-approve", Allowed.SCHOOL_ADMIN),
-                row(55, "POST", "/api/v1/feedbacks", Allowed.STUDENT, feedbackSubmit),
-                row(56, "POST", "/api/v1/feedbacks/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
-                row(57, "POST", "/api/v1/feedbacks/" + id + "/resolve", Allowed.SCHOOL_ADMIN, "{\"reply\":\"phase11\"}"),
-                row(58, "POST", "/api/v1/feedbacks/" + id + "/close", Allowed.STUDENT, reason),
-                row(59, "GET", "/api/v1/public/rankings", Allowed.PUBLIC),
-                row(60, "GET", "/api/v1/public/rankings/" + id, Allowed.PUBLIC),
-                row(61, "GET", "/api/v1/student/rankings", Allowed.STUDENT),
-                row(62, "GET", "/api/v1/student/rankings/" + id, Allowed.STUDENT),
-                row(63, "GET", "/api/v1/school-admin/rankings", Allowed.SCHOOL_ADMIN),
-                row(64, "GET", "/api/v1/school-admin/rankings/" + id, Allowed.SCHOOL_ADMIN),
-                row(65, "GET", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN),
-                row(66, "GET", "/api/v1/school-admin/activities/" + id + "/participant-candidates", Allowed.SCHOOL_ADMIN),
-                row(67, "POST", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN,
+                row(49, "POST", "/api/v1/ranking-definitions/" + id + "/generate", Allowed.SCHOOL_ADMIN),
+                row(50, "POST", "/api/v1/l3-authorizations", Allowed.SCHOOL_ADMIN, l3Create),
+                row(51, "POST", "/api/v1/l3-authorizations/" + id + "/approve", Allowed.SUPER_ADMIN, body),
+                row(52, "POST", "/api/v1/l3-authorizations/" + id + "/withdraw", Allowed.SCHOOL_ADMIN, reason),
+                row(53, "POST", "/api/v1/media", Allowed.DEFERRED_DENY, mediaRegister()),
+                row(54, "POST", "/api/v1/media/" + id + "/internal-review", Allowed.DEFERRED_DENY),
+                row(55, "POST", "/api/v1/media/" + id + "/internal-approve", Allowed.SCHOOL_ADMIN),
+                row(56, "POST", "/api/v1/feedbacks", Allowed.STUDENT, feedbackSubmit),
+                row(57, "POST", "/api/v1/feedbacks/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
+                row(58, "POST", "/api/v1/feedbacks/" + id + "/resolve", Allowed.SCHOOL_ADMIN, "{\"reply\":\"phase11\"}"),
+                row(59, "POST", "/api/v1/feedbacks/" + id + "/close", Allowed.STUDENT, reason),
+                row(60, "GET", "/api/v1/public/rankings", Allowed.PUBLIC),
+                row(61, "GET", "/api/v1/public/rankings/" + id, Allowed.PUBLIC),
+                row(62, "GET", "/api/v1/student/rankings", Allowed.STUDENT),
+                row(63, "GET", "/api/v1/student/rankings/" + id, Allowed.STUDENT),
+                row(64, "GET", "/api/v1/school-admin/rankings", Allowed.SCHOOL_ADMIN),
+                row(65, "GET", "/api/v1/school-admin/rankings/" + id, Allowed.SCHOOL_ADMIN),
+                row(66, "GET", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN),
+                row(67, "GET", "/api/v1/school-admin/activities/" + id + "/participant-candidates", Allowed.SCHOOL_ADMIN),
+                row(68, "POST", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN,
                         "{\"studentId\":\"" + UUID.randomUUID() + "\"}"),
-                row(68, "DELETE", "/api/v1/school-admin/activities/" + id + "/participants/" + UUID.randomUUID(), Allowed.SCHOOL_ADMIN),
-                row(69, "GET", "/api/v1/student/activities", Allowed.STUDENT),
-                row(70, "GET", "/api/v1/student/activities/" + id, Allowed.STUDENT)
+                row(69, "DELETE", "/api/v1/school-admin/activities/" + id + "/participants/" + UUID.randomUUID(), Allowed.SCHOOL_ADMIN),
+                row(70, "GET", "/api/v1/student/activities", Allowed.STUDENT),
+                row(71, "GET", "/api/v1/student/activities/" + id, Allowed.STUDENT)
         );
     }
 

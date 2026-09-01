@@ -1,6 +1,6 @@
 package com.campusguinness.ranking.application.service;
 
-import com.campusguinness.infrastructure.security.CurrentActor;
+import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.ranking.application.port.RankingDefinitionRepository;
 import com.campusguinness.ranking.application.result.RankingDefinitionResult;
@@ -13,21 +13,34 @@ import java.util.UUID;
 @Transactional
 public class RankingDefinitionApplicationService {
     private final RankingDefinitionRepository repo;
-    private final CurrentActor currentActor;
     private final SchoolResourceAuthorization authorization;
 
-    public RankingDefinitionApplicationService(RankingDefinitionRepository r, CurrentActor currentActor,
-            SchoolResourceAuthorization authorization) {
+    public RankingDefinitionApplicationService(RankingDefinitionRepository r, SchoolResourceAuthorization authorization) {
         this.repo = r;
-        this.currentActor = currentActor;
         this.authorization = authorization;
     }
 
     public RankingDefinitionResult create(RankingLayer layer, String name, UUID schoolId, UUID projectId) {
-        UUID actorUserId = schoolId != null ? authorization.requireSchoolAdmin(schoolId) : currentActor.requireUserId();
+        return create(layer, name, schoolId, projectId, null);
+    }
+
+    public RankingDefinitionResult create(RankingLayer layer, String name, UUID schoolId, UUID projectId, UUID activityProjectId) {
+        if (layer != RankingLayer.L1) {
+            throw new IllegalStateException("Cannot create ranking: Phase1 supports only L1 definitions.");
+        }
+        if (activityProjectId == null) {
+            throw new IllegalStateException("Cannot create ranking: activityProjectId is required.");
+        }
+        UUID authoritativeSchoolId = authorization.requireUniqueSchoolAdminSchool();
+        if (schoolId != null && !schoolId.equals(authoritativeSchoolId)) {
+            throw new IdentityApplicationException("SCHOOL_ADMIN_SCOPE_DENIED", "School administration scope denied.");
+        }
+        UUID actorUserId = authorization.requireSchoolAdmin(authoritativeSchoolId);
         var r = RankingDefinition.create(new RankingDefinition.Builder()
                 .id(new RankingDefinitionId(UUID.randomUUID())).layer(layer).name(name)
-                .schoolId(schoolId).projectId(projectId).createdBy(actorUserId));
+                .schoolId(authoritativeSchoolId).projectId(projectId)
+                .dimensionFilters("{\"activityProjectId\":\"" + activityProjectId + "\"}")
+                .createdBy(actorUserId));
         repo.save(r);
         return new RankingDefinitionResult(r.id().value(), r.isEnabled());
     }

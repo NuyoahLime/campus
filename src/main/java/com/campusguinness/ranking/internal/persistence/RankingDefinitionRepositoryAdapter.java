@@ -15,4 +15,7 @@ class RankingDefinitionRepositoryAdapter implements RankingDefinitionRepository 
     @Override @Transactional(readOnly = true) public Optional<RankingDefinition> findById(RankingDefinitionId id) {
         return jpa.findById(id.value()).map(RankingDefinitionPersistenceMapper::toDomain);
     }
+    @Override @Transactional public Optional<RankingDefinition> findByIdForUpdate(RankingDefinitionId id) {
+        return jpa.findByIdForUpdate(id.value()).map(RankingDefinitionPersistenceMapper::toDomain);
+    }
 }

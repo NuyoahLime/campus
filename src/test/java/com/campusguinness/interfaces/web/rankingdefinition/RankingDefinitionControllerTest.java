@@ -1,6 +1,8 @@
 package com.campusguinness.interfaces.web.rankingdefinition;
 
 import com.campusguinness.ranking.application.result.RankingDefinitionResult;
+import com.campusguinness.ranking.application.result.RankingGenerationResult;
+import com.campusguinness.ranking.application.service.RankingGenerationApplicationService;
 import com.campusguinness.ranking.application.service.RankingDefinitionApplicationService;
 import com.campusguinness.ranking.internal.domain.RankingLayer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,13 +25,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RankingDefinitionControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean RankingDefinitionApplicationService service;
+    @MockitoBean RankingGenerationApplicationService generationService;
     @Autowired ObjectMapper mapper;
 
     @Test void createReturns201() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.create(any(), anyString(), any(), any())).thenReturn(new RankingDefinitionResult(id, true));
+        when(service.create(any(), anyString(), any(), any(), any())).thenReturn(new RankingDefinitionResult(id, true));
         mvc.perform(post("/api/v1/ranking-definitions").contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID()))))
+                .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID(), UUID.randomUUID()))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.enabled").value(true));
     }
     @Test void enableReturns200() throws Exception {
@@ -45,5 +48,13 @@ class RankingDefinitionControllerTest {
     @Test void notFound() throws Exception {
         when(service.enable(any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/ranking-definitions/" + UUID.randomUUID() + "/enable")).andExpect(status().isNotFound());
+    }
+
+    @Test void generateReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(generationService.generate(id)).thenReturn(new RankingGenerationResult(id, UUID.randomUUID(), 1, 2, "GENERATED", java.time.Instant.now()));
+        mvc.perform(post("/api/v1/ranking-definitions/" + id + "/generate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("GENERATED"));
     }
 }
