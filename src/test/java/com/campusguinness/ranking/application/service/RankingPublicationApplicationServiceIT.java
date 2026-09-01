@@ -202,6 +202,22 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     @Test
+    void currentPointerToGeneratedTargetIsRejectedAsInconsistentState() {
+        UUID definitionId = createDefinition("-generated-current");
+        UUID generated = rankingGeneration.generate(definitionId).rankingVersionId();
+        jdbc.update("UPDATE ranking_definitions SET current_version_id = ? WHERE id = ?", generated, definitionId);
+
+        assertThatThrownBy(() -> rankingPublication.publish(definitionId, generated))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("current version state is inconsistent");
+
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?", String.class,
+                generated)).isEqualTo("GENERATED");
+        assertThat(jdbc.queryForObject("SELECT published_at FROM ranking_versions WHERE id = ?", Timestamp.class,
+                generated)).isNull();
+    }
+
+    @Test
     void authorizationAndDefinitionStateAreEnforced() {
         UUID definitionId = createDefinition("-auth");
         UUID generated = rankingGeneration.generate(definitionId).rankingVersionId();

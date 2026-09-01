@@ -37,29 +37,31 @@ class RankingPublicationRepositoryAdapter implements RankingPublicationRepositor
             throw new IllegalStateException("Cannot publish ranking: only GENERATED versions can be published.");
         }
 
-        if (currentVersionId != null && !currentVersionId.equals(rankingVersionId)) {
+        if (currentVersionId != null) {
             VersionRow current = lockVersion(currentVersionId);
             if (!definitionId.equals(current.definitionId()) || !"PUBLISHED".equals(current.status())) {
                 throw new IllegalStateException("Cannot publish ranking: current version state is inconsistent.");
             }
-            jdbc.update("""
-                    UPDATE ranking_versions
-                    SET version_status = 'REPLACED'
-                    WHERE id = ? AND definition_id = ? AND version_status = 'PUBLISHED'
-                    """, currentVersionId, definitionId);
+            if (!currentVersionId.equals(rankingVersionId)) {
+                requireUpdated("current ranking version replacement", jdbc.update("""
+                        UPDATE ranking_versions
+                        SET version_status = 'REPLACED'
+                        WHERE id = ? AND definition_id = ? AND version_status = 'PUBLISHED'
+                        """, currentVersionId, definitionId));
+            }
         }
 
         Instant publishedAt = Instant.now();
-        jdbc.update("""
+        requireUpdated("ranking version publication", jdbc.update("""
                 UPDATE ranking_versions
                 SET version_status = 'PUBLISHED', published_at = ?
                 WHERE id = ? AND definition_id = ? AND version_status = 'GENERATED'
-                """, Timestamp.from(publishedAt), rankingVersionId, definitionId);
-        jdbc.update("""
+                """, Timestamp.from(publishedAt), rankingVersionId, definitionId));
+        requireUpdated("ranking definition current version switch", jdbc.update("""
                 UPDATE ranking_definitions
                 SET current_version_id = ?, updated_at = ?
                 WHERE id = ?
-                """, rankingVersionId, Timestamp.from(publishedAt), definitionId);
+                """, rankingVersionId, Timestamp.from(publishedAt), definitionId));
         return new RankingPublicationResult(
                 definitionId, rankingVersionId, currentVersionId, rankingVersionId, "PUBLISHED", publishedAt);
     }
@@ -79,6 +81,12 @@ class RankingPublicationRepositoryAdapter implements RankingPublicationRepositor
                     rs.getObject("definition_id", UUID.class),
                     rs.getString("version_status"));
         }, versionId);
+    }
+
+    private void requireUpdated(String action, int updatedRows) {
+        if (updatedRows != 1) {
+            throw new IllegalStateException("Cannot publish ranking: " + action + " updated " + updatedRows + " rows.");
+        }
     }
 
     private record VersionRow(UUID id, UUID definitionId, String status) {}
