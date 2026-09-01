@@ -126,7 +126,9 @@ public class SecurityConfig {
                         "/api/v1/school-admin/feedback",
                         "/api/v1/school-admin/feedback/*",
                         "/api/v1/school-admin/rankings",
-                        "/api/v1/school-admin/rankings/*"
+                        "/api/v1/school-admin/rankings/*",
+                        "/api/v1/school-admin/ranking-definitions",
+                        "/api/v1/school-admin/ranking-definitions/*"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-admin/score-attempts/*/submit",
