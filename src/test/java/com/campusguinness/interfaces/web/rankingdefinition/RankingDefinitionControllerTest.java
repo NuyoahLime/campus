@@ -4,6 +4,8 @@ import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.application.result.RankingGenerationResult;
 import com.campusguinness.ranking.application.service.RankingGenerationApplicationService;
 import com.campusguinness.ranking.application.service.RankingDefinitionApplicationService;
+import com.campusguinness.ranking.application.result.RankingPublicationResult;
+import com.campusguinness.ranking.application.service.RankingPublicationApplicationService;
 import com.campusguinness.ranking.internal.domain.RankingLayer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
@@ -26,6 +28,7 @@ class RankingDefinitionControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean RankingDefinitionApplicationService service;
     @MockitoBean RankingGenerationApplicationService generationService;
+    @MockitoBean RankingPublicationApplicationService publicationService;
     @Autowired ObjectMapper mapper;
 
     @Test void createReturns201() throws Exception {
@@ -56,5 +59,16 @@ class RankingDefinitionControllerTest {
         mvc.perform(post("/api/v1/ranking-definitions/" + id + "/generate"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("GENERATED"));
+    }
+
+    @Test void publishReturns200() throws Exception {
+        UUID definitionId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        when(publicationService.publish(definitionId, versionId))
+                .thenReturn(new RankingPublicationResult(definitionId, versionId, null, versionId, "PUBLISHED", java.time.Instant.now()));
+        mvc.perform(post("/api/v1/ranking-definitions/" + definitionId + "/versions/" + versionId + "/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.currentVersionId").value(versionId.toString()));
     }
 }

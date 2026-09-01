@@ -157,6 +157,7 @@ public class SecurityConfig {
                         "/api/v1/ranking-definitions/*/enable",
                         "/api/v1/ranking-definitions/*/disable",
                         "/api/v1/ranking-definitions/*/generate",
+                        "/api/v1/ranking-definitions/*/versions/*/publish",
                         "/api/v1/l3-authorizations",
                         "/api/v1/l3-authorizations/*/withdraw",
                         "/api/v1/media/*/internal-approve",
