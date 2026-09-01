@@ -3,6 +3,7 @@ package com.campusguinness.ranking.application.service;
 import com.campusguinness.infrastructure.security.CurrentActor;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.ranking.application.port.RankingDefinitionRepository;
+import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.ranking.internal.domain.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,10 +23,37 @@ class RankingDefinitionApplicationServiceTest {
     @Mock SchoolResourceAuthorization authorization;
     RankingDefinitionApplicationService svc;
     UUID actorUserId;
-    @BeforeEach void setUp() { actorUserId = UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); lenient().when(authorization.requireSchoolAdmin(any())).thenReturn(actorUserId); svc = new RankingDefinitionApplicationService(repo, currentActor, authorization); }
-    @Test void createGlobalDefinitionWithoutSchoolScope() { var r=svc.create(RankingLayer.L1,"t",null,UUID.randomUUID()); assertThat(r.enabled()).isTrue(); var captor=forClass(RankingDefinition.class); verify(repo).save(captor.capture()); assertThat(captor.getValue().createdBy()).isEqualTo(actorUserId); verify(authorization, never()).requireSchoolAdmin(any()); }
-    @Test void createSchoolDefinitionWithSchoolScope() { UUID schoolId = UUID.randomUUID(); var r=svc.create(RankingLayer.L2,"t",schoolId,UUID.randomUUID()); assertThat(r.enabled()).isTrue(); verify(authorization).requireSchoolAdmin(schoolId); }
+    @BeforeEach void setUp() { actorUserId = UUID.randomUUID(); lenient().when(currentActor.requireUserId()).thenReturn(actorUserId); lenient().when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(UUID.randomUUID()); lenient().when(authorization.requireSchoolAdmin(any())).thenReturn(actorUserId); svc = new RankingDefinitionApplicationService(repo, authorization); }
+    @Test void createL1DefinitionUsesDerivedSchoolScope() {
+        UUID schoolId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        UUID activityProjectId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+        var r = svc.create(RankingLayer.L1,"t",schoolId,projectId,activityProjectId);
+        assertThat(r.enabled()).isTrue();
+        var captor = forClass(RankingDefinition.class);
+        verify(repo).save(captor.capture());
+        assertThat(captor.getValue().createdBy()).isEqualTo(actorUserId);
+        assertThat(captor.getValue().schoolId()).isEqualTo(schoolId);
+        assertThat(captor.getValue().dimensionFilters()).contains(activityProjectId.toString());
+        verify(authorization).requireUniqueSchoolAdminSchool();
+        verify(authorization).requireSchoolAdmin(schoolId);
+    }
+    @Test void createL1DefinitionRejectsForgedSchoolScope() {
+        UUID actualSchoolId = UUID.randomUUID();
+        UUID forgedSchoolId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(actualSchoolId);
+        assertThatThrownBy(() -> svc.create(RankingLayer.L1, "t", forgedSchoolId, UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(IdentityApplicationException.class)
+                .extracting("code").isEqualTo("SCHOOL_ADMIN_SCOPE_DENIED");
+        verify(repo, never()).save(any());
+    }
+    @Test void createRejectsNonL1Definition() {
+        assertThatThrownBy(() -> svc.create(RankingLayer.L2, "t", UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(repo);
+    }
     @Test void disable() { var d=def(UUID.randomUUID()); when(repo.findById(any())).thenReturn(Optional.of(d)); assertThat(svc.disable(d.id().value()).enabled()).isFalse(); verify(authorization).requireSchoolAdmin(d.schoolId()); }
     @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.disable(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); }
-    private RankingDefinition def(UUID schoolId) { return RankingDefinition.create(new RankingDefinition.Builder().id(new RankingDefinitionId(UUID.randomUUID())).layer(RankingLayer.L1).name("t").schoolId(schoolId).projectId(UUID.randomUUID()).createdBy(UUID.randomUUID())); }
+    private RankingDefinition def(UUID schoolId) { return RankingDefinition.create(new RankingDefinition.Builder().id(new RankingDefinitionId(UUID.randomUUID())).layer(RankingLayer.L1).name("t").schoolId(schoolId).projectId(UUID.randomUUID()).dimensionFilters("{\"activityProjectId\":\"" + UUID.randomUUID() + "\"}").createdBy(UUID.randomUUID())); }
 }
