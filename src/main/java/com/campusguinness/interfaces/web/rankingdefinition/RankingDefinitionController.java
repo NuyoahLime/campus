@@ -4,6 +4,7 @@ import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.application.result.RankingGenerationResult;
 import com.campusguinness.ranking.application.service.RankingGenerationApplicationService;
 import com.campusguinness.ranking.application.service.RankingDefinitionApplicationService;
+import com.campusguinness.ranking.application.service.RankingPublicationApplicationService;
 import com.campusguinness.ranking.internal.domain.RankingLayer;
 
 import jakarta.validation.Valid;
@@ -19,9 +20,14 @@ import java.util.UUID;
 public class RankingDefinitionController {
     private final RankingDefinitionApplicationService service;
     private final RankingGenerationApplicationService generationService;
-    public RankingDefinitionController(RankingDefinitionApplicationService s, RankingGenerationApplicationService generationService) {
+    private final RankingPublicationApplicationService publicationService;
+    public RankingDefinitionController(
+            RankingDefinitionApplicationService s,
+            RankingGenerationApplicationService generationService,
+            RankingPublicationApplicationService publicationService) {
         this.service = s;
         this.generationService = generationService;
+        this.publicationService = publicationService;
     }
 
     @PostMapping
@@ -51,5 +57,14 @@ public class RankingDefinitionController {
     public ResponseEntity<RankingGenerationResponse> generate(@PathVariable UUID id) {
         RankingGenerationResult result = generationService.generate(id);
         return ResponseEntity.ok(RankingGenerationResponse.from(result));
+    }
+
+    @PostMapping("/{definitionId}/versions/{versionId}/publish")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    public ResponseEntity<RankingPublicationResponse> publish(
+            @PathVariable UUID definitionId,
+            @PathVariable UUID versionId) {
+        var result = publicationService.publish(definitionId, versionId);
+        return ResponseEntity.ok(RankingPublicationResponse.from(result));
     }
 }
