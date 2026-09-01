@@ -34,7 +34,7 @@ public class RankingGenerationApplicationService {
     }
 
     public RankingGenerationResult generate(UUID rankingDefinitionId) {
-        RankingDefinition definition = definitions.findById(new RankingDefinitionId(rankingDefinitionId))
+        RankingDefinition definition = definitions.findByIdForUpdate(new RankingDefinitionId(rankingDefinitionId))
                 .orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + rankingDefinitionId));
         if (definition.layer() != RankingLayer.L1) {
             throw new IllegalStateException("Cannot generate ranking: Phase1 supports only L1 definitions.");

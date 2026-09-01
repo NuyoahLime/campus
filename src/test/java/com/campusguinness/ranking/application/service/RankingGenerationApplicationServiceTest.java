@@ -47,7 +47,7 @@ class RankingGenerationApplicationServiceTest {
         UUID activityProjectId = UUID.randomUUID();
         RankingDefinition definition = definition(schoolId, projectId, activityProjectId);
         RankingGenerationContext context = context(schoolId, projectId, activityProjectId);
-        when(definitions.findById(any())).thenReturn(Optional.of(definition));
+        when(definitions.findByIdForUpdate(any())).thenReturn(Optional.of(definition));
         when(sourceQuery.findContext(activityProjectId)).thenReturn(Optional.of(context));
         when(sourceQuery.findAuthoritativeEffectiveScores(activityProjectId, schoolId)).thenReturn(List.of(
                 new RankingGenerationSourceRow(UUID.randomUUID(), UUID.randomUUID(), "Alice", new BigDecimal("10"), null, null)
@@ -71,7 +71,7 @@ class RankingGenerationApplicationServiceTest {
         UUID projectId = UUID.randomUUID();
         UUID activityProjectId = UUID.randomUUID();
         RankingDefinition definition = definition(schoolId, projectId, activityProjectId);
-        when(definitions.findById(any())).thenReturn(Optional.of(definition));
+        when(definitions.findByIdForUpdate(any())).thenReturn(Optional.of(definition));
         when(sourceQuery.findContext(activityProjectId)).thenReturn(Optional.of(
                 context(UUID.randomUUID(), projectId, activityProjectId)));
         when(authorization.requireSchoolAdmin(schoolId)).thenReturn(UUID.randomUUID());
@@ -91,7 +91,7 @@ class RankingGenerationApplicationServiceTest {
                 .projectId(UUID.randomUUID())
                 .dimensionFilters("{\"activityProjectId\":\"" + UUID.randomUUID() + "\"}")
                 .createdBy(UUID.randomUUID()));
-        when(definitions.findById(any())).thenReturn(Optional.of(definition));
+        when(definitions.findByIdForUpdate(any())).thenReturn(Optional.of(definition));
 
         assertThatThrownBy(() -> service.generate(definition.id().value()))
                 .isInstanceOf(IllegalStateException.class);
@@ -105,7 +105,7 @@ class RankingGenerationApplicationServiceTest {
         UUID activityProjectId = UUID.randomUUID();
         RankingDefinition definition = definition(schoolId, projectId, activityProjectId);
         definition.disable();
-        when(definitions.findById(any())).thenReturn(Optional.of(definition));
+        when(definitions.findByIdForUpdate(any())).thenReturn(Optional.of(definition));
 
         assertThatThrownBy(() -> service.generate(definition.id().value()))
                 .isInstanceOf(IllegalStateException.class)

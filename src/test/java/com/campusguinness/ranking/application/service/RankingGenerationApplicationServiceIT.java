@@ -338,6 +338,68 @@ class RankingGenerationApplicationServiceIT extends PostgreSqlIntegrationTestSup
     }
 
     @Test
+    void generationRejectsWhenConcurrentDisableCommitsBeforeDefinitionLock() throws Exception {
+        UUID definitionId = rankingDefinitions.create(
+                RankingLayer.L1,
+                runPrefix + "-ranking",
+                schoolA,
+                projectId,
+                activityProjectId).id();
+        insertScore(studentA, schoolA, 1, "APPROVED", true, "98", null, null);
+
+        CountDownLatch disableHoldingLock = new CountDownLatch(1);
+        CountDownLatch releaseDisable = new CountDownLatch(1);
+        CountDownLatch generationFinished = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> disabling = executor.submit(() -> {
+                new TransactionTemplate(txManager).executeWithoutResult(status -> {
+                    jdbc.queryForObject("SELECT id FROM ranking_definitions WHERE id = ? FOR UPDATE",
+                            UUID.class, definitionId);
+                    jdbc.update("UPDATE ranking_definitions SET is_enabled = false WHERE id = ?", definitionId);
+                    disableHoldingLock.countDown();
+                    await(releaseDisable);
+                });
+                return null;
+            });
+            assertThat(disableHoldingLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> generation = executor.submit(() -> {
+                try {
+                    SecurityContextHolder.getContext().setAuthentication(adminAuthentication);
+                    rankingGeneration.generate(definitionId);
+                    return null;
+                } finally {
+                    SecurityContextHolder.clearContext();
+                    generationFinished.countDown();
+                }
+            });
+            assertThat(generationFinished.await(300, TimeUnit.MILLISECONDS)).isFalse();
+            releaseDisable.countDown();
+
+            assertThatThrownBy(() -> generation.get(30, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(IllegalStateException.class);
+            disabling.get(30, TimeUnit.SECONDS);
+            assertThat(jdbc.queryForObject("SELECT is_enabled FROM ranking_definitions WHERE id = ?",
+                    Boolean.class, definitionId)).isFalse();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ranking_versions WHERE definition_id = ?",
+                    Integer.class, definitionId)).isZero();
+        } finally {
+            releaseDisable.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Test
     void generationRollsBackWhenOuterTransactionFails() {
         UUID definitionId = rankingDefinitions.create(
                 RankingLayer.L1,
