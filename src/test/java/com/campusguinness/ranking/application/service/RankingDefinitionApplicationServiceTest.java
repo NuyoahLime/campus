@@ -49,9 +49,35 @@ class RankingDefinitionApplicationServiceTest {
         verify(repo, never()).save(any());
     }
     @Test void createRejectsNonL1Definition() {
-        assertThatThrownBy(() -> svc.create(RankingLayer.L2, "t", UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
+        UUID schoolId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+        assertThatThrownBy(() -> svc.create(RankingLayer.L3, "t", schoolId, UUID.randomUUID(), null))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(repo);
+    }
+    @Test void createL2DefinitionUsesChallengeProjectAndBestScorePolicy() {
+        UUID schoolId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+        var r = svc.create(RankingLayer.L2, "t", schoolId, projectId, null,
+                "{\"grade\":\"G5\",\"className\":\"C1\"}");
+        assertThat(r.enabled()).isTrue();
+        var captor = forClass(RankingDefinition.class);
+        verify(repo).save(captor.capture());
+        assertThat(captor.getValue().layer()).isEqualTo(RankingLayer.L2);
+        assertThat(captor.getValue().schoolId()).isEqualTo(schoolId);
+        assertThat(captor.getValue().projectId()).isEqualTo(projectId);
+        assertThat(captor.getValue().dimensionFilters()).contains("\"selectionPolicy\":\"BEST_SCORE\"");
+        assertThat(captor.getValue().dimensionFilters()).contains("\"grade\":\"G5\"");
+        assertThat(captor.getValue().dimensionFilters()).doesNotContain("activityProjectId");
+    }
+    @Test void createL2DefinitionRejectsActivityProjectId() {
+        UUID schoolId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+        assertThatThrownBy(() -> svc.create(RankingLayer.L2, "t", schoolId, UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("L2 definitions must not use activityProjectId");
+        verify(repo, never()).save(any());
     }
     @Test void disable() { var d=def(UUID.randomUUID()); when(repo.findById(any())).thenReturn(Optional.of(d)); assertThat(svc.disable(d.id().value()).enabled()).isFalse(); verify(authorization).requireSchoolAdmin(d.schoolId()); }
     @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.disable(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); }

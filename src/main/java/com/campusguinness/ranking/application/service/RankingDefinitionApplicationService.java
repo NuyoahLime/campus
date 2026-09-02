@@ -25,25 +25,49 @@ public class RankingDefinitionApplicationService {
     }
 
     public RankingDefinitionResult create(RankingLayer layer, String name, UUID schoolId, UUID projectId, UUID activityProjectId) {
-        if (layer != RankingLayer.L1) {
-            throw new IllegalStateException("Cannot create ranking: Phase1 supports only L1 definitions.");
-        }
-        if (activityProjectId == null) {
-            throw new IllegalStateException("Cannot create ranking: activityProjectId is required.");
-        }
+        return create(layer, name, schoolId, projectId, activityProjectId, null);
+    }
+
+    public RankingDefinitionResult create(
+            RankingLayer layer,
+            String name,
+            UUID schoolId,
+            UUID projectId,
+            UUID activityProjectId,
+            String dimensionFilters) {
         UUID authoritativeSchoolId = authorization.requireUniqueSchoolAdminSchool();
         if (schoolId != null && !schoolId.equals(authoritativeSchoolId)) {
             throw new IdentityApplicationException("SCHOOL_ADMIN_SCOPE_DENIED", "School administration scope denied.");
         }
         UUID actorUserId = authorization.requireSchoolAdmin(authoritativeSchoolId);
+        String normalizedDimensionFilters = switch (layer) {
+            case L1 -> l1DimensionFilters(activityProjectId);
+            case L2 -> l2DimensionFilters(activityProjectId, dimensionFilters);
+            case L3 -> throw new IllegalStateException("Cannot create ranking: school-admin definitions support only L1 and L2.");
+        };
         var r = RankingDefinition.create(new RankingDefinition.Builder()
                 .id(new RankingDefinitionId(UUID.randomUUID())).layer(layer).name(name)
                 .schoolId(authoritativeSchoolId).projectId(projectId)
-                .dimensionFilters("{\"activityProjectId\":\"" + activityProjectId + "\"}")
+                .dimensionFilters(normalizedDimensionFilters)
                 .createdBy(actorUserId));
         repo.save(r);
         return new RankingDefinitionResult(r.id().value(), r.isEnabled());
     }
+
+    private String l1DimensionFilters(UUID activityProjectId) {
+        if (activityProjectId == null) {
+            throw new IllegalStateException("Cannot create ranking: activityProjectId is required.");
+        }
+        return "{\"activityProjectId\":\"" + activityProjectId + "\"}";
+    }
+
+    private String l2DimensionFilters(UUID activityProjectId, String dimensionFilters) {
+        if (activityProjectId != null) {
+            throw new IllegalStateException("Cannot create ranking: L2 definitions must not use activityProjectId.");
+        }
+        return RankingGenerationScope.normalizeL2DimensionFilters(dimensionFilters);
+    }
+
     public RankingDefinitionResult disable(UUID id) {
         var r = find(id);
         if (r.schoolId() != null) authorization.requireSchoolAdmin(r.schoolId());

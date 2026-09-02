@@ -33,7 +33,13 @@ public class RankingDefinitionController {
     @PostMapping
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<RankingDefinitionResponse> create(@Valid @RequestBody CreateRankingDefinitionRequest req) {
-        var r = service.create(RankingLayer.valueOf(req.layer()), req.name(), req.schoolId(), req.projectId(), req.activityProjectId());
+        var r = service.create(
+                RankingLayer.valueOf(req.layer()),
+                req.name(),
+                req.schoolId(),
+                req.projectId(),
+                req.activityProjectId(),
+                req.dimensionFilters());
         return ResponseEntity.created(URI.create("/api/v1/ranking-definitions/" + r.id()))
                 .body(new RankingDefinitionResponse(r.id(), r.enabled()));
     }

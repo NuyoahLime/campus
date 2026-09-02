@@ -114,8 +114,32 @@ class RankingGenerationRepositoryAdapter implements RankingGenerationRepository 
     }
 
     private String dataScopeSnapshot(RankingGenerationScope scope, RankingGenerationContext context) {
+        if (scope.activityProjectId() == null) {
+            return """
+                    {
+                      "layer": "L2",
+                      "schoolId": %s,
+                      "projectId": %s,
+                      "ruleVersionId": %s,
+                      "selectionPolicy": %s,
+                      "grade": %s,
+                      "className": %s,
+                      "activityPeriodStart": %s,
+                      "activityPeriodEnd": %s
+                    }
+                    """.formatted(
+                    jsonValue(context.schoolId().toString()),
+                    jsonValue(context.projectId().toString()),
+                    jsonValue(context.ruleVersionId().toString()),
+                    jsonValue(scope.selectionPolicy()),
+                    jsonNullable(scope.grade()),
+                    jsonNullable(scope.className()),
+                    jsonNullable(scope.activityPeriodStart() == null ? null : scope.activityPeriodStart().toString()),
+                    jsonNullable(scope.activityPeriodEnd() == null ? null : scope.activityPeriodEnd().toString()));
+        }
         return """
                 {
+                  "layer": "L1",
                   "activityProjectId": %s,
                   "activityId": %s,
                   "schoolId": %s,
@@ -143,5 +167,9 @@ class RankingGenerationRepositoryAdapter implements RankingGenerationRepository 
         } catch (Exception ex) {
             throw new IllegalStateException("Cannot generate ranking: snapshot payload is invalid.");
         }
+    }
+
+    private String jsonNullable(String value) {
+        return value == null ? "null" : jsonValue(value);
     }
 }

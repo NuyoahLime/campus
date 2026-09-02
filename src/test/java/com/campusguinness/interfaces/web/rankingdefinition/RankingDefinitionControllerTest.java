@@ -33,7 +33,7 @@ class RankingDefinitionControllerTest {
 
     @Test void createReturns201() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.create(any(), anyString(), any(), any(), any())).thenReturn(new RankingDefinitionResult(id, true));
+        when(service.create(any(), anyString(), any(), any(), any(), any())).thenReturn(new RankingDefinitionResult(id, true));
         mvc.perform(post("/api/v1/ranking-definitions").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(new CreateRankingDefinitionRequest("L1","test",null,UUID.randomUUID(), UUID.randomUUID()))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.enabled").value(true));
