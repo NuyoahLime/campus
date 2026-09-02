@@ -13,6 +13,7 @@ export interface ActivityManagementListItem {
 }
 
 export interface ActivityProjectSnapshot {
+  id: string;
   projectId: string;
   projectName: string;
   category: string;

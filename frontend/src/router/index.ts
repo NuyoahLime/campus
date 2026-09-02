@@ -44,6 +44,7 @@ import SchoolAdminFeedbackView from '../views/SchoolAdminFeedbackView.vue';
 import SchoolAdminFeedbackDetailView from '../views/SchoolAdminFeedbackDetailView.vue';
 import RankingListView from '../views/RankingListView.vue';
 import RankingDetailView from '../views/RankingDetailView.vue';
+import SchoolAdminRankingManagementView from '../views/SchoolAdminRankingManagementView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -190,6 +191,12 @@ const router = createRouter({
       name: 'school-admin-rankings',
       component: RankingListView,
       props: { mode: 'school-admin' },
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
+      path: '/school-admin/ranking-management',
+      name: 'school-admin-ranking-management',
+      component: SchoolAdminRankingManagementView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {

@@ -199,7 +199,7 @@ class ActivityParticipantQueryAdapter implements ActivityParticipantPort {
 
     private List<ActivityProjectResult> loadProjects(UUID activityId) {
         return jdbc.query("""
-                SELECT ap.project_id, p.name, p.category, ap.rule_version_id,
+                SELECT ap.id, ap.project_id, p.name, p.category, ap.rule_version_id,
                        rv.version_number, rv.rules_text, rv.score_storage_type,
                        rv.score_indicator_type, rv.comparison_direction, rv.score_unit, rv.allow_tie
                 FROM activity_projects ap
@@ -208,6 +208,7 @@ class ActivityParticipantQueryAdapter implements ActivityParticipantPort {
                 WHERE ap.activity_id = ?
                 ORDER BY ap.id
                 """, (rs, row) -> new ActivityProjectResult(
+                rs.getObject("id", UUID.class),
                 rs.getObject("project_id", UUID.class), rs.getString("name"),
                 rs.getString("category"), rs.getObject("rule_version_id", UUID.class),
                 rs.getInt("version_number"), rs.getString("rules_text"),
