@@ -21,6 +21,7 @@ public class RankingGenerationApplicationService {
     private final RankingGenerationRepository generationRepository;
     private final SchoolResourceAuthorization authorization;
     private final RankingGenerationCalculator calculator = new RankingGenerationCalculator();
+    private final L2CandidateSelectionService l2CandidateSelection = new L2CandidateSelectionService();
 
     public RankingGenerationApplicationService(
             RankingDefinitionRepository definitions,
@@ -36,17 +37,24 @@ public class RankingGenerationApplicationService {
     public RankingGenerationResult generate(UUID rankingDefinitionId) {
         RankingDefinition definition = definitions.findByIdForUpdate(new RankingDefinitionId(rankingDefinitionId))
                 .orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + rankingDefinitionId));
-        if (definition.layer() != RankingLayer.L1) {
-            throw new IllegalStateException("Cannot generate ranking: Phase1 supports only L1 definitions.");
+        if (definition.layer() == RankingLayer.L3) {
+            throw new IllegalStateException("Cannot generate ranking: Phase4B supports only L1 and L2 definitions.");
         }
         if (!definition.isEnabled()) {
             throw new IllegalStateException("Cannot generate ranking: definition is disabled.");
         }
         if (definition.schoolId() == null) {
-            throw new IllegalStateException("Cannot generate ranking: L1 generation requires a school-scoped definition.");
+            throw new IllegalStateException("Cannot generate ranking: generation requires a school-scoped definition.");
         }
         authorization.requireSchoolAdmin(definition.schoolId());
-        RankingGenerationScope scope = RankingGenerationScope.fromDimensionFilters(definition.dimensionFilters());
+        if (definition.layer() == RankingLayer.L2) {
+            return generateL2(definition);
+        }
+        return generateL1(definition);
+    }
+
+    private RankingGenerationResult generateL1(RankingDefinition definition) {
+        RankingGenerationScope scope = RankingGenerationScope.l1FromDimensionFilters(definition.dimensionFilters());
         var context = sourceQuery.findContext(scope.activityProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("ActivityProject not found: " + scope.activityProjectId()));
         if (!definition.schoolId().equals(context.schoolId()) || !definition.projectId().equals(context.projectId())) {
@@ -54,6 +62,38 @@ public class RankingGenerationApplicationService {
         }
         var sources = sourceQuery.findAuthoritativeEffectiveScores(scope.activityProjectId(), definition.schoolId());
         var snapshot = calculator.calculate(context, sources);
+        return generationRepository.saveGeneratedSnapshot(definition, scope, context, snapshot);
+    }
+
+    private RankingGenerationResult generateL2(RankingDefinition definition) {
+        RankingGenerationScope scope = RankingGenerationScope.l2FromDimensionFilters(definition.dimensionFilters());
+        var contexts = sourceQuery.findL2CandidateContexts(
+                definition.projectId(),
+                definition.schoolId(),
+                scope.grade(),
+                scope.className(),
+                scope.activityPeriodStart(),
+                scope.activityPeriodEnd());
+        if (contexts.size() > 1) {
+            throw new IllegalStateException("Cannot generate ranking: L2 candidates span multiple RuleVersions.");
+        }
+        var context = contexts.isEmpty()
+                ? sourceQuery.findL2FallbackContext(definition.projectId(), definition.schoolId())
+                    .orElseThrow(() -> new IllegalArgumentException("ChallengeProject not found: " + definition.projectId()))
+                : contexts.getFirst();
+        if (!definition.schoolId().equals(context.schoolId()) || !definition.projectId().equals(context.projectId())) {
+            throw new IllegalStateException("Cannot generate ranking: definition scope does not match challenge project.");
+        }
+        var sources = sourceQuery.findL2AuthoritativeEffectiveScores(
+                definition.projectId(),
+                definition.schoolId(),
+                context.ruleVersionId(),
+                scope.grade(),
+                scope.className(),
+                scope.activityPeriodStart(),
+                scope.activityPeriodEnd());
+        var selected = l2CandidateSelection.selectBestScores(context, sources);
+        var snapshot = calculator.calculate(context, selected);
         return generationRepository.saveGeneratedSnapshot(definition, scope, context, snapshot);
     }
 }

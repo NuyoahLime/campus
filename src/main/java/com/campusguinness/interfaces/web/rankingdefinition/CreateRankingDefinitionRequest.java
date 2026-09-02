@@ -10,4 +10,14 @@ public record CreateRankingDefinitionRequest(
         @NotBlank @Size(max = 200) String name,
         UUID schoolId,
         @NotNull UUID projectId,
-        @NotNull UUID activityProjectId) {}
+        UUID activityProjectId,
+        String dimensionFilters) {
+    public CreateRankingDefinitionRequest(
+            String layer,
+            String name,
+            UUID schoolId,
+            UUID projectId,
+            UUID activityProjectId) {
+        this(layer, name, schoolId, projectId, activityProjectId, null);
+    }
+}

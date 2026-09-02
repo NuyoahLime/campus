@@ -9,5 +9,17 @@ public record RankingGenerationSourceRow(
         String studentDisplayName,
         BigDecimal numericValue,
         Long durationMs,
-        String grade
-) {}
+        String grade,
+        UUID activityProjectId,
+        UUID ruleVersionId
+) {
+    public RankingGenerationSourceRow(
+            UUID scoreAttemptId,
+            UUID studentId,
+            String studentDisplayName,
+            BigDecimal numericValue,
+            Long durationMs,
+            String grade) {
+        this(scoreAttemptId, studentId, studentDisplayName, numericValue, durationMs, grade, null, null);
+    }
+}
