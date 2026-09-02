@@ -31,14 +31,14 @@ public class RankingPublicationApplicationService {
     public RankingPublicationResult publish(UUID rankingDefinitionId, UUID rankingVersionId) {
         RankingDefinition definition = definitions.findByIdForUpdate(new RankingDefinitionId(rankingDefinitionId))
                 .orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + rankingDefinitionId));
-        if (definition.layer() != RankingLayer.L1) {
-            throw new IllegalStateException("Cannot publish ranking: Phase2 supports only L1 definitions.");
+        if (definition.layer() == RankingLayer.L3) {
+            throw new IllegalStateException("Cannot publish ranking: publication supports only L1 and L2 definitions.");
         }
         if (!definition.isEnabled()) {
             throw new IllegalStateException("Cannot publish ranking: definition is disabled.");
         }
         if (definition.schoolId() == null) {
-            throw new IllegalStateException("Cannot publish ranking: L1 publication requires a school-scoped definition.");
+            throw new IllegalStateException("Cannot publish ranking: publication requires a school-scoped definition.");
         }
         authorization.requireSchoolAdmin(definition.schoolId());
         return publications.publishGeneratedVersion(definition, rankingVersionId);

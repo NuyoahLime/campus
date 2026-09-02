@@ -43,11 +43,28 @@ class RankingPublicationApplicationServiceTest {
     }
 
     @Test
-    void nonL1DefinitionIsRejectedBeforePersistence() {
+    void l2PublishDelegatesExistingGeneratedSnapshotWithoutRecalculation() {
+        UUID schoolId = UUID.randomUUID();
+        UUID definitionId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        RankingDefinition definition = definition(definitionId, schoolId, RankingLayer.L2, true);
+        when(definitions.findByIdForUpdate(new RankingDefinitionId(definitionId))).thenReturn(Optional.of(definition));
+        when(publications.publishGeneratedVersion(definition, versionId))
+                .thenReturn(new RankingPublicationResult(definitionId, versionId, null, versionId, "PUBLISHED", Instant.now()));
+
+        new RankingPublicationApplicationService(definitions, publications, authorization).publish(definitionId, versionId);
+
+        verify(authorization).requireSchoolAdmin(schoolId);
+        verify(publications).publishGeneratedVersion(definition, versionId);
+        verifyNoMoreInteractions(publications);
+    }
+
+    @Test
+    void l3DefinitionIsRejectedBeforePersistence() {
         UUID definitionId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         when(definitions.findByIdForUpdate(new RankingDefinitionId(definitionId)))
-                .thenReturn(Optional.of(definition(definitionId, UUID.randomUUID(), RankingLayer.L2, true)));
+                .thenReturn(Optional.of(definition(definitionId, UUID.randomUUID(), RankingLayer.L3, true)));
 
         assertThatThrownBy(() -> new RankingPublicationApplicationService(definitions, publications, authorization)
                 .publish(definitionId, versionId))
@@ -77,7 +94,9 @@ class RankingPublicationApplicationServiceTest {
                 .name("test")
                 .schoolId(schoolId)
                 .projectId(UUID.randomUUID())
-                .dimensionFilters("{\"activityProjectId\":\"" + UUID.randomUUID() + "\"}")
+                .dimensionFilters(layer == RankingLayer.L2
+                        ? "{\"selectionPolicy\":\"BEST_SCORE\"}"
+                        : "{\"activityProjectId\":\"" + UUID.randomUUID() + "\"}")
                 .createdBy(UUID.randomUUID()), enabled, null);
     }
 }
