@@ -6,6 +6,15 @@ total_state_machines: 17
 total_p1: 6
 total_p2: 4
 
+policy_references:
+  - id: POLICY-RANKING-L2-BASELINE-001
+    package: PKG-RANKING
+    status: Accepted
+    file: docs/decision/l2-ranking-policy-baseline-v1.md
+    adr: docs/adr/ADR-015-l2-ranking-policy.md
+    scope: Ranking Production Phase4A L2 policy closure
+    notes: Freezes L2 candidate selection, RuleVersion, filters, visibility, privacy, and schema policy without changing the v1.2 DEC registry count.
+
 decisions:
   - {id: DEC-PERMISSION-001, name: 用户角色权限与超管边界, package: PKG-PERMISSION, files: ["01","10"]}
   - {id: DEC-SCHOOL-001, name: 学校入驻流程, package: PKG-SCHOOL, files: ["02"]}
