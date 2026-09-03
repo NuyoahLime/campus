@@ -106,7 +106,7 @@ class RankingReadQueryAdapter implements RankingReadQueryPort {
     }
 
     private String scopeClause(UUID schoolId, boolean includeGlobal) {
-        if (schoolId == null) return "";
+        if (schoolId == null) return " AND d.layer <> 'L2'";
         return includeGlobal
                 ? " AND (d.school_id IS NULL OR d.school_id = ?)"
                 : " AND d.school_id = ?";

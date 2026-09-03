@@ -239,12 +239,12 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     @Test
-    void nonL1DefinitionCannotPublish() {
+    void l3DefinitionCannotPublish() {
         UUID definitionId = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO ranking_definitions(id, layer, name, school_id, project_id, created_by)
-                VALUES (?, 'L2', ?, ?, ?, ?)
-                """, definitionId, runPrefix + "-l2", schoolA, projectId, adminA);
+                VALUES (?, 'L3', ?, ?, ?, ?)
+                """, definitionId, runPrefix + "-l3", schoolA, projectId, adminA);
         UUID versionId = insertVersion(definitionId, "GENERATED");
 
         assertThatThrownBy(() -> rankingPublication.publish(definitionId, versionId))
@@ -261,6 +261,223 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
         assertThat(rankingRead.publicDetail(definitionId).entries()).isEmpty();
         assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?", String.class,
                 generated.rankingVersionId())).isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void generatedL2PublishesAndPublicReadRemainsDeniedWhileSameSchoolReadsWork() {
+        UUID definitionId = createL2Definition("-l2-ranking");
+        UUID sourceA = insertScore(studentA, schoolA, 1, "98");
+        insertScore(studentB, schoolA, 1, "95");
+        var generated = rankingGeneration.generate(definitionId);
+        SnapshotCounts before = counts(generated.rankingVersionId());
+
+        assertThatThrownBy(() -> rankingRead.publicDetail(definitionId))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        var published = rankingPublication.publish(definitionId, generated.rankingVersionId());
+
+        assertThat(published.status()).isEqualTo("PUBLISHED");
+        assertThat(published.previousCurrentVersionId()).isNull();
+        assertThat(published.currentVersionId()).isEqualTo(generated.rankingVersionId());
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?", String.class,
+                generated.rankingVersionId())).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT published_at FROM ranking_versions WHERE id = ?", Timestamp.class,
+                generated.rankingVersionId())).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?", UUID.class,
+                definitionId)).isEqualTo(generated.rankingVersionId());
+        assertThat(counts(generated.rankingVersionId())).isEqualTo(before);
+
+        assertThatThrownBy(() -> rankingRead.publicDetail(definitionId))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(rankingRead.listPublic(0, 20).items()).extracting("id").doesNotContain(definitionId);
+        authenticateStudent(studentA, schoolA);
+        assertThat(rankingRead.studentDetail(definitionId).versionNumber()).isEqualTo(1);
+        authenticateSchoolAdmin(adminA, schoolA);
+        assertThat(rankingRead.schoolAdminDetail(definitionId).versionNumber()).isEqualTo(1);
+        assertThat(sourceFor(generated.rankingVersionId(), studentA)).isEqualTo(sourceA);
+    }
+
+    @Test
+    void publishingNewGeneratedL2VersionReplacesOldCurrentWithoutMutatingEntriesOrSourcesAndKeepsPublicReadDenied() {
+        UUID definitionId = createL2Definition("-l2-replacement");
+        UUID oldScore = insertScore(studentA, schoolA, 1, "98");
+        var v1 = rankingGeneration.generate(definitionId);
+        rankingPublication.publish(definitionId, v1.rankingVersionId());
+        SnapshotCounts v1Counts = counts(v1.rankingVersionId());
+        jdbc.update("UPDATE score_attempts SET is_current_effective = false WHERE id = ?", oldScore);
+        UUID newScore = insertScore(studentA, schoolA, 2, "99");
+        var v2 = rankingGeneration.generate(definitionId);
+
+        rankingPublication.publish(definitionId, v2.rankingVersionId());
+
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?", String.class,
+                v1.rankingVersionId())).isEqualTo("REPLACED");
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?", String.class,
+                v2.rankingVersionId())).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?", UUID.class,
+                definitionId)).isEqualTo(v2.rankingVersionId());
+        assertThat(counts(v1.rankingVersionId())).isEqualTo(v1Counts);
+        assertThat(sourceFor(v1.rankingVersionId(), studentA)).isEqualTo(oldScore);
+        assertThat(sourceFor(v2.rankingVersionId(), studentA)).isEqualTo(newScore);
+        assertThatThrownBy(() -> rankingRead.publicDetail(definitionId))
+                .isInstanceOf(IllegalArgumentException.class);
+        authenticateStudent(studentA, schoolA);
+        assertThat(rankingRead.studentDetail(definitionId).entries().getFirst().scoreDisplayValue()).isEqualTo("99");
+        authenticateSchoolAdmin(adminA, schoolA);
+        assertThat(rankingRead.schoolAdminDetail(definitionId).entries().getFirst().scoreDisplayValue()).isEqualTo("99");
+    }
+
+    @Test
+    void l2PublicationAuthorizationMatrixIsEnforced() {
+        UUID definitionId = createL2Definition("-l2-auth");
+        insertScore(studentA, schoolA, 1, "98");
+        UUID generated = rankingGeneration.generate(definitionId).rankingVersionId();
+
+        authenticateSchoolAdmin(adminB, schoolB);
+        assertThatThrownBy(() -> rankingPublication.publish(definitionId, generated))
+                .isInstanceOfSatisfying(IdentityApplicationException.class,
+                        ex -> assertThat(ex.code()).isEqualTo("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        authenticateStudent(studentA, schoolA);
+        assertThatThrownBy(() -> rankingPublication.publish(definitionId, generated))
+                .isInstanceOfSatisfying(IdentityApplicationException.class,
+                        ex -> assertThat(ex.code()).isEqualTo("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        authenticateSuperAdmin(enteredBy);
+        assertThatThrownBy(() -> rankingPublication.publish(definitionId, generated))
+                .isInstanceOfSatisfying(IdentityApplicationException.class,
+                        ex -> assertThat(ex.code()).isEqualTo("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        SecurityContextHolder.clearContext();
+        assertThatThrownBy(() -> rankingPublication.publish(definitionId, generated))
+                .isInstanceOf(RuntimeException.class);
+
+        authenticateSchoolAdmin(adminA, schoolA);
+        assertThat(rankingPublication.publish(definitionId, generated).status()).isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void concurrentL2PublicationSerializesOnDefinitionLock() throws Exception {
+        UUID definitionId = createL2Definition("-l2-concurrent");
+        insertScore(studentA, schoolA, 1, "98");
+        var v1 = rankingGeneration.generate(definitionId);
+        jdbc.update("UPDATE score_attempts SET is_current_effective = false WHERE student_id = ?", studentA);
+        insertScore(studentA, schoolA, 2, "99");
+        var v2 = rankingGeneration.generate(definitionId);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = executor.submit(() -> publishConcurrently(definitionId, v1.rankingVersionId(), ready, start));
+            Future<?> second = executor.submit(() -> publishConcurrently(definitionId, v2.rankingVersionId(), ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+
+            UUID current = jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?",
+                    UUID.class, definitionId);
+            assertThat(current).isIn(v1.rankingVersionId(), v2.rankingVersionId());
+            assertThat(jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM ranking_versions
+                    WHERE definition_id = ? AND version_status = 'PUBLISHED'
+                    """, Integer.class, definitionId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM ranking_versions
+                    WHERE definition_id = ? AND version_status IN ('PUBLISHED', 'REPLACED')
+                    """, Integer.class, definitionId)).isEqualTo(2);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void l2PublicationWaitsForConcurrentDisableAndThenRejects() throws Exception {
+        UUID definitionId = createL2Definition("-l2-disable-race");
+        insertScore(studentA, schoolA, 1, "98");
+        UUID versionId = rankingGeneration.generate(definitionId).rankingVersionId();
+        CountDownLatch disableHoldingLock = new CountDownLatch(1);
+        CountDownLatch releaseDisable = new CountDownLatch(1);
+        CountDownLatch publicationFinished = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> disabling = executor.submit(() -> {
+                new TransactionTemplate(txManager).executeWithoutResult(status -> {
+                    jdbc.queryForObject("SELECT id FROM ranking_definitions WHERE id = ? FOR UPDATE",
+                            UUID.class, definitionId);
+                    jdbc.update("UPDATE ranking_definitions SET is_enabled = false WHERE id = ?", definitionId);
+                    disableHoldingLock.countDown();
+                    await(releaseDisable);
+                });
+                return null;
+            });
+            assertThat(disableHoldingLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> publication = executor.submit(() -> {
+                try {
+                    SecurityContextHolder.getContext().setAuthentication(adminAAuth);
+                    rankingPublication.publish(definitionId, versionId);
+                    return null;
+                } finally {
+                    SecurityContextHolder.clearContext();
+                    publicationFinished.countDown();
+                }
+            });
+            assertThat(publicationFinished.await(300, TimeUnit.MILLISECONDS)).isFalse();
+            releaseDisable.countDown();
+
+            assertThatThrownBy(() -> publication.get(30, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(IllegalStateException.class);
+            disabling.get(30, TimeUnit.SECONDS);
+            assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?",
+                    String.class, versionId)).isEqualTo("GENERATED");
+            assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?",
+                    UUID.class, definitionId)).isNull();
+        } finally {
+            releaseDisable.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void l2GenerationAndPublicationSerializeOnDefinitionLock() throws Exception {
+        UUID definitionId = createL2Definition("-l2-generate-publish");
+        insertScore(studentA, schoolA, 1, "98");
+        UUID v1 = rankingGeneration.generate(definitionId).rankingVersionId();
+        jdbc.update("UPDATE score_attempts SET is_current_effective = false WHERE student_id = ?", studentA);
+        insertScore(studentA, schoolA, 2, "99");
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> publish = executor.submit(() -> publishConcurrently(definitionId, v1, ready, start));
+            Future<?> generate = executor.submit(() -> {
+                try {
+                    SecurityContextHolder.getContext().setAuthentication(adminAAuth);
+                    ready.countDown();
+                    assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                    rankingGeneration.generate(definitionId);
+                    return null;
+                } finally {
+                    SecurityContextHolder.clearContext();
+                }
+            });
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            publish.get(30, TimeUnit.SECONDS);
+            generate.get(30, TimeUnit.SECONDS);
+
+            assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?",
+                    UUID.class, definitionId)).isEqualTo(v1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ranking_versions WHERE definition_id = ?",
+                    Integer.class, definitionId)).isEqualTo(2);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ranking_versions WHERE definition_id = ? AND version_status = 'GENERATED'",
+                    Integer.class, definitionId)).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -418,6 +635,16 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
                 activityProjectId).id();
     }
 
+    private UUID createL2Definition(String suffix) {
+        return rankingDefinitions.create(
+                RankingLayer.L2,
+                runPrefix + suffix,
+                schoolA,
+                projectId,
+                null,
+                null).id();
+    }
+
     private UUID insertVersion(UUID definitionId, String status) {
         Integer maxVersion = jdbc.queryForObject(
                 "SELECT COALESCE(MAX(version_number), 0) FROM ranking_versions WHERE definition_id = ?",
@@ -502,6 +729,18 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
                 "NORMAL",
                 Set.of(new SimpleGrantedAuthority("ROLE_STUDENT")),
                 List.of(new AuthenticatedSchoolMembership(UUID.randomUUID(), schoolId, "STUDENT")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(details, "n/a", details.getAuthorities()));
+    }
+
+    private void authenticateSuperAdmin(UUID userId) {
+        var details = new CampusGuinnessUserDetails(
+                userId,
+                runPrefix + "-super",
+                "{noop}password",
+                "NORMAL",
+                Set.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN")),
+                List.of());
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(details, "n/a", details.getAuthorities()));
     }

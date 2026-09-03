@@ -22,6 +22,7 @@ class SuperAdminBootstrapIT extends PostgreSqlIntegrationTestSupport {
     @Autowired private PasswordHasher hasher;
     @Autowired private JdbcTemplate jdbc;
 
+    @BeforeEach
     @AfterEach
     void cleanUsers() {
         // Delete in reverse FK order
