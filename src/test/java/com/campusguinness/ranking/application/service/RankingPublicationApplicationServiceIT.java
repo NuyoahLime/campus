@@ -264,7 +264,7 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     @Test
-    void generatedL2PublishesAndExistingReadSideExposesSnapshot() {
+    void generatedL2PublishesAndPublicReadRemainsDeniedWhileSameSchoolReadsWork() {
         UUID definitionId = createL2Definition("-l2-ranking");
         UUID sourceA = insertScore(studentA, schoolA, 1, "98");
         insertScore(studentB, schoolA, 1, "95");
@@ -287,10 +287,9 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
                 definitionId)).isEqualTo(generated.rankingVersionId());
         assertThat(counts(generated.rankingVersionId())).isEqualTo(before);
 
-        var publicRead = rankingRead.publicDetail(definitionId);
-        assertThat(publicRead.layer()).isEqualTo("L2");
-        assertThat(publicRead.versionNumber()).isEqualTo(1);
-        assertThat(publicRead.entries()).extracting(e -> e.scoreDisplayValue()).containsExactly("98", "95");
+        assertThatThrownBy(() -> rankingRead.publicDetail(definitionId))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(rankingRead.listPublic(0, 20).items()).extracting("id").doesNotContain(definitionId);
         authenticateStudent(studentA, schoolA);
         assertThat(rankingRead.studentDetail(definitionId).versionNumber()).isEqualTo(1);
         authenticateSchoolAdmin(adminA, schoolA);
@@ -299,7 +298,7 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     @Test
-    void publishingNewGeneratedL2VersionReplacesOldCurrentWithoutMutatingEntriesOrSources() {
+    void publishingNewGeneratedL2VersionReplacesOldCurrentWithoutMutatingEntriesOrSourcesAndKeepsPublicReadDenied() {
         UUID definitionId = createL2Definition("-l2-replacement");
         UUID oldScore = insertScore(studentA, schoolA, 1, "98");
         var v1 = rankingGeneration.generate(definitionId);
@@ -320,8 +319,12 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
         assertThat(counts(v1.rankingVersionId())).isEqualTo(v1Counts);
         assertThat(sourceFor(v1.rankingVersionId(), studentA)).isEqualTo(oldScore);
         assertThat(sourceFor(v2.rankingVersionId(), studentA)).isEqualTo(newScore);
-        assertThat(rankingRead.publicDetail(definitionId).layer()).isEqualTo("L2");
-        assertThat(rankingRead.publicDetail(definitionId).entries().getFirst().scoreDisplayValue()).isEqualTo("99");
+        assertThatThrownBy(() -> rankingRead.publicDetail(definitionId))
+                .isInstanceOf(IllegalArgumentException.class);
+        authenticateStudent(studentA, schoolA);
+        assertThat(rankingRead.studentDetail(definitionId).entries().getFirst().scoreDisplayValue()).isEqualTo("99");
+        authenticateSchoolAdmin(adminA, schoolA);
+        assertThat(rankingRead.schoolAdminDetail(definitionId).entries().getFirst().scoreDisplayValue()).isEqualTo("99");
     }
 
     @Test
