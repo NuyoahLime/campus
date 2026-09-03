@@ -37,7 +37,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   ACADEMIC: '学术挑战',
   MATH: '数学挑战',
   SCIENCE: '科学挑战',
-  SPORT: '体育运动'
+  SPORT: '体育运动',
+  SPORTS: '体育运动'
 };
 
 function label(value: string | null | undefined, labels: Record<string, string>): string {

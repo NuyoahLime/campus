@@ -27,7 +27,7 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
 
     @Override
     public QueryPage<RankingManagementDefinitionResult> list(UUID schoolId, int page, int size) {
-        String from = fromClause() + " WHERE d.layer = 'L1' AND d.school_id = ?";
+        String from = fromClause() + " WHERE d.layer IN ('L1', 'L2') AND d.school_id = ?";
         List<RankingManagementDefinitionResult> items = jdbc.query(
                 selectClause() + from + " ORDER BY d.updated_at DESC, d.name ASC, d.id ASC LIMIT ? OFFSET ?",
                 (rs, row) -> mapDefinition(rs, false),
@@ -39,7 +39,7 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
     @Override
     public Optional<RankingManagementDefinitionResult> detail(UUID definitionId, UUID schoolId) {
         return jdbc.query(selectClause() + fromClause()
-                        + " WHERE d.id = ? AND d.layer = 'L1' AND d.school_id = ?",
+                        + " WHERE d.id = ? AND d.layer IN ('L1', 'L2') AND d.school_id = ?",
                 rs -> {
                     if (!rs.next()) return Optional.empty();
                     return Optional.of(mapDefinition(rs, true));
@@ -51,6 +51,12 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
         return """
                 SELECT d.id, d.name, d.layer, d.is_enabled, d.school_id, s.name AS school_name,
                        d.project_id, p.name AS project_name,
+                       d.dimension_filters::text AS dimension_filters,
+                       d.dimension_filters ->> 'selectionPolicy' AS selection_policy,
+                       d.dimension_filters ->> 'grade' AS grade,
+                       d.dimension_filters ->> 'className' AS class_name,
+                       NULLIF(d.dimension_filters ->> 'activityPeriodStart', '')::timestamptz AS activity_period_start,
+                       NULLIF(d.dimension_filters ->> 'activityPeriodEnd', '')::timestamptz AS activity_period_end,
                        ap.id AS activity_project_id, a.id AS activity_id, a.title AS activity_title,
                        gv.id AS generated_version_id, gv.version_number AS generated_version_number,
                        gv.version_status AS generated_version_status, gv.generated_at AS generated_at,
@@ -104,6 +110,12 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
                 rs.getObject("activity_id", UUID.class),
                 rs.getString("activity_title"),
                 rs.getObject("activity_project_id", UUID.class),
+                rs.getString("dimension_filters"),
+                rs.getString("selection_policy"),
+                rs.getString("grade"),
+                rs.getString("class_name"),
+                instant(rs, "activity_period_start"),
+                instant(rs, "activity_period_end"),
                 generated,
                 current);
     }

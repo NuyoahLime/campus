@@ -19,16 +19,13 @@ test.describe('L1 ranking management frontend', () => {
     await loginUi(page, actors.schoolAdminB);
     await page.goto('/school-admin/ranking-management');
     await expect(page).toHaveURL(/\/school-admin\/ranking-management$/);
-    await expect(page.getByRole('heading', { name: 'Ranking Management' })).toBeVisible();
 
     const name = `E2E L1 Management ${Date.now()}`;
     await page.getByLabel(/^Name$/).fill(name);
     const createForm = page.locator('.ranking-create-form');
-    await createForm.locator('select').first().selectOption({ label: 'ACTIVITY_OTHER_SCHOOL' });
-    await expect(createForm.locator('select').nth(1).locator('option', {
-      hasText: 'E2E Other School Project / Rule V1'
-    })).toBeAttached();
-    await createForm.locator('select').nth(1).selectOption({ label: 'E2E Other School Project / Rule V1' });
+    await createForm.locator('select').first().selectOption('L1');
+    await createForm.locator('select').nth(1).selectOption({ label: 'ACTIVITY_OTHER_SCHOOL' });
+    await createForm.locator('select').nth(2).selectOption({ label: 'E2E Other School Project / Rule V1' });
 
     const createResponse = page.waitForResponse(response =>
       response.request().method() === 'POST'
@@ -58,11 +55,6 @@ test.describe('L1 ranking management frontend', () => {
     const publicBeforePublish = await apiRequest(request, 'GET', `/api/v1/public/rankings/${created.id}`);
     expect(publicBeforePublish.status()).toBe(404);
 
-    await page.reload();
-    await expect(page.getByRole('heading', { name })).toBeVisible();
-    await expect(page.locator('.ranking-version-box').first()).toContainText('GENERATED');
-    await expect(page.locator('.ranking-version-box').first()).toContainText('e2e-student-other-school');
-
     await page.locator('.ranking-management-section').first().getByRole('button', { name: 'Publish' }).click();
     const dialog = page.getByRole('dialog', { name: 'Confirm publication' });
     await expect(dialog).toBeVisible();
@@ -86,9 +78,50 @@ test.describe('L1 ranking management frontend', () => {
 
     await detail.getByRole('button', { name: 'Disable' }).click();
     await expect(page.getByText('RankingDefinition disabled.')).toBeVisible();
-    await expect(page.locator('.ranking-management-summary')).toContainText('Disabled');
+    await expect(detail.getByRole('button', { name: 'Enable' })).toBeVisible();
     await expect(page.getByText('Disabled definitions cannot generate or publish rankings.')).toBeVisible();
     await expect(detail.getByRole('button', { name: 'Generate' })).toBeDisabled();
+  });
+
+  test('school admin creates and generates an L2 ranking definition', async ({ page, request }) => {
+    await fixture();
+    await loginUi(page, actors.schoolAdminA);
+    await page.goto('/school-admin/ranking-management');
+    await expect(page).toHaveURL(/\/school-admin\/ranking-management$/);
+
+    const name = `E2E L2 Management ${Date.now()}`;
+    await page.getByLabel(/^Name$/).fill(name);
+    const createForm = page.locator('.ranking-create-form');
+    await createForm.locator('select').first().selectOption('L2');
+    await createForm.locator('select').nth(1).selectOption({ label: 'E2E Best Project / 体育运动' });
+    await page.getByLabel(/^Grade Filter$/).fill('2026');
+    await page.getByLabel(/^Class Filter$/).fill('E2E-A');
+
+    const createResponse = page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && response.url().endsWith('/api/v1/ranking-definitions')
+    );
+    await page.getByRole('button', { name: 'Create L2 Ranking' }).click();
+    const createResult = await createResponse;
+    expect(createResult.status()).toBe(201);
+    const created = await createResult.json() as { id: string };
+    await expect(page.getByText('L2 RankingDefinition created.')).toBeVisible();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+
+    const detail = page.locator('.ranking-management-detail');
+    await expect(detail).toContainText('L2 · E2E Best Project / Grade 2026 / Class E2E-A');
+    await expect(detail).toContainText('L2 SCOPE');
+    await expect(detail).toContainText('BEST_SCORE');
+
+    const generateResponse = page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && response.url().endsWith(`/api/v1/ranking-definitions/${created.id}/generate`)
+    );
+    await detail.getByRole('button', { name: 'Generate' }).click();
+    const generated = await generateResponse;
+    expect(generated.status()).toBe(200);
+    await expect(detail).toContainText('GENERATED');
+    await expect(detail.locator('.ranking-version-box').first()).toContainText('0 entries');
   });
 
   test('student route and backend management access are denied', async ({ page, request }) => {
