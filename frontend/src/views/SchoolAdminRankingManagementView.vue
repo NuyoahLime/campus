@@ -4,6 +4,7 @@ import WorkspaceShell from '../components/WorkspaceShell.vue';
 import RankingEntriesTable from '../components/RankingEntriesTable.vue';
 import { ApiError } from '../api/http';
 import { getManagedActivity, listManagedActivities } from '../api/activityManagement';
+import { listPublicProjects } from '../api/challengeProjects';
 import { getRanking } from '../api/ranking';
 import {
   createRankingDefinition,
@@ -16,13 +17,21 @@ import {
 } from '../api/rankingManagement';
 import { schoolAdminNavigation as navigation } from '../router/schoolAdminNavigation';
 import type { ActivityManagementDetail, ActivityManagementListItem } from '../types/activityManagement';
+import type { ChallengeProjectListItem } from '../types/challengeProject';
 import type { RankingDetail } from '../types/ranking';
-import type { RankingManagementDefinition, RankingManagementVersion } from '../types/rankingManagement';
+import type {
+  RankingDefinitionCreateForm,
+  RankingManagementDefinition,
+  RankingManagementLayer,
+  RankingManagementVersion
+} from '../types/rankingManagement';
+import { labelForCategory } from '../utils/challengeProjectLabels';
 
 const definitions = ref<RankingManagementDefinition[]>([]);
 const selected = ref<RankingManagementDefinition | null>(null);
 const published = ref<RankingDetail | null>(null);
 const activities = ref<ActivityManagementListItem[]>([]);
+const projects = ref<ChallengeProjectListItem[]>([]);
 const selectedActivity = ref<ActivityManagementDetail | null>(null);
 const loading = ref(true);
 const loadingActivity = ref(false);
@@ -34,15 +43,81 @@ const pageError = ref('');
 const actionMessage = ref('');
 const actionError = ref('');
 const publishCandidate = ref<RankingManagementVersion | null>(null);
-const form = ref({ name: '', activityId: '', activityProjectId: '' });
+const form = ref({
+  layer: 'L1' as RankingManagementLayer,
+  name: '',
+  activityId: '',
+  activityProjectId: '',
+  projectId: '',
+  grade: '',
+  className: '',
+  activityPeriodStart: '',
+  activityPeriodEnd: ''
+});
 
 const selectedActivityProject = computed(() =>
   selectedActivity.value?.projects.find((project) => project.id === form.value.activityProjectId) ?? null
 );
 
-const canCreate = computed(() =>
-  form.value.name.trim().length > 0 && Boolean(selectedActivityProject.value) && !saving.value
+const selectedChallengeProject = computed(() =>
+  projects.value.find((project) => project.id === form.value.projectId) ?? null
 );
+
+const activityPeriodError = computed(() => {
+  if (form.value.layer !== 'L2' || !form.value.activityPeriodStart || !form.value.activityPeriodEnd) {
+    return '';
+  }
+  return new Date(form.value.activityPeriodStart).getTime() > new Date(form.value.activityPeriodEnd).getTime()
+    ? 'Activity period start must not be after end.'
+    : '';
+});
+
+const canCreate = computed(() => {
+  if (saving.value || form.value.name.trim().length === 0 || activityPeriodError.value) return false;
+  return form.value.layer === 'L1'
+    ? Boolean(selectedActivityProject.value)
+    : Boolean(selectedChallengeProject.value);
+});
+
+function resetCreateFields(layer: RankingManagementLayer = 'L1', keepName = true) {
+  form.value = {
+    layer,
+    name: keepName ? form.value.name : '',
+    activityId: '',
+    activityProjectId: '',
+    projectId: '',
+    grade: '',
+    className: '',
+    activityPeriodStart: '',
+    activityPeriodEnd: ''
+  };
+  selectedActivity.value = null;
+}
+
+function localDateTimeToIso(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function buildL2DimensionFilters() {
+  return JSON.stringify({
+    selectionPolicy: 'BEST_SCORE',
+    grade: form.value.grade.trim() || null,
+    className: form.value.className.trim() || null,
+    activityPeriodStart: localDateTimeToIso(form.value.activityPeriodStart),
+    activityPeriodEnd: localDateTimeToIso(form.value.activityPeriodEnd)
+  });
+}
+
+function describeDefinition(definition: RankingManagementDefinition) {
+  const scope = definition.layer === 'L1'
+    ? [definition.activityTitle || 'Activity unavailable', definition.projectName].filter(Boolean).join(' / ')
+    : [
+        definition.projectName,
+        definition.grade ? `Grade ${definition.grade}` : '',
+        definition.className ? `Class ${definition.className}` : ''
+      ].filter(Boolean).join(' / ');
+  return scope || definition.projectName;
+}
 
 function formatDate(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString() : 'Not recorded';
@@ -53,6 +128,9 @@ function describeError(error: unknown) {
     if (error.status === 401) return 'Please sign in again.';
     if (error.status === 403) return 'This account cannot manage rankings.';
     if (error.status === 404) return 'The ranking resource was not found.';
+    if (error.code === 'L2_RANKING_DEFINITION_ALREADY_EXISTS') {
+      return 'An L2 ranking already exists for this project.';
+    }
     if (error.status === 409) return 'The ranking state changed. Refresh and try again.';
     if (error.status === 400) return 'Check the required fields and try again.';
   }
@@ -63,19 +141,32 @@ async function loadDefinitions(selectId = selected.value?.id ?? '') {
   loading.value = true;
   pageError.value = '';
   try {
-    const [definitionPage, activityPage] = await Promise.all([
-      listManagedRankingDefinitions(0, 50),
-      listManagedActivities(0, 50)
-    ]);
+    const definitionPage = await listManagedRankingDefinitions(0, 50);
     definitions.value = definitionPage.items;
-    activities.value = activityPage.items;
     const next = definitions.value.find((definition) => definition.id === selectId) ?? definitions.value[0] ?? null;
     selected.value = next;
     await refreshSelected();
+    const [activityPage, projectPage] = await Promise.allSettled([
+      listManagedActivities(0, 50),
+      listPublicProjects(0, 100)
+    ]);
+    if (activityPage.status === 'fulfilled') {
+      activities.value = activityPage.value.items;
+    } else {
+      activities.value = [];
+      actionError.value = describeError(activityPage.reason);
+    }
+    if (projectPage.status === 'fulfilled') {
+      projects.value = projectPage.value.items;
+    } else {
+      projects.value = [];
+      actionError.value = describeError(projectPage.reason);
+    }
   } catch (error) {
     definitions.value = [];
     selected.value = null;
     published.value = null;
+    projects.value = [];
     pageError.value = describeError(error);
   } finally {
     loading.value = false;
@@ -110,6 +201,7 @@ async function selectDefinition(definition: RankingManagementDefinition) {
 }
 
 watch(() => form.value.activityId, async (activityId) => {
+  if (form.value.layer !== 'L1') return;
   form.value.activityProjectId = '';
   selectedActivity.value = null;
   if (!activityId) return;
@@ -127,22 +219,35 @@ watch(() => form.value.activityId, async (activityId) => {
   }
 });
 
+watch(() => form.value.layer, () => {
+  actionError.value = '';
+  actionMessage.value = '';
+  resetCreateFields(form.value.layer, true);
+});
+
 async function createDefinition() {
-  const project = selectedActivityProject.value;
-  if (!project || !canCreate.value) return;
+  if (!canCreate.value) return;
   saving.value = true;
   actionError.value = '';
   actionMessage.value = '';
   try {
-    const created = await createRankingDefinition({
-      name: form.value.name.trim(),
-      activityProjectId: project.id,
-      projectId: project.projectId
-    });
-    form.value = { name: '', activityId: '', activityProjectId: '' };
-    selectedActivity.value = null;
+    const payload: RankingDefinitionCreateForm = form.value.layer === 'L1'
+      ? {
+          layer: 'L1',
+          name: form.value.name.trim(),
+          projectId: selectedActivityProject.value!.projectId,
+          activityProjectId: selectedActivityProject.value!.id
+        }
+      : {
+          layer: 'L2',
+          name: form.value.name.trim(),
+          projectId: selectedChallengeProject.value!.id,
+          dimensionFilters: buildL2DimensionFilters()
+        };
+    const created = await createRankingDefinition(payload);
+    resetCreateFields(form.value.layer, false);
     await loadDefinitions(created.id);
-    actionMessage.value = 'RankingDefinition created.';
+    actionMessage.value = `${payload.layer} RankingDefinition created.`;
   } catch (error) {
     actionError.value = describeError(error);
   } finally {
@@ -218,7 +323,7 @@ onMounted(() => void loadDefinitions());
     role-label="School Admin"
     workspace-title="School Admin Workspace"
     page-title="Ranking Management"
-    description="Create, generate, publish, and verify L1 rankings for the current school."
+    description="Create, generate, publish, and verify L1 and L2 rankings for the current school."
     home-path="/school-admin"
     :navigation="navigation"
     :show-identity="false"
@@ -227,7 +332,7 @@ onMounted(() => void loadDefinitions());
       <div class="ranking-management-panel">
         <header class="student-score-toolbar">
           <div>
-            <p class="eyebrow">L1 DEFINITIONS</p>
+            <p class="eyebrow">MANAGED DEFINITIONS</p>
             <h2>Managed Rankings</h2>
             <span>{{ definitions.length }} definitions</span>
           </div>
@@ -243,7 +348,7 @@ onMounted(() => void loadDefinitions());
         </div>
         <div v-else-if="definitions.length === 0" class="project-state">
           <strong>No RankingDefinition yet</strong>
-          <p>Create the first L1 ranking from an activity project.</p>
+          <p>Create the first ranking definition for this school.</p>
         </div>
         <div v-else class="ranking-definition-list">
           <button
@@ -256,7 +361,7 @@ onMounted(() => void loadDefinitions());
           >
             <span>
               <strong>{{ definition.name }}</strong>
-              <small>{{ definition.activityTitle || 'Activity unavailable' }} / {{ definition.projectName }}</small>
+              <small>{{ definition.layer }} · {{ describeDefinition(definition) }}</small>
             </span>
             <em :data-status="definition.enabled ? 'ENABLED' : 'DISABLED'">
               {{ definition.enabled ? 'Enabled' : 'Disabled' }}
@@ -268,7 +373,7 @@ onMounted(() => void loadDefinitions());
       <div class="ranking-management-panel ranking-create-panel">
         <header class="student-score-toolbar">
           <div>
-            <p class="eyebrow">CREATE L1</p>
+            <p class="eyebrow">CREATE DEFINITION</p>
             <h2>Create RankingDefinition</h2>
             <span>School scope is derived from the signed-in account.</span>
           </div>
@@ -276,28 +381,67 @@ onMounted(() => void loadDefinitions());
         <form class="ranking-create-form" @submit.prevent="createDefinition">
           <label>
             <span>Name</span>
-            <input v-model.trim="form.name" maxlength="200" required placeholder="L1 ranking name" />
+            <input v-model.trim="form.name" maxlength="200" required placeholder="Ranking name" />
           </label>
           <label>
-            <span>Activity</span>
-            <select v-model="form.activityId" required>
-              <option value="">Select activity</option>
-              <option v-for="activity in activities" :key="activity.id" :value="activity.id">
-                {{ activity.title }}
-              </option>
+            <span>Layer</span>
+            <select v-model="form.layer">
+              <option value="L1">L1</option>
+              <option value="L2">L2</option>
             </select>
           </label>
-          <label>
-            <span>Activity Project</span>
-            <select v-model="form.activityProjectId" required :disabled="!selectedActivity || loadingActivity">
-              <option value="">{{ loadingActivity ? 'Loading projects...' : 'Select activity project' }}</option>
-              <option v-for="project in selectedActivity?.projects ?? []" :key="project.id" :value="project.id">
-                {{ project.projectName }} / Rule V{{ project.ruleVersionNumber }}
-              </option>
-            </select>
-          </label>
+          <template v-if="form.layer === 'L1'">
+            <label>
+              <span>Activity</span>
+              <select v-model="form.activityId" required>
+                <option value="">Select activity</option>
+                <option v-for="activity in activities" :key="activity.id" :value="activity.id">
+                  {{ activity.title }}
+                </option>
+              </select>
+            </label>
+            <label>
+              <span>Activity Project</span>
+              <select v-model="form.activityProjectId" required :disabled="!selectedActivity || loadingActivity">
+                <option value="">{{ loadingActivity ? 'Loading projects...' : 'Select activity project' }}</option>
+                <option v-for="project in selectedActivity?.projects ?? []" :key="project.id" :value="project.id">
+                  {{ project.projectName }} / Rule V{{ project.ruleVersionNumber }}
+                </option>
+              </select>
+            </label>
+          </template>
+          <template v-else>
+            <label class="project-form-wide">
+              <span>Challenge Project</span>
+              <select v-model="form.projectId" required>
+                <option value="">Select challenge project</option>
+                <option v-for="project in projects" :key="project.id" :value="project.id">
+                  {{ project.name }} / {{ labelForCategory(project.category) }}
+                </option>
+              </select>
+            </label>
+            <label>
+              <span>Grade Filter</span>
+              <input v-model.trim="form.grade" maxlength="32" placeholder="Optional" />
+            </label>
+            <label>
+              <span>Class Filter</span>
+              <input v-model.trim="form.className" maxlength="64" placeholder="Optional" />
+            </label>
+            <label>
+              <span>Activity Period Start</span>
+              <input v-model="form.activityPeriodStart" type="datetime-local" />
+            </label>
+            <label>
+              <span>Activity Period End</span>
+              <input v-model="form.activityPeriodEnd" type="datetime-local" />
+            </label>
+            <p v-if="activityPeriodError" class="project-inline-error project-form-wide" role="alert">
+              {{ activityPeriodError }}
+            </p>
+          </template>
           <button class="primary-button" type="submit" :disabled="!canCreate">
-            {{ saving ? 'Creating...' : 'Create L1 Ranking' }}
+            {{ saving ? 'Creating...' : form.layer === 'L1' ? 'Create L1 Ranking' : 'Create L2 Ranking' }}
           </button>
         </form>
       </div>
@@ -311,7 +455,7 @@ onMounted(() => void loadDefinitions());
         <div>
           <p class="eyebrow">SELECTED DEFINITION</p>
           <h2>{{ selected.name }}</h2>
-          <span>{{ selected.activityTitle || 'Activity unavailable' }} / {{ selected.projectName }}</span>
+          <span>{{ selected.layer }} · {{ describeDefinition(selected) }}</span>
         </div>
         <div class="ranking-management-actions">
           <button
@@ -346,6 +490,37 @@ onMounted(() => void loadDefinitions());
       <div v-if="!selected.enabled" class="ranking-management-notice" role="status">
         Disabled definitions cannot generate or publish rankings. Published read remains hidden while disabled.
       </div>
+
+      <section v-if="selected.layer === 'L2'" class="ranking-management-section">
+        <div class="project-section-heading">
+          <div>
+            <p class="eyebrow">L2 SCOPE</p>
+            <h2>Dimension Filters</h2>
+          </div>
+        </div>
+        <dl class="ranking-management-summary">
+          <div>
+            <dt>Selection Policy</dt>
+            <dd>{{ selected.selectionPolicy || 'BEST_SCORE' }}</dd>
+          </div>
+          <div>
+            <dt>Grade</dt>
+            <dd>{{ selected.grade || 'Any' }}</dd>
+          </div>
+          <div>
+            <dt>Class</dt>
+            <dd>{{ selected.className || 'Any' }}</dd>
+          </div>
+          <div>
+            <dt>Activity Period Start</dt>
+            <dd>{{ formatDate(selected.activityPeriodStart) }}</dd>
+          </div>
+          <div>
+            <dt>Activity Period End</dt>
+            <dd>{{ formatDate(selected.activityPeriodEnd) }}</dd>
+          </div>
+        </dl>
+      </section>
 
       <section class="ranking-management-section">
         <div class="project-section-heading">

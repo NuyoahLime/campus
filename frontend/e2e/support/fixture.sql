@@ -26,6 +26,7 @@
 \set designated_project '40000000-0000-0000-0000-000000000005'
 \set api_project '40000000-0000-0000-0000-000000000006'
 \set other_project '40000000-0000-0000-0000-000000000007'
+\set l2_best_project '40000000-0000-0000-0000-000000000008'
 \set lifecycle_rule '50000000-0000-0000-0000-000000000001'
 \set empty_rule '50000000-0000-0000-0000-000000000002'
 \set best_rule '50000000-0000-0000-0000-000000000003'
@@ -33,12 +34,14 @@
 \set designated_rule '50000000-0000-0000-0000-000000000005'
 \set api_rule '50000000-0000-0000-0000-000000000006'
 \set other_rule '50000000-0000-0000-0000-000000000007'
+\set l2_best_rule '50000000-0000-0000-0000-000000000008'
 \set activity_lifecycle '60000000-0000-0000-0000-000000000001'
 \set activity_best '60000000-0000-0000-0000-000000000002'
 \set activity_last '60000000-0000-0000-0000-000000000003'
 \set activity_designated '60000000-0000-0000-0000-000000000004'
 \set activity_api '60000000-0000-0000-0000-000000000005'
 \set activity_other '60000000-0000-0000-0000-000000000006'
+\set activity_l2_best '60000000-0000-0000-0000-000000000007'
 \set lifecycle_ap '70000000-0000-0000-0000-000000000001'
 \set empty_ap '70000000-0000-0000-0000-000000000002'
 \set best_ap '70000000-0000-0000-0000-000000000003'
@@ -46,6 +49,7 @@
 \set designated_ap '70000000-0000-0000-0000-000000000005'
 \set api_ap '70000000-0000-0000-0000-000000000006'
 \set other_ap '70000000-0000-0000-0000-000000000007'
+\set l2_best_ap '70000000-0000-0000-0000-000000000008'
 \set designated_first '80000000-0000-0000-0000-000000000005'
 \set designated_second '80000000-0000-0000-0000-000000000006'
 \set api_pending '80000000-0000-0000-0000-000000000007'
@@ -89,7 +93,8 @@ INSERT INTO challenge_projects(id, name, category, score_storage_type, score_ind
 (:'last_project', 'E2E Last Project', 'SPORTS', 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'LAST', 'PUBLISHED', NULL),
 (:'designated_project', 'E2E Designated Project', 'SPORTS', 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'ADMIN_DESIGNATED', 'PUBLISHED', NULL),
 (:'api_project', 'E2E API Project', 'SPORTS', 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'ADMIN_DESIGNATED', 'PUBLISHED', NULL),
-(:'other_project', 'E2E Other School Project', 'SPORTS', 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'PUBLISHED', NULL);
+(:'other_project', 'E2E Other School Project', 'SPORTS', 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'PUBLISHED', NULL),
+(:'l2_best_project', 'E2E L2 Best Project', 'SPORTS', 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'PUBLISHED', NULL);
 
 INSERT INTO project_rule_versions(id, project_id, version_number, score_storage_type, score_indicator_type, comparison_direction, score_unit, effective_score_rule, rules_text, created_by) VALUES
 (:'lifecycle_rule', :'lifecycle_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'E2E lifecycle rules', :'admin_a'),
@@ -98,7 +103,8 @@ INSERT INTO project_rule_versions(id, project_id, version_number, score_storage_
 (:'last_rule', :'last_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'LAST', 'E2E last rules', :'admin_a'),
 (:'designated_rule', :'designated_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'ADMIN_DESIGNATED', 'E2E designated rules', :'admin_a'),
 (:'api_rule', :'api_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'ADMIN_DESIGNATED', 'E2E api rules', :'admin_a'),
-(:'other_rule', :'other_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'E2E other rules', :'admin_b');
+(:'other_rule', :'other_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'E2E other rules', :'admin_b'),
+(:'l2_best_rule', :'l2_best_project', 1, 'INTEGER', 'NUMERIC', 'HIGHER_BETTER', 'points', 'BEST', 'E2E l2 best rules', :'admin_a');
 
 UPDATE challenge_projects SET current_rule_version_id = CASE id
   WHEN :'lifecycle_project'::uuid THEN :'lifecycle_rule'::uuid
@@ -108,9 +114,10 @@ UPDATE challenge_projects SET current_rule_version_id = CASE id
   WHEN :'designated_project'::uuid THEN :'designated_rule'::uuid
   WHEN :'api_project'::uuid THEN :'api_rule'::uuid
   WHEN :'other_project'::uuid THEN :'other_rule'::uuid
+  WHEN :'l2_best_project'::uuid THEN :'l2_best_rule'::uuid
 END
 WHERE id IN (:'lifecycle_project', :'empty_project', :'best_project', :'last_project',
-             :'designated_project', :'api_project', :'other_project');
+             :'designated_project', :'api_project', :'other_project', :'l2_best_project');
 
 INSERT INTO activities(id, school_id, title, execution_status, public_status, created_by) VALUES
 (:'activity_lifecycle', :'school_a', 'ACTIVITY_LIFECYCLE', 'PUBLISHED', 'PUBLIC', :'admin_a'),
@@ -118,7 +125,8 @@ INSERT INTO activities(id, school_id, title, execution_status, public_status, cr
 (:'activity_last', :'school_a', 'ACTIVITY_LAST', 'PUBLISHED', 'PUBLIC', :'admin_a'),
 (:'activity_designated', :'school_a', 'ACTIVITY_ADMIN_DESIGNATED', 'PUBLISHED', 'PUBLIC', :'admin_a'),
 (:'activity_api', :'school_a', 'ACTIVITY_API', 'PUBLISHED', 'PUBLIC', :'admin_a'),
-(:'activity_other', :'school_b', 'ACTIVITY_OTHER_SCHOOL', 'PUBLISHED', 'PUBLIC', :'admin_b');
+(:'activity_other', :'school_b', 'ACTIVITY_OTHER_SCHOOL', 'PUBLISHED', 'PUBLIC', :'admin_b'),
+(:'activity_l2_best', :'school_a', 'ACTIVITY_L2_BEST', 'PUBLISHED', 'PUBLIC', :'admin_a');
 
 INSERT INTO activity_projects(id, activity_id, project_id, rule_version_id) VALUES
 (:'lifecycle_ap', :'activity_lifecycle', :'lifecycle_project', :'lifecycle_rule'),
@@ -127,7 +135,8 @@ INSERT INTO activity_projects(id, activity_id, project_id, rule_version_id) VALU
 (:'last_ap', :'activity_last', :'last_project', :'last_rule'),
 (:'designated_ap', :'activity_designated', :'designated_project', :'designated_rule'),
 (:'api_ap', :'activity_api', :'api_project', :'api_rule'),
-(:'other_ap', :'activity_other', :'other_project', :'other_rule');
+(:'other_ap', :'activity_other', :'other_project', :'other_rule'),
+(:'l2_best_ap', :'activity_l2_best', :'l2_best_project', :'l2_best_rule');
 
 INSERT INTO activity_participants(id, activity_id, student_membership_id) VALUES
 ('71000000-0000-0000-0000-000000000101', :'activity_lifecycle', :'student_a_membership'),
@@ -135,7 +144,8 @@ INSERT INTO activity_participants(id, activity_id, student_membership_id) VALUES
 ('71000000-0000-0000-0000-000000000103', :'activity_last', :'student_a_membership'),
 ('71000000-0000-0000-0000-000000000104', :'activity_designated', :'student_a_membership'),
 ('71000000-0000-0000-0000-000000000105', :'activity_api', :'student_a_membership'),
-('71000000-0000-0000-0000-000000000106', :'activity_other', :'student_other_membership');
+('71000000-0000-0000-0000-000000000106', :'activity_other', :'student_other_membership'),
+('71000000-0000-0000-0000-000000000107', :'activity_l2_best', :'student_a_membership');
 
 INSERT INTO score_attempts(id, school_id, activity_project_id, student_id, attempt_number, score_storage_type, score_value, score_status, is_current_effective, entered_by, score_business_time) VALUES
 (:'designated_first', :'school_a', :'designated_ap', :'student_a', 1, 'INTEGER', 30, 'APPROVED', false, :'admin_a', now() - interval '2 minutes'),
@@ -149,12 +159,14 @@ SELECT 'FIXTURE_STATE=' || json_build_object(
   'activityLifecycle', :'activity_lifecycle', 'activityBest', :'activity_best',
   'activityLast', :'activity_last', 'activityAdminDesignated', :'activity_designated',
   'activityOtherSchool', :'activity_other', 'activityApi', :'activity_api',
+  'activityL2Best', :'activity_l2_best',
   'lifecycleProject', :'lifecycle_project', 'emptyHistoryProject', :'empty_project',
-  'bestProject', :'best_project', 'lastProject', :'last_project', 'designatedProject', :'designated_project',
+  'bestProject', :'best_project', 'l2BestProject', :'l2_best_project', 'lastProject', :'last_project', 'designatedProject', :'designated_project',
   'apiProject', :'api_project', 'lifecycleActivityProject', :'lifecycle_ap',
   'emptyHistoryActivityProject', :'empty_ap', 'bestActivityProject', :'best_ap',
   'lastActivityProject', :'last_ap', 'designatedActivityProject', :'designated_ap',
   'apiActivityProject', :'api_ap', 'otherSchoolActivityProject', :'other_ap',
+  'l2BestActivityProject', :'l2_best_ap',
   'designatedFirstAttempt', :'designated_first', 'designatedSecondAttempt', :'designated_second',
   'apiPendingAttempt', :'api_pending', 'otherSchoolAttempt', :'other_attempt'
 )::text;

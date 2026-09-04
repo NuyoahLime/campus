@@ -152,6 +152,14 @@ public class GlobalExceptionHandler {
                             req.getRequestURI()
                     ));
         }
+        if (containsInCauseChain(ex, "uq_ranking_def_l2_school_project")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of(
+                            "L2_RANKING_DEFINITION_ALREADY_EXISTS",
+                            "An L2 ranking definition already exists for this school and ChallengeProject.",
+                            req.getRequestURI()
+                    ));
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));
     }

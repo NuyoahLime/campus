@@ -19,10 +19,11 @@ export function createRankingDefinition(form: RankingDefinitionCreateForm) {
   return apiRequest<{ id: string; enabled: boolean }>('/ranking-definitions', {
     method: 'POST',
     body: JSON.stringify({
-      layer: 'L1',
+      layer: form.layer,
       name: form.name,
       projectId: form.projectId,
-      activityProjectId: form.activityProjectId
+      activityProjectId: form.activityProjectId ?? null,
+      dimensionFilters: form.dimensionFilters ?? null
     })
   });
 }

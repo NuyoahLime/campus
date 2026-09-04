@@ -1,6 +1,8 @@
 import type { PageResponse } from './schoolGovernance';
 import type { RankingEntry } from './ranking';
 
+export type RankingManagementLayer = 'L1' | 'L2';
+
 export interface RankingManagementVersion {
   id: string;
   versionNumber: number;
@@ -14,7 +16,7 @@ export interface RankingManagementVersion {
 export interface RankingManagementDefinition {
   id: string;
   name: string;
-  layer: 'L1';
+  layer: RankingManagementLayer;
   enabled: boolean;
   schoolId: string;
   schoolName: string;
@@ -23,14 +25,22 @@ export interface RankingManagementDefinition {
   activityId: string | null;
   activityTitle: string | null;
   activityProjectId: string | null;
+  dimensionFilters: string | null;
+  selectionPolicy: string | null;
+  grade: string | null;
+  className: string | null;
+  activityPeriodStart: string | null;
+  activityPeriodEnd: string | null;
   latestGeneratedVersion: RankingManagementVersion | null;
   currentPublishedVersion: RankingManagementVersion | null;
 }
 
 export interface RankingDefinitionCreateForm {
+  layer: RankingManagementLayer;
   name: string;
   projectId: string;
-  activityProjectId: string;
+  activityProjectId?: string;
+  dimensionFilters?: string;
 }
 
 export interface RankingGenerationResult {

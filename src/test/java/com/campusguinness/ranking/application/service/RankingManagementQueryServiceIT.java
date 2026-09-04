@@ -147,6 +147,36 @@ class RankingManagementQueryServiceIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
+    void sameSchoolAdminCanReadL2ManagementDefinition() {
+        UUID definitionId = rankingDefinitions.create(
+                RankingLayer.L2,
+                runPrefix + "-l2-ranking",
+                null,
+                projectId,
+                null,
+                """
+                {"selectionPolicy":"BEST_SCORE","grade":"G5","className":"C1","activityPeriodStart":"2026-01-01T00:00:00Z","activityPeriodEnd":"2026-01-31T23:59:59Z"}
+                """).id();
+
+        var page = managementQuery.list(0, 20);
+        assertThat(page.items()).extracting("id").contains(definitionId);
+
+        var detail = managementQuery.detail(definitionId);
+        assertThat(detail.layer()).isEqualTo("L2");
+        assertThat(detail.schoolId()).isEqualTo(schoolA);
+        assertThat(detail.projectId()).isEqualTo(projectId);
+        assertThat(detail.activityId()).isNull();
+        assertThat(detail.activityProjectId()).isNull();
+        assertThat(detail.selectionPolicy()).isEqualTo("BEST_SCORE");
+        assertThat(detail.grade()).isEqualTo("G5");
+        assertThat(detail.className()).isEqualTo("C1");
+        assertThat(detail.activityPeriodStart()).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"));
+        assertThat(detail.activityPeriodEnd()).isEqualTo(Instant.parse("2026-01-31T23:59:59Z"));
+        assertThat(detail.currentPublishedVersion()).isNull();
+        assertThat(detail.latestGeneratedVersion()).isNull();
+    }
+
+    @Test
     void managementReadIsSameSchoolOnly() {
         UUID definitionId = rankingDefinitions.create(
                 RankingLayer.L1, runPrefix + "-school-a-ranking", null, projectId, activityProjectId).id();

@@ -20,6 +20,12 @@ public record RankingManagementResponse(
         UUID activityId,
         String activityTitle,
         UUID activityProjectId,
+        String dimensionFilters,
+        String selectionPolicy,
+        String grade,
+        String className,
+        Instant activityPeriodStart,
+        Instant activityPeriodEnd,
         Version latestGeneratedVersion,
         Version currentPublishedVersion
 ) {
@@ -36,6 +42,12 @@ public record RankingManagementResponse(
                 result.activityId(),
                 result.activityTitle(),
                 result.activityProjectId(),
+                result.dimensionFilters(),
+                result.selectionPolicy(),
+                result.grade(),
+                result.className(),
+                result.activityPeriodStart(),
+                result.activityPeriodEnd(),
                 Version.from(result.latestGeneratedVersion()),
                 Version.from(result.currentPublishedVersion()));
     }
