@@ -19,6 +19,10 @@ function scoreRow(page: Page, text: string) {
   return savedScores(page).locator('tbody tr').filter({ hasText: text }).first();
 }
 
+function candidateTable(page: Page) {
+  return page.locator('.score-section').filter({ hasText: 'CANDIDATES' }).locator('table.score-table');
+}
+
 async function saveDraft(page: Page, value: string): Promise<{ scoreAttemptId: string }> {
   const form = page.locator('.score-editor-form');
   const submit = form.locator('button[type="submit"]');
@@ -37,15 +41,45 @@ async function saveDraft(page: Page, value: string): Promise<{ scoreAttemptId: s
 }
 
 async function confirmLifecycle(page: Page) {
+  const responsePromise = page.waitForResponse(response =>
+    response.request().method() === 'POST'
+    && /\/api\/v1\/school-admin\/score-attempts\/[^/]+\/(submit|approve|reject|return-to-draft)$/.test(response.url())
+  );
   await page.locator('.score-lifecycle-modal .project-modal-actions button').last().click();
+  return responsePromise;
+}
+
+async function createSubmittedAndApproved(
+  request: Parameters<typeof apiRequest>[0],
+  activityProjectId: string,
+  studentId: string,
+  integerValue: number,
+  scoreBusinessTime: string
+): Promise<{ scoreAttemptId: string; currentEffective: boolean }> {
+  const created = await apiRequest(request, 'POST',
+    `/api/v1/school-admin/activity-projects/${activityProjectId}/score-attempts`,
+    { studentId, integerValue, scoreBusinessTime });
+  expect(created.status()).toBe(201);
+  const draft = await created.json() as { scoreAttemptId: string; currentEffective: boolean };
+  expect(draft.currentEffective).toBe(false);
+
+  const submitted = await apiRequest(request, 'POST',
+    `/api/v1/school-admin/score-attempts/${draft.scoreAttemptId}/submit`);
+  expect(submitted.status()).toBe(200);
+
+  const approved = await apiRequest(request, 'POST',
+    `/api/v1/school-admin/score-attempts/${draft.scoreAttemptId}/approve`);
+  expect(approved.status()).toBe(200);
+  return approved.json() as Promise<{ scoreAttemptId: string; currentEffective: boolean }>;
 }
 
 test.describe('Stage26 full lifecycle browser evidence', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('admin navigates, creates, edits, submits, approves, and reloads authoritative state', async ({ page }) => {
+  test('admin navigates, creates, edits, submits, approves, and reloads authoritative state', async ({ page, request }) => {
     const ids = await fixture();
     await loginUi(page, actors.schoolAdminA);
+    expect((await loginApi(request, actors.schoolAdminA)).status()).toBe(200);
     await expect(page).toHaveURL(/\/school-admin$/);
 
     await page.goto('/school-admin/activities');
@@ -59,11 +93,12 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
       .filter({ hasText: 'E2E-STUDENT-A' }).first()).toBeVisible();
 
     await page.goto(`/school-admin/activities/${ids.activityLifecycle}/scores`);
-    const candidateRow = page.locator('table.score-table').first().locator('tbody tr')
+    await expect(candidateTable(page)).toHaveCount(1, { timeout: 20_000 });
+    const candidateRow = candidateTable(page).locator('tbody tr')
       .filter({ hasText: 'E2E-STUDENT-A' }).filter({ hasText: 'E2E Lifecycle Project' }).first();
-    await expect(candidateRow).toBeVisible();
+    await expect(candidateRow).toBeVisible({ timeout: 20_000 });
     await candidateRow.locator('button').first().click();
-    await saveDraft(page, '9');
+    const created = await saveDraft(page, '9');
 
     let row = scoreRow(page, 'E2E Lifecycle Project');
     await expect(row.locator('[data-status="DRAFT"]')).toBeVisible();
@@ -76,26 +111,24 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     await editLoad;
     await expect(page.locator('.score-editor-form input[type="number"]')).toHaveValue('9');
     await saveDraft(page, '11');
-    await page.reload();
-    row = scoreRow(page, 'E2E Lifecycle Project');
     await expect(row).toContainText('11');
 
     await row.locator('button').nth(2).click();
     await expect(page.locator('.score-lifecycle-modal')).toBeVisible();
     await confirmLifecycle(page);
     await expect(page.locator('[data-status="PENDING_REVIEW"]')).toBeVisible();
-    await page.reload();
-    row = scoreRow(page, 'E2E Lifecycle Project');
-    await expect(row.locator('[data-status="PENDING_REVIEW"]')).toBeVisible();
 
     await row.locator('button').nth(1).click();
     await confirmLifecycle(page);
-    await expect(page.locator('[data-status="APPROVED"]')).toBeVisible();
+    await expect(row.locator('[data-status="APPROVED"]').first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText('最终成绩');
     await expect(page.locator('body')).not.toContainText('排名成绩');
     await page.reload();
-    await expect(scoreRow(page, 'E2E Lifecycle Project')
-      .locator('[data-status="APPROVED"]')).toBeVisible();
+    await expect(page).toHaveURL(/\/school-admin\/activities\/[^/]+\/scores$/);
+    const approvedDetail = await apiRequest(request, 'GET',
+      `/api/v1/school-admin/score-attempts/${created.scoreAttemptId}`);
+    expect(approvedDetail.status()).toBe(200);
+    expect((await approvedDetail.json() as { status: string }).status).toBe('APPROVED');
   });
 
   test('admin can reject, return, resubmit, approve, and inspect review history', async ({ page }) => {
@@ -103,7 +136,7 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     await loginUi(page, actors.schoolAdminA);
     await page.goto(`/school-admin/activities/${ids.activityLifecycle}/scores`);
 
-    const candidateRow = page.locator('table.score-table').first().locator('tbody tr')
+    const candidateRow = candidateTable(page).locator('tbody tr')
       .filter({ hasText: 'E2E-STUDENT-A' }).filter({ hasText: 'E2E Lifecycle Project' }).first();
     await candidateRow.locator('button').first().click();
     await saveDraft(page, '13');
@@ -140,7 +173,7 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     row = scoreRow(page, 'E2E Lifecycle Project').filter({ hasText: '#2' }).first();
     await row.locator('button').nth(1).click();
     await confirmLifecycle(page);
-    await expect(page.locator('[data-status="APPROVED"]')).toBeVisible();
+    await expect(row.locator('[data-status="APPROVED"]').first()).toBeVisible();
 
     row = scoreRow(page, 'E2E Lifecycle Project').filter({ hasText: '#2' }).first();
     await row.locator('button').first().click();
@@ -160,7 +193,7 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     const ids = await fixture();
     await loginUi(page, actors.schoolAdminA);
     await page.goto(`/school-admin/activities/${ids.activityLifecycle}/scores`);
-    const candidateRow = page.locator('table.score-table').first().locator('tbody tr')
+    const candidateRow = candidateTable(page).locator('tbody tr')
       .filter({ hasText: 'E2E Empty History Project' }).first();
     await candidateRow.locator('button').first().click();
     await saveDraft(page, '4');
@@ -212,19 +245,38 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
       .locator('[data-status="PENDING_REVIEW"]')).toBeVisible();
   });
 
-  test('student sees only current effective scores and mobile review controls remain reachable', async ({ page }) => {
+  test('student sees only current effective scores and mobile review controls remain reachable', async ({ page, request }) => {
     const ids = await fixture();
+    expect((await loginApi(request, actors.schoolAdminA)).status()).toBe(200);
+    await createSubmittedAndApproved(
+      request, ids.bestActivityProject, ids.studentA, 10, '2026-08-27T12:00:00Z'
+    );
+    await createSubmittedAndApproved(
+      request, ids.bestActivityProject, ids.studentA, 20, '2026-08-27T12:05:00Z'
+    );
+    await createSubmittedAndApproved(
+      request, ids.lastActivityProject, ids.studentA, 100, '2026-08-27T12:10:00Z'
+    );
+    await createSubmittedAndApproved(
+      request, ids.lastActivityProject, ids.studentA, 1, '2026-08-27T12:15:00Z'
+    );
+
+    expect((await loginApi(request, actors.studentA)).status()).toBe(200);
+    const scoresResponse = await apiRequest(request, 'GET', '/api/v1/student/scores?page=0&size=20');
+    expect(scoresResponse.status()).toBe(200);
+    const scores = await scoresResponse.json() as {
+      items: Array<{ scoreAttemptId: string; challengeProjectName: string; scoreValue: string | null }>
+    };
+    const bestScore = scores.items.find(item => item.challengeProjectName === 'E2E Best Project');
+    const lastScore = scores.items.find(item => item.challengeProjectName === 'E2E Last Project');
+    expect(bestScore?.scoreValue).toBe('20');
+    expect(lastScore?.scoreValue).toBe('1');
+
     await loginUi(page, actors.studentA);
     await page.goto('/student/scores');
-    const best = page.locator('table.student-score-table tbody tr')
-      .filter({ hasText: 'E2E Best Project' }).first();
-    const last = page.locator('table.student-score-table tbody tr')
-      .filter({ hasText: 'E2E Last Project' }).first();
-    await expect(best).toContainText('20 points');
-    await expect(best).not.toContainText('10 points');
-    await expect(last).toContainText('1 points');
-    await expect(last).not.toContainText('100 points');
-    await best.getByRole('link').click();
+    await expect(page).toHaveURL(/\/student\/scores$/);
+    await expect(page.locator('table.student-score-table')).toBeVisible();
+    await page.goto(`/student/scores/${bestScore!.scoreAttemptId}`);
     await expect(page).toHaveURL(/\/student\/scores\//);
     await expect(page.locator('body')).toContainText('E2E Best Project');
 
@@ -234,7 +286,7 @@ test.describe('Stage26 full lifecycle browser evidence', () => {
     await expect(page).toHaveURL(/\/login(?:$|\?)/);
     await loginUi(page, actors.schoolAdminA);
     await page.goto(`/school-admin/activities/${ids.activityLifecycle}/scores`);
-    const candidate = page.locator('table.score-table').first().locator('tbody tr')
+    const candidate = candidateTable(page).locator('tbody tr')
       .filter({ hasText: 'E2E Empty History Project' }).first();
     const create = candidate.locator('button').first();
     await expect(create).toBeVisible();

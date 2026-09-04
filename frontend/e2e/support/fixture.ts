@@ -22,12 +22,14 @@ export type FixtureState = {
   activityAdminDesignated: string;
   activityOtherSchool: string;
   activityApi: string;
+  activityL2Best: string;
   lifecycleProject: string;
   emptyHistoryProject: string;
   bestProject: string;
   lastProject: string;
   designatedProject: string;
   apiProject: string;
+  l2BestProject: string;
   lifecycleActivityProject: string;
   emptyHistoryActivityProject: string;
   bestActivityProject: string;
@@ -35,6 +37,7 @@ export type FixtureState = {
   designatedActivityProject: string;
   apiActivityProject: string;
   otherSchoolActivityProject: string;
+  l2BestActivityProject: string;
   designatedFirstAttempt: string;
   designatedSecondAttempt: string;
   apiPendingAttempt: string;
