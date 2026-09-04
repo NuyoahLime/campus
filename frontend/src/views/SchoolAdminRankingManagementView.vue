@@ -63,8 +63,17 @@ const selectedChallengeProject = computed(() =>
   projects.value.find((project) => project.id === form.value.projectId) ?? null
 );
 
+const activityPeriodError = computed(() => {
+  if (form.value.layer !== 'L2' || !form.value.activityPeriodStart || !form.value.activityPeriodEnd) {
+    return '';
+  }
+  return new Date(form.value.activityPeriodStart).getTime() > new Date(form.value.activityPeriodEnd).getTime()
+    ? 'Activity period start must not be after end.'
+    : '';
+});
+
 const canCreate = computed(() => {
-  if (saving.value || form.value.name.trim().length === 0) return false;
+  if (saving.value || form.value.name.trim().length === 0 || activityPeriodError.value) return false;
   return form.value.layer === 'L1'
     ? Boolean(selectedActivityProject.value)
     : Boolean(selectedChallengeProject.value);
@@ -119,6 +128,9 @@ function describeError(error: unknown) {
     if (error.status === 401) return 'Please sign in again.';
     if (error.status === 403) return 'This account cannot manage rankings.';
     if (error.status === 404) return 'The ranking resource was not found.';
+    if (error.code === 'L2_RANKING_DEFINITION_ALREADY_EXISTS') {
+      return 'An L2 ranking already exists for this project.';
+    }
     if (error.status === 409) return 'The ranking state changed. Refresh and try again.';
     if (error.status === 400) return 'Check the required fields and try again.';
   }
@@ -129,17 +141,27 @@ async function loadDefinitions(selectId = selected.value?.id ?? '') {
   loading.value = true;
   pageError.value = '';
   try {
-    const [definitionPage, activityPage, projectPage] = await Promise.all([
-      listManagedRankingDefinitions(0, 50),
-      listManagedActivities(0, 50),
-      listPublicProjects(0, 100)
-    ]);
+    const definitionPage = await listManagedRankingDefinitions(0, 50);
     definitions.value = definitionPage.items;
-    activities.value = activityPage.items;
-    projects.value = projectPage.items;
     const next = definitions.value.find((definition) => definition.id === selectId) ?? definitions.value[0] ?? null;
     selected.value = next;
     await refreshSelected();
+    const [activityPage, projectPage] = await Promise.allSettled([
+      listManagedActivities(0, 50),
+      listPublicProjects(0, 100)
+    ]);
+    if (activityPage.status === 'fulfilled') {
+      activities.value = activityPage.value.items;
+    } else {
+      activities.value = [];
+      actionError.value = describeError(activityPage.reason);
+    }
+    if (projectPage.status === 'fulfilled') {
+      projects.value = projectPage.value.items;
+    } else {
+      projects.value = [];
+      actionError.value = describeError(projectPage.reason);
+    }
   } catch (error) {
     definitions.value = [];
     selected.value = null;
@@ -414,6 +436,9 @@ onMounted(() => void loadDefinitions());
               <span>Activity Period End</span>
               <input v-model="form.activityPeriodEnd" type="datetime-local" />
             </label>
+            <p v-if="activityPeriodError" class="project-inline-error project-form-wide" role="alert">
+              {{ activityPeriodError }}
+            </p>
           </template>
           <button class="primary-button" type="submit" :disabled="!canCreate">
             {{ saving ? 'Creating...' : form.layer === 'L1' ? 'Create L1 Ranking' : 'Create L2 Ranking' }}

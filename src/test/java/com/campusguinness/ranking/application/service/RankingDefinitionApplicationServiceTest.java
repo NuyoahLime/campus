@@ -79,6 +79,32 @@ class RankingDefinitionApplicationServiceTest {
                 .hasMessageContaining("L2 definitions must not use activityProjectId");
         verify(repo, never()).save(any());
     }
+
+    @Test void createL2DefinitionAcceptsForwardEqualAndOpenActivityPeriods() {
+        UUID schoolId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+
+        svc.create(RankingLayer.L2, "forward", schoolId, UUID.randomUUID(), null,
+                "{\"activityPeriodStart\":\"2026-01-01T00:00:00Z\",\"activityPeriodEnd\":\"2026-01-02T00:00:00Z\"}");
+        svc.create(RankingLayer.L2, "equal", schoolId, UUID.randomUUID(), null,
+                "{\"activityPeriodStart\":\"2026-01-01T00:00:00Z\",\"activityPeriodEnd\":\"2026-01-01T00:00:00Z\"}");
+        svc.create(RankingLayer.L2, "only-start", schoolId, UUID.randomUUID(), null,
+                "{\"activityPeriodStart\":\"2026-01-01T00:00:00Z\"}");
+        svc.create(RankingLayer.L2, "only-end", schoolId, UUID.randomUUID(), null,
+                "{\"activityPeriodEnd\":\"2026-01-02T00:00:00Z\"}");
+
+        verify(repo, times(4)).save(any());
+    }
+
+    @Test void createL2DefinitionRejectsReverseActivityPeriod() {
+        UUID schoolId = UUID.randomUUID();
+        when(authorization.requireUniqueSchoolAdminSchool()).thenReturn(schoolId);
+
+        assertThatThrownBy(() -> svc.create(RankingLayer.L2, "reverse", schoolId, UUID.randomUUID(), null,
+                "{\"activityPeriodStart\":\"2026-01-02T00:00:00Z\",\"activityPeriodEnd\":\"2026-01-01T00:00:00Z\"}"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("activityPeriodStart must not be after activityPeriodEnd");
+    }
     @Test void disable() { var d=def(UUID.randomUUID()); when(repo.findById(any())).thenReturn(Optional.of(d)); assertThat(svc.disable(d.id().value()).enabled()).isFalse(); verify(authorization).requireSchoolAdmin(d.schoolId()); }
     @Test void notFound() { when(repo.findById(any())).thenReturn(Optional.empty()); assertThatThrownBy(()->svc.disable(UUID.randomUUID())).isInstanceOf(IllegalArgumentException.class); }
     private RankingDefinition def(UUID schoolId) { return RankingDefinition.create(new RankingDefinition.Builder().id(new RankingDefinitionId(UUID.randomUUID())).layer(RankingLayer.L1).name("t").schoolId(schoolId).projectId(UUID.randomUUID()).dimensionFilters("{\"activityProjectId\":\"" + UUID.randomUUID() + "\"}").createdBy(UUID.randomUUID())); }

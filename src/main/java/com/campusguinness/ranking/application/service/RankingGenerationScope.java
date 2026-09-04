@@ -64,13 +64,20 @@ public record RankingGenerationScope(
             if (selectionPolicy != null && !L2_SELECTION_POLICY.equals(selectionPolicy)) {
                 throw new IllegalStateException("Cannot generate ranking: L2 supports only BEST_SCORE selectionPolicy.");
             }
+            Instant activityPeriodStart = instant(node, "activityPeriodStart");
+            Instant activityPeriodEnd = instant(node, "activityPeriodEnd");
+            if (activityPeriodStart != null && activityPeriodEnd != null
+                    && activityPeriodStart.isAfter(activityPeriodEnd)) {
+                throw new IllegalStateException(
+                        "Cannot generate ranking: activityPeriodStart must not be after activityPeriodEnd.");
+            }
             return new RankingGenerationScope(
                     null,
                     L2_SELECTION_POLICY,
                     text(node, "grade"),
                     text(node, "className"),
-                    instant(node, "activityPeriodStart"),
-                    instant(node, "activityPeriodEnd"));
+                    activityPeriodStart,
+                    activityPeriodEnd);
         } catch (IllegalStateException ex) {
             throw ex;
         } catch (Exception ex) {
