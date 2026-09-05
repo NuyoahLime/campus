@@ -34,9 +34,9 @@ public final class L3Authorization {
     private final UUID schoolId;
     private final UUID projectId;
     private final UUID ruleVersionId;
-    private final String dataScope;
-    private final boolean allowSchoolName;
-    private final boolean allowStudentName;
+    private String dataScope;
+    private boolean allowSchoolName;
+    private boolean allowStudentName;
     private AuthorizationStatus status;
     private Instant submittedAt;
     private UUID reviewedBy;
@@ -94,6 +94,15 @@ public final class L3Authorization {
         this.status = AuthorizationStatus.PENDING_REVIEW;
         this.submittedAt = Instant.now();
         domainEvents.add(new L3AuthorizationSubmitted(id));
+    }
+
+    public void editDraft(String dataScope, boolean allowSchoolName, boolean allowStudentName) {
+        if (status != AuthorizationStatus.DRAFT) {
+            throw new InvalidAuthorizationStateTransitionException(status, "edit");
+        }
+        this.dataScope = dataScope;
+        this.allowSchoolName = allowSchoolName;
+        this.allowStudentName = allowStudentName;
     }
 
     /** PENDING_REVIEW → APPROVED */
@@ -157,6 +166,16 @@ public final class L3Authorization {
                 && status != AuthorizationStatus.APPROVED
                 && status != AuthorizationStatus.SUSPENDED) {
             throw new InvalidAuthorizationStateTransitionException(status, "withdraw");
+        }
+        this.status = AuthorizationStatus.WITHDRAWN;
+        this.withdrawnAt = Instant.now();
+        this.withdrawReason = reason;
+        domainEvents.add(new L3AuthorizationWithdrawn(id));
+    }
+
+    public void withdrawForSchoolDisable(String reason) {
+        if (status == AuthorizationStatus.WITHDRAWN) {
+            return;
         }
         this.status = AuthorizationStatus.WITHDRAWN;
         this.withdrawnAt = Instant.now();

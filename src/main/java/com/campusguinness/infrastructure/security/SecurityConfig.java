@@ -125,6 +125,8 @@ public class SecurityConfig {
                         "/api/v1/school-admin/appeals/*",
                         "/api/v1/school-admin/feedback",
                         "/api/v1/school-admin/feedback/*",
+                        "/api/v1/school-admin/l3-authorizations",
+                        "/api/v1/school-admin/l3-authorizations/*",
                         "/api/v1/school-admin/rankings",
                         "/api/v1/school-admin/rankings/*",
                         "/api/v1/school-admin/ranking-definitions",
@@ -160,15 +162,18 @@ public class SecurityConfig {
                         "/api/v1/ranking-definitions/*/disable",
                         "/api/v1/ranking-definitions/*/generate",
                         "/api/v1/ranking-definitions/*/versions/*/publish",
-                        "/api/v1/l3-authorizations",
-                        "/api/v1/l3-authorizations/*/withdraw",
+                        "/api/v1/school-admin/l3-authorizations",
+                        "/api/v1/school-admin/l3-authorizations/*",
                         "/api/v1/media/*/internal-approve",
                         "/api/v1/feedbacks/*/begin-processing",
                         "/api/v1/feedbacks/*/resolve",
                         "/api/v1/school-admin/feedback/*/begin-processing",
                         "/api/v1/school-admin/feedback/*/resolve"
                 ).hasRole("SCHOOL_ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/v1/activities/*").hasRole("SCHOOL_ADMIN")
+                .requestMatchers(HttpMethod.PUT,
+                        "/api/v1/activities/*",
+                        "/api/v1/school-admin/l3-authorizations/*"
+                ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/schools/*/activate",
                         "/api/v1/schools/*/suspend",
@@ -184,7 +189,9 @@ public class SecurityConfig {
                         "/api/v1/school-admin-invitations",
                         "/api/v1/school-admin-invitations/*/revoke",
                         "/api/v1/school-admin-invitations/*/regenerate",
-                        "/api/v1/l3-authorizations/*/approve"
+                        "/api/v1/super-admin/l3-authorizations/*/approve",
+                        "/api/v1/super-admin/l3-authorizations/*/reject",
+                        "/api/v1/super-admin/l3-authorizations/*/resume"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/challenge-projects/*")
                 .hasRole("SUPER_ADMIN")
@@ -192,7 +199,9 @@ public class SecurityConfig {
                         "/api/v1/schools/*",
                         "/api/v1/schools/*/school-admins",
                         "/api/v1/schools/*/school-admin-invitations",
-                        "/api/v1/schools/*/school-admin-invitations/*"
+                        "/api/v1/schools/*/school-admin-invitations/*",
+                        "/api/v1/super-admin/l3-authorizations",
+                        "/api/v1/super-admin/l3-authorizations/*"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/score-appeals",

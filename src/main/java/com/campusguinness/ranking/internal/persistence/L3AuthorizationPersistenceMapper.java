@@ -8,7 +8,14 @@ final class L3AuthorizationPersistenceMapper {
 
     static L3AuthorizationEntity toEntity(L3Authorization domain) {
         var e = new L3AuthorizationEntity();
-        e.setId(domain.id().value()); e.setSchoolId(domain.schoolId());
+        e.setId(domain.id().value());
+        e.setCreatedAt(Instant.now());
+        copyToEntity(domain, e);
+        return e;
+    }
+
+    static void copyToEntity(L3Authorization domain, L3AuthorizationEntity e) {
+        e.setSchoolId(domain.schoolId());
         e.setProjectId(domain.projectId()); e.setRuleVersionId(domain.ruleVersionId());
         e.setDataScope(domain.dataScope()); e.setAllowSchoolName(domain.allowSchoolName());
         e.setAllowStudentName(domain.allowStudentName());
@@ -17,8 +24,7 @@ final class L3AuthorizationPersistenceMapper {
         e.setReviewedAt(domain.reviewedAt()); e.setReviewComment(domain.reviewComment());
         e.setRejectReason(domain.rejectReason()); e.setPausedAt(domain.pausedAt());
         e.setWithdrawnAt(domain.withdrawnAt()); e.setWithdrawReason(domain.withdrawReason());
-        e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
-        return e;
+        e.setUpdatedAt(Instant.now());
     }
 
     static L3Authorization toDomain(L3AuthorizationEntity e) {

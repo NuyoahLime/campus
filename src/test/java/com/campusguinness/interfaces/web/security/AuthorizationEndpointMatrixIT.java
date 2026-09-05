@@ -80,7 +80,7 @@ class AuthorizationEndpointMatrixIT {
     @Test
     void endpointMatrixRows() throws Exception {
         var rows = matrix();
-        assertThat(rows).hasSize(74);
+        assertThat(rows).hasSize(83);
         for (Row row : rows) {
             assertRow(row);
         }
@@ -181,8 +181,8 @@ class AuthorizationEndpointMatrixIT {
                 {"layer":"L1","name":"phase11","schoolId":"%s","projectId":"%s","activityProjectId":"%s"}
                 """.formatted(school, rankingProjectId, rankingActivityProjectId);
         String l3Create = """
-                {"schoolId":"%s","projectId":"%s","ruleVersionId":"%s"}
-                """.formatted(school, UUID.randomUUID(), UUID.randomUUID());
+                {"projectId":"%s","ruleVersionId":"%s","dataScope":{}}
+                """.formatted(UUID.randomUUID(), UUID.randomUUID());
         return List.of(
                 row(1, "GET", "/actuator/health", Allowed.PUBLIC),
                 row(2, "GET", "/actuator/info", Allowed.PUBLIC),
@@ -234,31 +234,40 @@ class AuthorizationEndpointMatrixIT {
                 row(48, "POST", "/api/v1/ranking-definitions/" + id + "/disable", Allowed.SCHOOL_ADMIN),
                 row(49, "POST", "/api/v1/ranking-definitions/" + id + "/generate", Allowed.SCHOOL_ADMIN),
                 row(50, "POST", "/api/v1/ranking-definitions/" + id + "/versions/" + UUID.randomUUID() + "/publish", Allowed.SCHOOL_ADMIN),
-                row(51, "POST", "/api/v1/l3-authorizations", Allowed.SCHOOL_ADMIN, l3Create),
-                row(52, "POST", "/api/v1/l3-authorizations/" + id + "/approve", Allowed.SUPER_ADMIN, body),
-                row(53, "POST", "/api/v1/l3-authorizations/" + id + "/withdraw", Allowed.SCHOOL_ADMIN, reason),
-                row(54, "POST", "/api/v1/media", Allowed.DEFERRED_DENY, mediaRegister()),
-                row(55, "POST", "/api/v1/media/" + id + "/internal-review", Allowed.DEFERRED_DENY),
-                row(56, "POST", "/api/v1/media/" + id + "/internal-approve", Allowed.SCHOOL_ADMIN),
-                row(57, "POST", "/api/v1/feedbacks", Allowed.STUDENT, feedbackSubmit),
-                row(58, "POST", "/api/v1/feedbacks/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
-                row(59, "POST", "/api/v1/feedbacks/" + id + "/resolve", Allowed.SCHOOL_ADMIN, "{\"reply\":\"phase11\"}"),
-                row(60, "POST", "/api/v1/feedbacks/" + id + "/close", Allowed.STUDENT, reason),
-                row(61, "GET", "/api/v1/public/rankings", Allowed.PUBLIC),
-                row(62, "GET", "/api/v1/public/rankings/" + id, Allowed.PUBLIC),
-                row(63, "GET", "/api/v1/student/rankings", Allowed.STUDENT),
-                row(64, "GET", "/api/v1/student/rankings/" + id, Allowed.STUDENT),
-                row(65, "GET", "/api/v1/school-admin/rankings", Allowed.SCHOOL_ADMIN),
-                row(66, "GET", "/api/v1/school-admin/rankings/" + id, Allowed.SCHOOL_ADMIN),
-                row(67, "GET", "/api/v1/school-admin/ranking-definitions", Allowed.SCHOOL_ADMIN),
-                row(68, "GET", "/api/v1/school-admin/ranking-definitions/" + id, Allowed.SCHOOL_ADMIN),
-                row(69, "GET", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN),
-                row(70, "GET", "/api/v1/school-admin/activities/" + id + "/participant-candidates", Allowed.SCHOOL_ADMIN),
-                row(71, "POST", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN,
+                row(51, "POST", "/api/v1/school-admin/l3-authorizations", Allowed.SCHOOL_ADMIN, l3Create),
+                row(52, "PUT", "/api/v1/school-admin/l3-authorizations/" + id, Allowed.SCHOOL_ADMIN, "{\"dataScope\":{}}"),
+                row(53, "POST", "/api/v1/school-admin/l3-authorizations/" + id + "/submit", Allowed.SCHOOL_ADMIN),
+                row(54, "POST", "/api/v1/school-admin/l3-authorizations/" + id + "/return-to-draft", Allowed.SCHOOL_ADMIN),
+                row(55, "POST", "/api/v1/school-admin/l3-authorizations/" + id + "/withdraw", Allowed.SCHOOL_ADMIN, reason),
+                row(56, "GET", "/api/v1/school-admin/l3-authorizations", Allowed.SCHOOL_ADMIN),
+                row(57, "GET", "/api/v1/school-admin/l3-authorizations/" + id, Allowed.SCHOOL_ADMIN),
+                row(58, "GET", "/api/v1/super-admin/l3-authorizations", Allowed.SUPER_ADMIN),
+                row(59, "GET", "/api/v1/super-admin/l3-authorizations/" + id, Allowed.SUPER_ADMIN),
+                row(60, "POST", "/api/v1/super-admin/l3-authorizations/" + id + "/approve", Allowed.SUPER_ADMIN, body),
+                row(61, "POST", "/api/v1/super-admin/l3-authorizations/" + id + "/reject", Allowed.SUPER_ADMIN, "{\"reason\":\"phase11\"}"),
+                row(62, "POST", "/api/v1/super-admin/l3-authorizations/" + id + "/resume", Allowed.SUPER_ADMIN),
+                row(63, "POST", "/api/v1/media", Allowed.DEFERRED_DENY, mediaRegister()),
+                row(64, "POST", "/api/v1/media/" + id + "/internal-review", Allowed.DEFERRED_DENY),
+                row(65, "POST", "/api/v1/media/" + id + "/internal-approve", Allowed.SCHOOL_ADMIN),
+                row(66, "POST", "/api/v1/feedbacks", Allowed.STUDENT, feedbackSubmit),
+                row(67, "POST", "/api/v1/feedbacks/" + id + "/begin-processing", Allowed.SCHOOL_ADMIN, handler),
+                row(68, "POST", "/api/v1/feedbacks/" + id + "/resolve", Allowed.SCHOOL_ADMIN, "{\"reply\":\"phase11\"}"),
+                row(69, "POST", "/api/v1/feedbacks/" + id + "/close", Allowed.STUDENT, reason),
+                row(70, "GET", "/api/v1/public/rankings", Allowed.PUBLIC),
+                row(71, "GET", "/api/v1/public/rankings/" + id, Allowed.PUBLIC),
+                row(72, "GET", "/api/v1/student/rankings", Allowed.STUDENT),
+                row(73, "GET", "/api/v1/student/rankings/" + id, Allowed.STUDENT),
+                row(74, "GET", "/api/v1/school-admin/rankings", Allowed.SCHOOL_ADMIN),
+                row(75, "GET", "/api/v1/school-admin/rankings/" + id, Allowed.SCHOOL_ADMIN),
+                row(76, "GET", "/api/v1/school-admin/ranking-definitions", Allowed.SCHOOL_ADMIN),
+                row(77, "GET", "/api/v1/school-admin/ranking-definitions/" + id, Allowed.SCHOOL_ADMIN),
+                row(78, "GET", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN),
+                row(79, "GET", "/api/v1/school-admin/activities/" + id + "/participant-candidates", Allowed.SCHOOL_ADMIN),
+                row(80, "POST", "/api/v1/school-admin/activities/" + id + "/participants", Allowed.SCHOOL_ADMIN,
                         "{\"studentId\":\"" + UUID.randomUUID() + "\"}"),
-                row(72, "DELETE", "/api/v1/school-admin/activities/" + id + "/participants/" + UUID.randomUUID(), Allowed.SCHOOL_ADMIN),
-                row(73, "GET", "/api/v1/student/activities", Allowed.STUDENT),
-                row(74, "GET", "/api/v1/student/activities/" + id, Allowed.STUDENT)
+                row(81, "DELETE", "/api/v1/school-admin/activities/" + id + "/participants/" + UUID.randomUUID(), Allowed.SCHOOL_ADMIN),
+                row(82, "GET", "/api/v1/student/activities", Allowed.STUDENT),
+                row(83, "GET", "/api/v1/student/activities/" + id, Allowed.STUDENT)
         );
     }
 

@@ -160,6 +160,14 @@ public class GlobalExceptionHandler {
                             req.getRequestURI()
                     ));
         }
+        if (containsInCauseChain(ex, "uq_l3_auth_active_school_project_rule_scope")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of(
+                            "L3_AUTHORIZATION_ALREADY_EXISTS",
+                            "An active L3 authorization already exists for this scope.",
+                            req.getRequestURI()
+                    ));
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));
     }

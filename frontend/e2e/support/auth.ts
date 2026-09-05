@@ -34,7 +34,7 @@ export async function loginApi(context: APIRequestContext, username: string) {
 
 export async function apiRequest(
   context: APIRequestContext,
-  method: 'GET' | 'POST' | 'PATCH',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
   url: string,
   data?: unknown
 ) {
