@@ -1,116 +1,132 @@
 # Current Business Capability Inventory v2
 
-> Stage 24 refresh
-> Baseline: `9989295d6b782f431c43f1dfd43c241d37bed5d8`
-> Evidence: current source, controllers, frontend routes, tests, and accepted browser UAT through Stage 23
+> L2 product seal refresh
+> Baseline: `508f1205608a1675a4e2ebec944ebe703ec892c9`
+> Evidence: current source, controllers, frontend routes, tests, accepted Stage26
+> E2E, and Phase4A-Phase4D L2 ranking closure.
 
 ## 1. Completion Rule
 
-`COMPLETE_VERTICAL_SLICE` requires all of Domain, Application, Persistence, Query,
-authorized API, frontend, tests, and browser UAT for the stated scope. A controller,
-entity, or test-file count alone is not completion evidence.
+`COMPLETE_VERTICAL_SLICE` requires the relevant Domain, Application,
+Persistence, Query, authorized API, frontend, tests, and browser E2E for the
+stated product scope. A controller, entity, or test-file count alone is not
+completion evidence.
 
-Current formal identity remains `SUPER_ADMIN`, `SCHOOL_ADMIN`, and `STUDENT`. The
-ordinary Teacher role is removed. Teacher-dependent lines are denied or deferred;
-their historical screens are not counted as missing frontend work to be implemented.
+Current formal identity remains `SUPER_ADMIN`, `SCHOOL_ADMIN`, and `STUDENT`.
+The ordinary Teacher role is removed. Teacher-dependent lines are denied or
+deferred; their historical screens are not counted as missing frontend work to
+be implemented.
 
 ## 2. Audit Summary
 
 | Status | Count |
 | --- | ---: |
-| Capability lines audited | 18 |
-| COMPLETE_VERTICAL_SLICE | 11 |
-| BACKEND_READY_FRONTEND_MISSING | 0 |
-| BACKEND_PARTIAL | 3 |
+| Capability lines audited | 22 |
+| COMPLETE_VERTICAL_SLICE | 16 |
+| BACKEND_PARTIAL | 2 |
 | DOMAIN_READY_API_MISSING | 1 |
 | DEFERRED_BY_IDENTITY_MODEL | 1 |
-| PRODUCT_DECISION_REQUIRED flags | 0 |
+| LEGACY_FROZEN / DEFERRED_FOR_V1 | 1 |
 | NOT_IMPLEMENTED | 1 |
 
-The legacy generic-user governance endpoints are retained as an auxiliary risk note,
-not a current product capability line. They must not be exposed as generic account
-management UI.
+The legacy generic-user governance endpoints are retained as an auxiliary risk
+note, not a current product capability line. They must not be exposed as
+generic account management UI.
 
 ## 3. Capability Matrix
 
 | Capability | Current status | Reusable layers | Missing / blocker | Recommended stage |
 | --- | --- | --- | --- | --- |
-| Auth, session, registration, activation | COMPLETE_VERTICAL_SLICE | Domain, session application/query, persistence, CSRF API, auth UI, UAT | Password recovery UI is outside accepted scope | Preserve regression |
-| School registration review | COMPLETE_VERTICAL_SLICE | State machine, locked review service, query, persistence, SUPER_ADMIN API/UI, browser UAT | Applicant-facing submission UI remains separate | Preserve |
-| Public school registration intake | COMPLETE_VERTICAL_SLICE | Anonymous submit API, domain, persistence, tests, public form and browser UAT | Preserve regression | Preserve Stage 22 |
-| School master and lifecycle governance | COMPLETE_VERTICAL_SLICE | School lifecycle, query, persistence, reasoned transitions, SUPER_ADMIN routes/UI, UAT | No new lifecycle behavior in Stage 17 | Preserve |
-| School-admin invitation/account governance | COMPLETE_VERTICAL_SLICE | Invitation commands, read models, persistence, scoped API/UI, UAT | Do not expose generic user CRUD | Preserve |
-| Student identity application | COMPLETE_VERTICAL_SLICE | Registration/resubmit/review/rollback, profile/membership persistence, API/UI, UAT | Student profile management is separate | Preserve |
-| ChallengeProject resource library/governance | COMPLETE_VERTICAL_SLICE | Lifecycle, rule versions, public/governance queries, persistence, API/UI, UAT | Activity linkage/resources outside accepted scope | Preserve Stage 16 |
-| Activity | COMPLETE_VERTICAL_SLICE | Domain, public read, school-admin management query/detail/create/edit/publish, persistence, API/UI, tests and UAT | ActivityApplication linkage is a separate line | Preserve Stage 18-19 |
+| Auth, session, registration, activation | COMPLETE_VERTICAL_SLICE | Domain, session application/query, persistence, CSRF API, auth UI, E2E | Password recovery UI is outside accepted scope | Preserve regression |
+| School registration review | COMPLETE_VERTICAL_SLICE | State machine, locked review service, query, persistence, SUPER_ADMIN API/UI, E2E | Applicant-facing submission UI remains separate | Preserve |
+| Public school registration intake | COMPLETE_VERTICAL_SLICE | Anonymous submit API, domain, persistence, tests, public form and E2E | Preserve regression | Preserve |
+| School master and lifecycle governance | COMPLETE_VERTICAL_SLICE | School lifecycle, query, persistence, reasoned transitions, SUPER_ADMIN routes/UI, E2E | No new lifecycle behavior in the L2 seal stage | Preserve |
+| School-admin invitation/account governance | COMPLETE_VERTICAL_SLICE | Invitation commands, read models, persistence, scoped API/UI, E2E | Do not expose generic user CRUD | Preserve |
+| Student identity application | COMPLETE_VERTICAL_SLICE | Registration/resubmit/review/rollback, profile/membership persistence, API/UI, E2E | Student profile management is separate | Preserve |
+| ChallengeProject resource library/governance | COMPLETE_VERTICAL_SLICE | Lifecycle, rule versions, public/governance queries, persistence, API/UI, E2E | Activity linkage/resources outside accepted scope | Preserve |
+| Activity | COMPLETE_VERTICAL_SLICE | Domain, public read, school-admin management query/detail/create/edit/publish, persistence, API/UI, tests and E2E | ActivityApplication linkage is a separate line | Preserve |
+| Activity Participant Scope | COMPLETE_VERTICAL_SLICE | Participant assignment, same-school authorization, API/UI, persistence, tests and E2E | Preserve scope and participant eligibility regression | Preserve |
 | ActivityApplication | LEGACY_FROZEN / DEFERRED_FOR_V1 | Independent activity-creation application aggregate, persistence, review commands and negative API boundary | No current runtime role submits this legacy flow; historical Teacher responsibility is frozen | No V1 implementation |
-| Score write | BACKEND_PARTIAL | Value types, state/domain, persistence, denial tests | Decision resolved; SCHOOL_ADMIN create/edit, explicit confirm/review, same-school authorization and correction coordinator missing | Stage 26 |
-| Score appeal | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and UAT | Correction remains a score-write concern | Preserve Stage 21 |
-| Ranking published snapshot read | COMPLETE_VERTICAL_SLICE | Published snapshot persistence, scoped read API, public/student/school-admin frontend and tests | Ranking Production is not implemented: calculation, version generation, preview, publication and final L3 visibility enforcement | Stage 27 |
-| L3 authorization | BACKEND_PARTIAL | Domain, commands, persistence, partial API | Full query/detail/reject/suspend workflow absent | Later governance stage |
+| Score Write / Review | COMPLETE_VERTICAL_SLICE | SCHOOL_ADMIN score create/edit/submit/review, lifecycle, persistence, same-school authorization, tests and Stage26 E2E | Preserve Stage26 semantics | Preserve |
+| Effective Score / Correction | COMPLETE_VERTICAL_SLICE | Authoritative effective-score selection, correction coordination, `APPROVED` + `is_current_effective=true`, tests and Stage26 E2E | Ranking must consume, not reselect, effective scores | Preserve |
+| Score appeal | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and E2E | Correction remains a score-write concern | Preserve |
+| Ranking published snapshot read | COMPLETE_VERTICAL_SLICE | Published snapshot persistence, scoped read API, public/student/school-admin frontend and tests | Public read is L3/global plus non-L2; same-school reads cover L1/L2 | Preserve |
+| L1 Ranking Production | COMPLETE_VERTICAL_SLICE | Definition, generation, immutable generated versions, preview, publication, read, management UI, tests and E2E | Preserve same-school L1 semantics | Preserve |
+| L2 Ranking Production | COMPLETE_VERTICAL_SLICE | Policy baseline, definition, BEST_SCORE generation, same-rule-version guard, publication, same-school read, management UI, tests and E2E | L2 public visibility remains denied; SUPER_ADMIN production-view override is not implemented | L2 product seal |
+| L3 authorization | BACKEND_PARTIAL | Domain, commands, persistence, partial API | Full query/detail/reject/suspend workflow absent | L3 policy / authorization closure |
 | Media | DEFERRED_BY_IDENTITY_MODEL | Lifecycle domain, persistence, review commands | Uploader/reviewer/publication contract unresolved after Teacher removal | Later product decision |
-| Activity result | BACKEND_PARTIAL | Domain, persistence, publish command/API | Create/read/review/public query and frontend absent | Stage 28 |
-| Feedback | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and UAT | Notifications are separate | Preserve Stage 21 |
-| Audit / platform audit | DOMAIN_READY_API_MISSING | Audit command port, adapter, entity, repository | Authorized query/list/detail/export API and UI absent | Stage 29 |
+| Activity result | BACKEND_PARTIAL | Domain, persistence, publish command/API | Create/read/review/public query and frontend absent | ActivityResult closure |
+| Feedback | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and E2E | Notifications are separate | Preserve |
+| Audit / platform audit | DOMAIN_READY_API_MISSING | Audit command port, adapter, entity, repository | Authorized query/list/detail/export API and UI absent | Production readiness |
 | Notification | NOT_IMPLEMENTED | Placeholder entity only | No rules, service, handlers, API, or UI | Reassess after product need |
 
-## 4. Stage 14-16 Reclassification
+## 4. L2 Ranking Product Seal
 
-The following are upgraded from the v1 partial classifications for their accepted
-scope: school master/lifecycle governance, school-admin invitation/account governance,
-and ChallengeProject resource library/governance. This upgrade is limited to the
-implemented read/write contracts and browser-tested workflows; it does not imply that
-all historical screenshot features exist.
+L2 ranking is now a complete same-school vertical slice:
 
-## 5. Deferred and Partial Lines
+1. `SCHOOL_ADMIN` creates one L2 `RankingDefinition` per school and
+   ChallengeProject.
+2. Generation consumes Stage26 authoritative effective scores only:
+   `score_status = APPROVED` and `is_current_effective = true`.
+3. L2 candidate selection uses `BEST_SCORE` across eligible ActivityProjects.
+4. Candidates must share the same RuleVersion. Cross-rule-version generation is
+   rejected.
+5. Supported L2 filters are grade, class, and activity period.
+6. Generated `RankingVersion` snapshots remain invisible until publication.
+7. Publication switches a generated version to `PUBLISHED`, replaces the
+   previous current published version, sets `current_version_id`, and records a
+   server-derived `published_at`.
+8. Ranking entries and score-source rows remain immutable publication
+   snapshots.
+9. `/school-admin/ranking-management` supports L1 and L2 create, generate,
+   preview, reload, publish, read, and disable workflows.
 
-ActivityApplication remains a legacy/frozen line for V1: it represents an activity
-creation application and is not a student enrollment model. Its historical Teacher
-submitter is not a runtime role. Score Write, Ranking Production, L3 authorization
-and ActivityResult remain partial implementation lines. Stage 24 has resolved the
-target identity, school scope, review ownership and separation-of-duties contract
-for the capabilities that remain in the active roadmap. Media upload and
-publication remain `DEFERRED_BY_IDENTITY_MODEL` because its uploader, school
-reviewer and platform reviewer model is still unresolved. The removed Teacher role
-cannot be recreated or silently replaced with `SCHOOL_ADMIN`.
+The L2 physical invariant is preserved by
+`uq_ranking_def_l2_school_project`: one school may have only one L2 definition
+per ChallengeProject. Duplicate creation is a controlled `409` conflict with
+code `L2_RANKING_DEFINITION_ALREADY_EXISTS`.
 
-Score Write is no longer identity-deferred. Its responsibility is resolved to
-`SCHOOL_ADMIN` with same-school scope; implementation remains incomplete and is
-targeted for Stage 26.
+L2 activity-period filters reject `activityPeriodStart > activityPeriodEnd`
+before persisting the definition. `start < end`, `start == end`, only-start,
+and only-end filters remain valid.
 
-## 6. Roadmap After Stage 23
+## 5. Visibility Seal
 
-1. Stage 18: public home plus public activity read slice. SEALED.
-2. Stage 19: SCHOOL_ADMIN activity management read/create/publish slice. SEALED.
-3. Stage 20: STUDENT self-scoped score read experience. SEALED.
-4. Stage 21: appeal and feedback workflows. SEALED.
-5. Stage 22: public school registration frontend. SEALED.
-6. Stage 23: published ranking snapshot read/publicization. SEALED.
-7. Stage 24: three-role operational responsibility baseline. Current documentation stage.
-8. Stage 25: Activity Participant Scope closure.
-9. Stage 26: SCHOOL_ADMIN Score Write closure.
-10. Stage 27: Ranking calculation, version and publication.
-11. Stage 28: ActivityResult closure.
-12. Stage 29: Production readiness.
-13. Stage 30: full real-data E2E and UI closure.
+| Actor / access path | L1 | L2 | L3 |
+| --- | --- | --- | --- |
+| Anonymous public read | Existing public/global behavior | DENY | ALLOW when implemented and published |
+| Same-school student | ALLOW published same-school snapshot | ALLOW published same-school snapshot | Future L3 policy |
+| Same-school school admin | ALLOW published same-school snapshot | ALLOW published same-school snapshot | Future L3 policy |
+| Other school | DENY | DENY | Future L3 policy |
+| Super Admin production-view override | NOT IMPLEMENTED | NOT IMPLEMENTED | Administrative capability only |
 
-This roadmap is a decision baseline, not permission to implement later stages in the
-Stage 24 change set.
+## 6. L3 Current State
 
-The existing `activity_participants` table is persistence evidence only. Until a
-complete participant-scope domain, authorization contract, API, frontend and UAT
-exist, `Activity Participant Scope` remains `NOT_IMPLEMENTED`.
+L3 remains outside the L2 product seal:
 
-## 7. Stage 23 Read Boundary
+| L3 area | Status |
+| --- | --- |
+| L3 Authorization | PARTIAL |
+| L3 Generation | NOT_IMPLEMENTED |
+| L3 Publication | NOT_IMPLEMENTED |
+| L3 Management Frontend | NOT_IMPLEMENTED |
 
-Ranking read is a complete vertical slice for public, student and school-admin
-clients. It reads enabled definitions with published current versions and does not
-calculate rankings during reads. Ranking generation and publication remain absent.
+Current production code explicitly supports L1/L2 generation and publication
+and rejects L3 for those production endpoints.
 
-`RANKING_READ: COMPLETE_VERTICAL_SLICE` does not imply that Ranking Production is
-complete. Calculation, version generation, preview, publication and final L3
-visibility enforcement remain `NOT_IMPLEMENTED` or `BACKEND_PARTIAL` for Stage 27.
+## 7. Remaining Product Roadmap
 
-The current public query is broader than the final L3-only publication rule and must
-be narrowed in the Ranking production stage. This is a documented follow-up, not a
-reason to change Stage 24 production code.
+1. L2 Product Seal.
+2. L3 policy / authorization closure.
+3. L3 generation.
+4. L3 publication.
+5. L3 management frontend.
+6. ActivityResult closure.
+7. Production readiness.
+8. Full real-data E2E / UI closure.
+
+Media and Notification are not inserted into the current main production chain
+until a separate product decision makes them part of that chain.
+
+This inventory is a decision baseline, not permission to implement later
+stages in the L2 product-seal change set.
