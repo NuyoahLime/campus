@@ -116,6 +116,8 @@ SchoolAdmin / SuperAdmin authorization UI is complete. L3 ranking management
 frontend remains unimplemented and is not to be conflated with authorization
 workflow closure.
 
+Implementation exists on the feature branch and awaits PR acceptance.
+
 ## 7. Remaining Product Roadmap
 
 1. L3 Generation.

@@ -1,6 +1,7 @@
 package com.campusguinness.ranking.application.query.port;
 
 import com.campusguinness.ranking.application.query.model.RankingGenerationContext;
+import com.campusguinness.ranking.application.query.model.L3GenerationCandidateRow;
 import com.campusguinness.ranking.application.query.model.RankingGenerationSourceRow;
 
 import java.util.List;
@@ -11,7 +12,11 @@ import java.time.Instant;
 public interface RankingGenerationQueryPort {
     Optional<RankingGenerationContext> findContext(UUID activityProjectId);
 
+    Optional<RankingGenerationContext> findL3Context(UUID projectId, UUID ruleVersionId);
+
     List<RankingGenerationSourceRow> findAuthoritativeEffectiveScores(UUID activityProjectId, UUID schoolId);
+
+    List<L3GenerationCandidateRow> findL3CandidateScores(UUID projectId, UUID ruleVersionId);
 
     List<RankingGenerationContext> findL2CandidateContexts(
             UUID projectId,

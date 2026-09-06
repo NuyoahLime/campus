@@ -4,6 +4,7 @@ import com.campusguinness.activity.application.exception.ActivityParticipantAlre
 import com.campusguinness.score.application.exception.ScoreWriteException;
 import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
+import com.campusguinness.ranking.application.exception.RankingGenerationException;
 import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
 import com.campusguinness.school.application.exception.SchoolRegistrationReviewException;
 import com.campusguinness.school.internal.persistence.SchoolRegistrationConcurrentReviewException;
@@ -130,6 +131,14 @@ public class GlobalExceptionHandler {
             default -> HttpStatus.CONFLICT;
         };
         return ResponseEntity.status(status).body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(RankingGenerationException.class)
+    public ResponseEntity<ApiErrorResponse> handleRankingGeneration(
+            RankingGenerationException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

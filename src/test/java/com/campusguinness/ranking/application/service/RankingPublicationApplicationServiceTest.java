@@ -92,7 +92,7 @@ class RankingPublicationApplicationServiceTest {
                 .id(new RankingDefinitionId(definitionId))
                 .layer(layer)
                 .name("test")
-                .schoolId(schoolId)
+                .schoolId(layer == RankingLayer.L3 ? null : schoolId)
                 .projectId(UUID.randomUUID())
                 .dimensionFilters(layer == RankingLayer.L2
                         ? "{\"selectionPolicy\":\"BEST_SCORE\"}"

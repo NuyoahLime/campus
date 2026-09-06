@@ -2,6 +2,7 @@ import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { actors, E2E_PASSWORD } from './fixture';
 
 export async function loginUi(page: Page, username: string) {
+  await page.context().clearCookies();
   await page.goto('/login');
   await page.locator('input[autocomplete="username"]').fill(username);
   await page.locator('input[autocomplete="current-password"]').fill(E2E_PASSWORD);

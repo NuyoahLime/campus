@@ -3,22 +3,25 @@ package com.campusguinness.ranking.application.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.campusguinness.ranking.internal.domain.RankingLayer;
 
 import java.time.Instant;
 import java.util.UUID;
 
 public record RankingGenerationScope(
         UUID activityProjectId,
+        RankingLayer layer,
         String selectionPolicy,
         String grade,
         String className,
         Instant activityPeriodStart,
-        Instant activityPeriodEnd) {
+        Instant activityPeriodEnd,
+        UUID ruleVersionId) {
     private static final ObjectMapper JSON = new ObjectMapper();
     static final String L2_SELECTION_POLICY = "BEST_SCORE";
 
     public RankingGenerationScope(UUID activityProjectId) {
-        this(activityProjectId, null, null, null, null, null);
+        this(activityProjectId, RankingLayer.L1, null, null, null, null, null, null);
     }
 
     public static RankingGenerationScope l1FromDimensionFilters(String raw) {
@@ -50,7 +53,7 @@ public record RankingGenerationScope(
 
     public static RankingGenerationScope l2FromDimensionFilters(String raw) {
         if (raw == null || raw.isBlank()) {
-            return new RankingGenerationScope(null, L2_SELECTION_POLICY, null, null, null, null);
+            return new RankingGenerationScope(null, RankingLayer.L2, L2_SELECTION_POLICY, null, null, null, null, null);
         }
         try {
             JsonNode node = JSON.readTree(raw);
@@ -73,13 +76,56 @@ public record RankingGenerationScope(
             }
             return new RankingGenerationScope(
                     null,
+                    RankingLayer.L2,
                     L2_SELECTION_POLICY,
                     text(node, "grade"),
                     text(node, "className"),
                     activityPeriodStart,
-                    activityPeriodEnd);
+                    activityPeriodEnd,
+                    null);
         } catch (IllegalStateException ex) {
             throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Cannot generate ranking: dimensionFilters JSON is malformed.");
+        }
+    }
+
+    public static RankingGenerationScope l3FromDimensionFilters(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalStateException("Cannot generate ranking: dimensionFilters.ruleVersionId is required.");
+        }
+        try {
+            JsonNode node = JSON.readTree(raw);
+            if (!node.isObject()) {
+                throw new IllegalStateException("Cannot generate ranking: dimensionFilters must be a JSON object.");
+            }
+            if (node.size() == 0) {
+                throw new IllegalStateException("Cannot generate ranking: dimensionFilters.ruleVersionId is required.");
+            }
+            for (var fields = node.fieldNames(); fields.hasNext();) {
+                String field = fields.next();
+                if (!"ruleVersionId".equals(field)) {
+                    throw new IllegalStateException("Cannot generate ranking: unsupported dataScope field: " + field + ".");
+                }
+            }
+            String ruleVersionId = text(node, "ruleVersionId");
+            if (ruleVersionId == null) {
+                throw new IllegalStateException("Cannot generate ranking: dimensionFilters.ruleVersionId is required.");
+            }
+            UUID parsedRuleVersionId = UUID.fromString(ruleVersionId);
+            return new RankingGenerationScope(
+                    null,
+                    RankingLayer.L3,
+                    L2_SELECTION_POLICY,
+                    null,
+                    null,
+                    null,
+                    null,
+                    parsedRuleVersionId);
+        } catch (IllegalStateException ex) {
+            throw ex;
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("Cannot generate ranking: dimensionFilters.ruleVersionId is invalid.");
         } catch (Exception ex) {
             throw new IllegalStateException("Cannot generate ranking: dimensionFilters JSON is malformed.");
         }
@@ -93,6 +139,13 @@ public record RankingGenerationScope(
         put(node, "className", scope.className());
         put(node, "activityPeriodStart", scope.activityPeriodStart());
         put(node, "activityPeriodEnd", scope.activityPeriodEnd());
+        return node.toString();
+    }
+
+    public static String normalizeL3DimensionFilters(String raw) {
+        RankingGenerationScope scope = l3FromDimensionFilters(raw);
+        ObjectNode node = JSON.createObjectNode();
+        node.put("ruleVersionId", scope.ruleVersionId().toString());
         return node.toString();
     }
 
