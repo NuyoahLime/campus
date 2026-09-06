@@ -1,6 +1,7 @@
 # L3 Authorization Product Seal v1
 
-> Baseline: `9e782922b32a2a7863d539cfd7b16eba27756cfd`
+> Implementation baseline: `9e782922b32a2a7863d539cfd7b16eba27756cfd`
+> Seal commit: `229f433809b91e1134ad172b30420c639c4506c8`
 > Scope: final product seal for completed L3 authorization policy,
 > workflow, UI, and E2E evidence.
 
@@ -9,7 +10,9 @@
 | Area | Status |
 | --- | --- |
 | L3 Authorization | COMPLETE_VERTICAL_SLICE |
-| L3 Authorization Product Seal | READY_FOR_FINAL_ACCEPTANCE |
+| L3 Authorization Product Seal | CLOSED |
+
+Sealed on master at `229f433809b91e1134ad172b30420c639c4506c8`.
 
 ## 2. Product Status
 
@@ -135,7 +138,7 @@ This is a management UX debt, not an authorization safety debt.
 
 ## 12. Explicitly Out Of Scope
 
-This stage does not implement:
+This seal does not implement:
 
 ```text
 L3 Ranking Generation
