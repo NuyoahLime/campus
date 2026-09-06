@@ -136,6 +136,57 @@ class RankingGenerationApplicationServiceTest {
     }
 
     @Test
+    void generateL3SnapshotsOnlyWinningAuthorizationIds() {
+        UUID projectId = UUID.randomUUID();
+        UUID ruleVersionId = UUID.randomUUID();
+        UUID authA = UUID.randomUUID();
+        UUID authB = UUID.randomUUID();
+        UUID schoolId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID activityIdA = UUID.randomUUID();
+        UUID activityIdB = UUID.randomUUID();
+        UUID scoreAttemptA = UUID.randomUUID();
+        UUID scoreAttemptB = UUID.randomUUID();
+        RankingDefinition definition = RankingDefinition.create(new RankingDefinition.Builder()
+                .id(new RankingDefinitionId(UUID.randomUUID()))
+                .layer(RankingLayer.L3)
+                .name("t")
+                .schoolId(null)
+                .projectId(projectId)
+                .dimensionFilters("{\"ruleVersionId\":\"" + ruleVersionId + "\"}")
+                .createdBy(UUID.randomUUID()));
+        when(definitions.findByIdForUpdate(any())).thenReturn(Optional.of(definition));
+        when(platformAuthorization.requireSuperAdmin()).thenReturn(UUID.randomUUID());
+        when(sourceQuery.findL3Context(projectId, ruleVersionId)).thenReturn(Optional.of(
+                new RankingGenerationContext(null, null, null, null, null, projectId, "Project",
+                        ruleVersionId, 1, "INTEGER", "HIGHER_BETTER", null, null)));
+        when(usableAuthorizationQuery.findUsableAuthorizations(projectId, ruleVersionId)).thenReturn(List.of(
+                new L3UsableAuthorizationResult(authA, schoolId, projectId, ruleVersionId,
+                        "{\"activityIds\":[\"" + activityIdA + "\"]}", true, false),
+                new L3UsableAuthorizationResult(authB, schoolId, projectId, ruleVersionId,
+                        "{\"activityIds\":[\"" + activityIdB + "\"]}", true, false)
+        ));
+        when(sourceQuery.findL3CandidateScores(projectId, ruleVersionId)).thenReturn(List.of(
+                new L3GenerationCandidateRow(scoreAttemptA, studentId, schoolId, "Campus School",
+                        activityIdA, "Activity A", java.time.Instant.parse("2026-01-01T00:00:00Z"),
+                        java.time.Instant.parse("2026-01-01T01:00:00Z"), null, null,
+                        new BigDecimal("10"), null, null, UUID.randomUUID(), ruleVersionId),
+                new L3GenerationCandidateRow(scoreAttemptB, studentId, schoolId, "Campus School",
+                        activityIdB, "Activity B", java.time.Instant.parse("2026-01-02T00:00:00Z"),
+                        java.time.Instant.parse("2026-01-02T01:00:00Z"), null, null,
+                        new BigDecimal("20"), null, null, UUID.randomUUID(), ruleVersionId)
+        ));
+        when(generationRepository.saveGeneratedSnapshot(any(), any(), any(), any()))
+                .thenReturn(new RankingGenerationResult(definition.id().value(), UUID.randomUUID(), 1, 1, "GENERATED", java.time.Instant.now()));
+
+        service.generate(definition.id().value());
+
+        ArgumentCaptor<GeneratedRankingSnapshot> snapshotCaptor = ArgumentCaptor.forClass(GeneratedRankingSnapshot.class);
+        verify(generationRepository).saveGeneratedSnapshot(eq(definition), any(), any(), snapshotCaptor.capture());
+        assertThat(snapshotCaptor.getValue().authorizationIdsSnapshot()).containsExactly(authB);
+    }
+
+    @Test
     void generateL3RejectsWhenNoUsableAuthorizationExists() {
         UUID projectId = UUID.randomUUID();
         UUID ruleVersionId = UUID.randomUUID();

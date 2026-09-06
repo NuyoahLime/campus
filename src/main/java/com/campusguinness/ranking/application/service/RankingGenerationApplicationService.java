@@ -20,8 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
 
@@ -138,7 +139,7 @@ public class RankingGenerationApplicationService {
                 .toList();
         var candidates = sourceQuery.findL3CandidateScores(definition.projectId(), scope.ruleVersionId());
         var eligibleSources = new ArrayList<RankingGenerationSourceRow>();
-        TreeSet<UUID> authorizationIds = new TreeSet<>(Comparator.comparing(UUID::toString));
+        Map<UUID, List<UUID>> authorizationIdsByScoreAttemptId = new HashMap<>();
 
         for (L3GenerationCandidateRow candidate : candidates) {
             List<ParsedAuthorization> matches = parsedAuthorizations.stream()
@@ -147,7 +148,13 @@ public class RankingGenerationApplicationService {
             if (matches.isEmpty()) {
                 continue;
             }
-            matches.forEach(match -> authorizationIds.add(match.result().id()));
+            authorizationIdsByScoreAttemptId.put(
+                    candidate.scoreAttemptId(),
+                    matches.stream()
+                            .map(match -> match.result().id())
+                            .distinct()
+                            .sorted()
+                            .toList());
             boolean allowSchoolName = matches.stream().anyMatch(match -> match.result().allowSchoolName());
             boolean allowStudentName = matches.stream().anyMatch(match -> match.result().allowStudentName());
             eligibleSources.add(new RankingGenerationSourceRow(
@@ -166,6 +173,10 @@ public class RankingGenerationApplicationService {
 
         var selected = l2CandidateSelection.selectBestScores(context, eligibleSources);
         var snapshot = calculator.calculate(context, selected);
+        TreeSet<UUID> authorizationIds = new TreeSet<>();
+        for (RankingGenerationSourceRow source : selected) {
+            authorizationIds.addAll(authorizationIdsByScoreAttemptId.getOrDefault(source.scoreAttemptId(), List.of()));
+        }
         snapshot = new GeneratedRankingSnapshot(snapshot.tiePolicy(), snapshot.entries(), List.copyOf(authorizationIds));
         return generationRepository.saveGeneratedSnapshot(definition, scope, context, snapshot);
     }
@@ -184,10 +195,15 @@ public class RankingGenerationApplicationService {
         if (!scope.classNames().isEmpty() && !scope.classNames().contains(candidate.studentClassName())) {
             return false;
         }
-        if (scope.activityPeriodStart() != null && candidate.activityStart().isBefore(scope.activityPeriodStart())) {
+        if (scope.activityPeriodStart() != null
+                && (candidate.activityStart() == null || candidate.activityStart().isBefore(scope.activityPeriodStart()))) {
             return false;
         }
-        return scope.activityPeriodEnd() == null || !candidate.activityEnd().isAfter(scope.activityPeriodEnd());
+        if (scope.activityPeriodEnd() != null
+                && (candidate.activityEnd() == null || candidate.activityEnd().isAfter(scope.activityPeriodEnd()))) {
+            return false;
+        }
+        return true;
     }
 
     private record ParsedAuthorization(L3UsableAuthorizationResult result, L3AuthorizationScope scope) {}

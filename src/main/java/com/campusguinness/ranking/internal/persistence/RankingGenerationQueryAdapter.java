@@ -100,9 +100,7 @@ class RankingGenerationQueryAdapter implements RankingGenerationQueryPort {
                     AND sm.school_id = sa.school_id
                     AND sm.role_in_school = 'STUDENT'
                     AND sm.status = 'ACTIVE'
-                JOIN student_profiles sp ON sp.membership_id = sm.id
-                    AND sp.grade IS NOT NULL
-                    AND sp.class_name IS NOT NULL
+                LEFT JOIN student_profiles sp ON sp.membership_id = sm.id
                 WHERE ap.project_id = ?
                   AND ap.rule_version_id = ?
                   AND sa.school_id = a.school_id
@@ -117,8 +115,8 @@ class RankingGenerationQueryAdapter implements RankingGenerationQueryPort {
                 rs.getString("school_name"),
                 rs.getObject("activity_id", UUID.class),
                 rs.getString("activity_title"),
-                rs.getTimestamp("activity_start").toInstant(),
-                rs.getTimestamp("activity_end").toInstant(),
+                instant(rs, "activity_start"),
+                instant(rs, "activity_end"),
                 rs.getString("student_grade"),
                 rs.getString("student_class_name"),
                 (BigDecimal) rs.getObject("score_value"),
@@ -299,5 +297,10 @@ class RankingGenerationQueryAdapter implements RankingGenerationQueryPort {
 
     private Timestamp timestamp(Instant value) {
         return value == null ? null : Timestamp.from(value);
+    }
+
+    private Instant instant(ResultSet rs, String column) throws SQLException {
+        Timestamp value = rs.getTimestamp(column);
+        return value == null ? null : value.toInstant();
     }
 }
