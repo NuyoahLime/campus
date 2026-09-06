@@ -1,7 +1,7 @@
 # L3 Generation Product Seal v1
 
-> Baseline: `a6244fd91c169c1607ad23fc814f836aa3ed4d1a`
-> Scope: final product seal for completed L3 ranking generation after PR #58
+> Baseline: `530b226f9216a8b5a737491031b42167cdf72c90`
+> Scope: final product seal for completed L3 ranking generation after PR #59
 > merge and post-merge exact-SHA acceptance.
 
 ## 1. Seal Status
@@ -9,10 +9,10 @@
 | Area | Status |
 | --- | --- |
 | L3 Generation | COMPLETE_VERTICAL_SLICE |
-| L3 Generation Product Seal | READY_FOR_FINAL_ACCEPTANCE |
+| L3 Generation Product Seal | CLOSED |
 
-`PR #58 = MERGED` and the merged master baseline is
-`a6244fd91c169c1607ad23fc814f836aa3ed4d1a`.
+`PR #59 = MERGED` and the merged master baseline is
+`530b226f9216a8b5a737491031b42167cdf72c90`.
 
 ## 2. Product Scope
 
@@ -131,5 +131,5 @@ This seal does not implement:
 ## 10. Next Stage
 
 ```text
-RANKING_PRODUCTION_L3_GENERATION_PRODUCT_SEAL_PR_FINAL_ACCEPTANCE
+RANKING_PRODUCTION_L3_PUBLICATION
 ```

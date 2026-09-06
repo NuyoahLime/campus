@@ -1,10 +1,10 @@
 # Current Business Capability Inventory v2
 
 > L3 generation product seal state sync
-> Baseline: `a6244fd91c169c1607ad23fc814f836aa3ed4d1a`
+> Baseline: `530b226f9216a8b5a737491031b42167cdf72c90`
 > Evidence: current source, controllers, frontend routes, tests, accepted Stage26
-> E2E, Phase4A-Phase4D L2 ranking closure, L3 authorization closure, and PR
-> #58 post-merge acceptance.
+> E2E, Phase4A-Phase4D L2 ranking closure, L3 authorization closure, L3
+> generation closure, and PR #59 post-merge acceptance.
 
 ## 1. Completion Rule
 
