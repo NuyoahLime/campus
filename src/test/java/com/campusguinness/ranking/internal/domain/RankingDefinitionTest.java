@@ -79,7 +79,9 @@ class RankingDefinitionTest {
         @Test
         @DisplayName("L3 layer")
         void shouldSupportL3Layer() {
-            var r = RankingDefinition.create(validBuilder().layer(RankingLayer.L3));
+            var r = RankingDefinition.create(validBuilder()
+                    .layer(RankingLayer.L3)
+                    .schoolId(null));
             assertThat(r.layer()).isEqualTo(RankingLayer.L3);
         }
     }

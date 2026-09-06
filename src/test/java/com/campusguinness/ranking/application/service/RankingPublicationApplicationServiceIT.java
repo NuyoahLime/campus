@@ -244,7 +244,7 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
         jdbc.update("""
                 INSERT INTO ranking_definitions(id, layer, name, school_id, project_id, created_by)
                 VALUES (?, 'L3', ?, ?, ?, ?)
-                """, definitionId, runPrefix + "-l3", schoolA, projectId, adminA);
+                """, definitionId, runPrefix + "-l3", null, projectId, adminA);
         UUID versionId = insertVersion(definitionId, "GENERATED");
 
         assertThatThrownBy(() -> rankingPublication.publish(definitionId, versionId))

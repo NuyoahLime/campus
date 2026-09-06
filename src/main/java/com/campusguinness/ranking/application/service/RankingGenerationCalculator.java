@@ -32,7 +32,8 @@ class RankingGenerationCalculator {
                 currentRank = i + 1;
             }
             entries.add(new GeneratedRankingEntry(row.source().studentId(), row.source().scoreAttemptId(),
-                    currentRank, row.source().studentDisplayName(), context.schoolName(),
+                    currentRank, row.source().studentDisplayName(),
+                    row.source().schoolName() != null ? row.source().schoolName() : context.schoolName(),
                     scoreDisplayValue(context, row.source()), context.ruleVersionId()));
             previous = row.score();
         }

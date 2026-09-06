@@ -53,6 +53,9 @@ public final class RankingDefinition {
         if (b.name.length() > 200) throw new IllegalArgumentException("name max 200 chars");
         if (b.projectId == null) throw new IllegalArgumentException("projectId required");
         if (b.createdBy == null) throw new IllegalArgumentException("createdBy required");
+        if (b.layer == RankingLayer.L3 && b.schoolId != null) {
+            throw new IllegalArgumentException("schoolId must be null for L3 ranking definitions");
+        }
     }
 
     /** Disable this ranking definition. */

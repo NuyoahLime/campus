@@ -7,6 +7,7 @@ import com.campusguinness.ranking.application.service.GeneratedRankingEntry;
 import com.campusguinness.ranking.application.service.GeneratedRankingSnapshot;
 import com.campusguinness.ranking.application.service.RankingGenerationScope;
 import com.campusguinness.ranking.internal.domain.RankingDefinition;
+import com.campusguinness.ranking.internal.domain.RankingLayer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -62,8 +63,8 @@ class RankingGenerationRepositoryAdapter implements RankingGenerationRepository 
                 versionNumber,
                 previousVersionId,
                 json(calculationParams(context, snapshot)),
-                json(dataScopeSnapshot(scope, context)),
-                "[]",
+                json(dataScopeSnapshot(scope, context, snapshot)),
+                jsonValue(snapshot.authorizationIdsSnapshot()),
                 Timestamp.from(now),
                 Timestamp.from(now));
         insertEntries(versionId, snapshot.entries());
@@ -113,8 +114,25 @@ class RankingGenerationRepositoryAdapter implements RankingGenerationRepository 
                 jsonValue(context.scoreStorageType()), jsonValue(context.comparisonDirection()));
     }
 
-    private String dataScopeSnapshot(RankingGenerationScope scope, RankingGenerationContext context) {
-        if (scope.activityProjectId() == null) {
+    private String dataScopeSnapshot(RankingGenerationScope scope, RankingGenerationContext context, GeneratedRankingSnapshot snapshot) {
+        if (scope.layer() == RankingLayer.L3) {
+            return """
+                    {
+                      "layer": "L3",
+                      "projectId": %s,
+                      "ruleVersionId": %s,
+                      "selectionPolicy": %s,
+                      "authorizationCount": %d,
+                      "authorizationIds": %s
+                    }
+                    """.formatted(
+                    jsonValue(context.projectId().toString()),
+                    jsonValue(context.ruleVersionId().toString()),
+                    jsonValue(scope.selectionPolicy()),
+                    snapshot.authorizationIdsSnapshot().size(),
+                    jsonValue(snapshot.authorizationIdsSnapshot()));
+        }
+        if (scope.layer() == RankingLayer.L2) {
             return """
                     {
                       "layer": "L2",
@@ -164,6 +182,14 @@ class RankingGenerationRepositoryAdapter implements RankingGenerationRepository 
     private String jsonValue(String value) {
         try {
             return JSON.writeValueAsString(value);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Cannot generate ranking: snapshot payload is invalid.");
+        }
+    }
+
+    private String jsonValue(List<UUID> values) {
+        try {
+            return JSON.writeValueAsString(values);
         } catch (Exception ex) {
             throw new IllegalStateException("Cannot generate ranking: snapshot payload is invalid.");
         }

@@ -11,7 +11,8 @@ public record RankingGenerationSourceRow(
         Long durationMs,
         String grade,
         UUID activityProjectId,
-        UUID ruleVersionId
+        UUID ruleVersionId,
+        String schoolName
 ) {
     public RankingGenerationSourceRow(
             UUID scoreAttemptId,
@@ -20,6 +21,18 @@ public record RankingGenerationSourceRow(
             BigDecimal numericValue,
             Long durationMs,
             String grade) {
-        this(scoreAttemptId, studentId, studentDisplayName, numericValue, durationMs, grade, null, null);
+        this(scoreAttemptId, studentId, studentDisplayName, numericValue, durationMs, grade, null, null, null);
+    }
+
+    public RankingGenerationSourceRow(
+            UUID scoreAttemptId,
+            UUID studentId,
+            String studentDisplayName,
+            BigDecimal numericValue,
+            Long durationMs,
+            String grade,
+            UUID activityProjectId,
+            UUID ruleVersionId) {
+        this(scoreAttemptId, studentId, studentDisplayName, numericValue, durationMs, grade, activityProjectId, ruleVersionId, null);
     }
 }

@@ -1,6 +1,7 @@
 package com.campusguinness.ranking.internal.persistence;
 
 import com.campusguinness.ranking.application.query.model.RankingGenerationContext;
+import com.campusguinness.ranking.application.query.model.L3GenerationCandidateRow;
 import com.campusguinness.ranking.application.query.model.RankingGenerationSourceRow;
 import com.campusguinness.ranking.application.query.port.RankingGenerationQueryPort;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,6 +44,20 @@ class RankingGenerationQueryAdapter implements RankingGenerationQueryPort {
     }
 
     @Override
+    public Optional<RankingGenerationContext> findL3Context(UUID projectId, UUID ruleVersionId) {
+        return jdbc.query("""
+                SELECT NULL::uuid AS activity_project_id, NULL::uuid AS activity_id,
+                       NULL::text AS activity_title, NULL::uuid AS school_id, NULL::text AS school_name,
+                       p.id AS project_id, p.name AS project_name,
+                       prv.id AS rule_version_id, prv.version_number AS rule_version_number,
+                       prv.score_storage_type, prv.comparison_direction, prv.decimal_places, prv.grade_order
+                FROM challenge_projects p
+                JOIN project_rule_versions prv ON prv.project_id = p.id
+                WHERE p.id = ? AND p.project_status = 'PUBLISHED' AND prv.id = ?
+                """, rs -> rs.next() ? Optional.of(mapContext(rs)) : Optional.empty(), projectId, ruleVersionId);
+    }
+
+    @Override
     public List<RankingGenerationSourceRow> findAuthoritativeEffectiveScores(UUID activityProjectId, UUID schoolId) {
         return jdbc.query("""
                 SELECT sa.id AS score_attempt_id, sa.student_id, u.username AS student_display_name,
@@ -53,6 +68,65 @@ class RankingGenerationQueryAdapter implements RankingGenerationQueryPort {
                   AND sa.is_current_effective = true
                 ORDER BY LOWER(u.username), sa.student_id, sa.id
                 """, this::mapSource, activityProjectId, schoolId);
+    }
+
+    @Override
+    public List<L3GenerationCandidateRow> findL3CandidateScores(UUID projectId, UUID ruleVersionId) {
+        return jdbc.query("""
+                SELECT sa.id AS score_attempt_id,
+                       sa.student_id,
+                       a.school_id,
+                       s.name AS school_name,
+                       a.id AS activity_id,
+                       a.title AS activity_title,
+                       a.start_time AS activity_start,
+                       a.end_time AS activity_end,
+                       sp.grade AS student_grade,
+                       sp.class_name AS student_class_name,
+                       sa.score_value,
+                       sa.score_duration_ms,
+                       sa.score_grade,
+                       sa.activity_project_id,
+                       ap.rule_version_id
+                FROM score_attempts sa
+                JOIN activity_projects ap ON ap.id = sa.activity_project_id
+                JOIN activities a ON a.id = ap.activity_id
+                JOIN schools s ON s.id = a.school_id
+                    AND s.school_status = 'NORMAL'
+                JOIN challenge_projects p ON p.id = ap.project_id
+                    AND p.project_status = 'PUBLISHED'
+                JOIN project_rule_versions prv ON prv.id = ap.rule_version_id AND prv.project_id = ap.project_id
+                JOIN school_memberships sm ON sm.user_id = sa.student_id
+                    AND sm.school_id = sa.school_id
+                    AND sm.role_in_school = 'STUDENT'
+                    AND sm.status = 'ACTIVE'
+                JOIN student_profiles sp ON sp.membership_id = sm.id
+                    AND sp.grade IS NOT NULL
+                    AND sp.class_name IS NOT NULL
+                WHERE ap.project_id = ?
+                  AND ap.rule_version_id = ?
+                  AND sa.school_id = a.school_id
+                  AND sa.score_status = 'APPROVED'
+                  AND sa.is_current_effective = true
+                  AND sa.score_storage_type = prv.score_storage_type
+                ORDER BY sa.student_id, sa.activity_project_id, sa.id
+                """, (rs, row) -> new L3GenerationCandidateRow(
+                rs.getObject("score_attempt_id", UUID.class),
+                rs.getObject("student_id", UUID.class),
+                rs.getObject("school_id", UUID.class),
+                rs.getString("school_name"),
+                rs.getObject("activity_id", UUID.class),
+                rs.getString("activity_title"),
+                rs.getTimestamp("activity_start").toInstant(),
+                rs.getTimestamp("activity_end").toInstant(),
+                rs.getString("student_grade"),
+                rs.getString("student_class_name"),
+                (BigDecimal) rs.getObject("score_value"),
+                (Long) rs.getObject("score_duration_ms"),
+                rs.getString("score_grade"),
+                rs.getObject("activity_project_id", UUID.class),
+                rs.getObject("rule_version_id", UUID.class)),
+                projectId, ruleVersionId);
     }
 
     @Override
