@@ -55,12 +55,6 @@ public class L3AuthorizationApplicationService {
         return result(authorization);
     }
 
-    /** Backward compatible command entry; schoolId is ignored as an authority source. */
-    public L3AuthorizationResult submit(UUID schoolId, UUID projectId, UUID ruleVersionId) {
-        L3AuthorizationResult created = create(projectId, ruleVersionId, null, true, false);
-        return submit(created.id());
-    }
-
     public L3AuthorizationResult editDraft(UUID id, JsonNode dataScope, boolean allowSchoolName, boolean allowStudentName) {
         var authorization = findForSchoolUpdate(id);
         L3AuthorizationScope scope = normalizeAndValidate(

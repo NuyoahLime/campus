@@ -47,11 +47,13 @@ class L3AuthorizationApplicationServiceTest {
     }
 
     @Test void createDerivesSchoolScopeAndSavesDraft() {
-        var r = svc.create(UUID.randomUUID(), UUID.randomUUID(), null, true, false);
+        var r = svc.create(UUID.randomUUID(), UUID.randomUUID(), null, false, false);
         assertThat(r.status()).isEqualTo("DRAFT");
         var captor = forClass(L3Authorization.class);
         verify(repo).save(captor.capture());
         assertThat(captor.getValue().schoolId()).isEqualTo(schoolId);
+        assertThat(captor.getValue().allowSchoolName()).isFalse();
+        assertThat(captor.getValue().allowStudentName()).isFalse();
         verify(schoolAuthorization).requireUniqueSchoolAdminSchool();
     }
 
