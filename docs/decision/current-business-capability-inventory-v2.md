@@ -1,7 +1,7 @@
 # Current Business Capability Inventory v2
 
-> L3 authorization product seal refresh
-> Baseline: `508f1205608a1675a4e2ebec944ebe703ec892c9`
+> L3 authorization product seal state sync
+> Baseline: `229f433809b91e1134ad172b30420c639c4506c8`
 > Evidence: current source, controllers, frontend routes, tests, accepted Stage26
 > E2E, Phase4A-Phase4D L2 ranking closure, and L3 authorization closure.
 
@@ -118,14 +118,13 @@ workflow closure.
 
 ## 7. Remaining Product Roadmap
 
-1. L3 Authorization Product Seal.
-2. L3 generation.
-3. L3 publication.
-4. L3 ranking management frontend.
-5. L3 product seal.
-6. ActivityResult closure.
-7. Production readiness.
-8. Full real-data E2E / UI closure.
+1. L3 Generation.
+2. L3 Publication.
+3. L3 Ranking Management Frontend.
+4. L3 Product Seal.
+5. ActivityResult closure.
+6. Production readiness.
+7. Full real-data E2E / UI closure.
 
 Media and Notification are not inserted into the current main production chain
 until a separate product decision makes them part of that chain.
