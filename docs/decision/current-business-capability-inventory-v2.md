@@ -1,9 +1,9 @@
 # Current Business Capability Inventory v2
 
-> L2 product seal refresh
+> L3 authorization product seal refresh
 > Baseline: `508f1205608a1675a4e2ebec944ebe703ec892c9`
 > Evidence: current source, controllers, frontend routes, tests, accepted Stage26
-> E2E, and Phase4A-Phase4D L2 ranking closure.
+> E2E, Phase4A-Phase4D L2 ranking closure, and L3 authorization closure.
 
 ## 1. Completion Rule
 
@@ -22,8 +22,8 @@ be implemented.
 | Status | Count |
 | --- | ---: |
 | Capability lines audited | 22 |
-| COMPLETE_VERTICAL_SLICE | 16 |
-| BACKEND_PARTIAL | 2 |
+| COMPLETE_VERTICAL_SLICE | 17 |
+| BACKEND_PARTIAL | 1 |
 | DOMAIN_READY_API_MISSING | 1 |
 | DEFERRED_BY_IDENTITY_MODEL | 1 |
 | LEGACY_FROZEN / DEFERRED_FOR_V1 | 1 |
@@ -53,7 +53,7 @@ generic account management UI.
 | Ranking published snapshot read | COMPLETE_VERTICAL_SLICE | Published snapshot persistence, scoped read API, public/student/school-admin frontend and tests | Public read is L3/global plus non-L2; same-school reads cover L1/L2 | Preserve |
 | L1 Ranking Production | COMPLETE_VERTICAL_SLICE | Definition, generation, immutable generated versions, preview, publication, read, management UI, tests and E2E | Preserve same-school L1 semantics | Preserve |
 | L2 Ranking Production | COMPLETE_VERTICAL_SLICE | Policy baseline, definition, BEST_SCORE generation, same-rule-version guard, publication, same-school read, management UI, tests and E2E | L2 public visibility remains denied; SUPER_ADMIN production-view override is not implemented | L2 product seal |
-| L3 authorization | BACKEND_PARTIAL | Domain, commands, persistence, partial API | Full query/detail/reject/suspend workflow absent | L3 policy / authorization closure |
+| L3 authorization | COMPLETE_VERTICAL_SLICE | Domain, commands, persistence, scoped API/query, validation, SchoolAdmin auth UI, SuperAdmin auth UI, workflow lifecycle, tests and E2E | Manual Activity UUID selector remains deferred | L3 authorization product seal |
 | Media | DEFERRED_BY_IDENTITY_MODEL | Lifecycle domain, persistence, review commands | Uploader/reviewer/publication contract unresolved after Teacher removal | Later product decision |
 | Activity result | BACKEND_PARTIAL | Domain, persistence, publish command/API | Create/read/review/public query and frontend absent | ActivityResult closure |
 | Feedback | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and E2E | Notifications are separate | Preserve |
@@ -102,25 +102,27 @@ and only-end filters remain valid.
 
 ## 6. L3 Current State
 
-L3 remains outside the L2 product seal:
+L3 authorization is now a complete vertical slice. The authorization UI is
+finished, but the ranking chain remains out of scope here:
 
 | L3 area | Status |
 | --- | --- |
-| L3 Authorization | PARTIAL |
+| L3 Authorization | COMPLETE_VERTICAL_SLICE |
 | L3 Generation | NOT_IMPLEMENTED |
 | L3 Publication | NOT_IMPLEMENTED |
 | L3 Management Frontend | NOT_IMPLEMENTED |
 
-Current production code explicitly supports L1/L2 generation and publication
-and rejects L3 for those production endpoints.
+SchoolAdmin / SuperAdmin authorization UI is complete. L3 ranking management
+frontend remains unimplemented and is not to be conflated with authorization
+workflow closure.
 
 ## 7. Remaining Product Roadmap
 
-1. L2 Product Seal.
-2. L3 policy / authorization closure.
-3. L3 generation.
-4. L3 publication.
-5. L3 management frontend.
+1. L3 Authorization Product Seal.
+2. L3 generation.
+3. L3 publication.
+4. L3 ranking management frontend.
+5. L3 product seal.
 6. ActivityResult closure.
 7. Production readiness.
 8. Full real-data E2E / UI closure.
