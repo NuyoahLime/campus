@@ -16,6 +16,20 @@ import { schoolAdminNavigation as navigation } from '../router/schoolAdminNaviga
 import type { ChallengeProjectDetail, ChallengeProjectListItem } from '../types/challengeProject';
 import type { L3Authorization, L3AuthorizationPage, L3AuthorizationStatus } from '../types/l3Authorization';
 
+type ScopeForm = {
+  activityIds: string;
+  grades: string;
+  classNames: string;
+  activityPeriodStart: string;
+  activityPeriodEnd: string;
+  allowSchoolName: boolean;
+  allowStudentName: boolean;
+};
+
+type CreateForm = ScopeForm & {
+  projectId: string;
+};
+
 const statuses: Array<L3AuthorizationStatus | ''> = ['', 'DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED', 'WITHDRAWN'];
 
 const items = ref<L3Authorization[]>([]);
@@ -23,27 +37,42 @@ const result = ref<L3AuthorizationPage | null>(null);
 const selected = ref<L3Authorization | null>(null);
 const projects = ref<ChallengeProjectListItem[]>([]);
 const projectDetail = ref<ChallengeProjectDetail | null>(null);
-const loading = ref(true);
+const authLoading = ref(true);
+const projectLoading = ref(true);
 const saving = ref(false);
 const page = ref(0);
 const status = ref<L3AuthorizationStatus | ''>('');
 const pageError = ref('');
+const projectListError = ref('');
+const projectDetailError = ref('');
 const actionMessage = ref('');
 const actionError = ref('');
 const withdrawReason = ref('');
-const form = ref({
-  projectId: '',
-  activityIds: '',
-  grades: '',
-  classNames: '',
-  activityPeriodStart: '',
-  activityPeriodEnd: '',
-  allowSchoolName: true,
-  allowStudentName: false
-});
+const createForm = ref<CreateForm>(blankCreateForm());
+const editForm = ref<ScopeForm>(blankScopeForm());
 
 const ruleVersionId = computed(() => projectDetail.value?.currentRuleVersionId ?? '');
-const canSave = computed(() => Boolean(form.value.projectId && ruleVersionId.value && !saving.value));
+const canCreate = computed(() => Boolean(createForm.value.projectId && ruleVersionId.value && !saving.value));
+const canUpdate = computed(() => Boolean(selected.value && selected.value.status === 'DRAFT' && !saving.value));
+
+function blankScopeForm(): ScopeForm {
+  return {
+    activityIds: '',
+    grades: '',
+    classNames: '',
+    activityPeriodStart: '',
+    activityPeriodEnd: '',
+    allowSchoolName: false,
+    allowStudentName: false
+  };
+}
+
+function blankCreateForm(): CreateForm {
+  return {
+    projectId: '',
+    ...blankScopeForm()
+  };
+}
 
 function describeError(error: unknown) {
   if (error instanceof ApiError) {
@@ -63,19 +92,64 @@ function localDateTimeToIso(value: string) {
   return value ? new Date(value).toISOString() : null;
 }
 
-function buildScope() {
+function isoToLocalDateTime(value: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (input: number) => String(input).padStart(2, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate())
+  ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function buildScope(form: ScopeForm) {
   const scope: Record<string, unknown> = {};
-  const activityIds = splitValues(form.value.activityIds);
-  const grades = splitValues(form.value.grades);
-  const classNames = splitValues(form.value.classNames);
+  const activityIds = splitValues(form.activityIds);
+  const grades = splitValues(form.grades);
+  const classNames = splitValues(form.classNames);
   if (activityIds.length) scope.activityIds = activityIds;
   if (grades.length) scope.grades = grades;
   if (classNames.length) scope.classNames = classNames;
-  const start = localDateTimeToIso(form.value.activityPeriodStart);
-  const end = localDateTimeToIso(form.value.activityPeriodEnd);
+  const start = localDateTimeToIso(form.activityPeriodStart);
+  const end = localDateTimeToIso(form.activityPeriodEnd);
   if (start) scope.activityPeriodStart = start;
   if (end) scope.activityPeriodEnd = end;
   return scope;
+}
+
+function parseScope(value: string | null): ScopeForm {
+  const form = blankScopeForm();
+  if (!value) return form;
+  try {
+    const scope = JSON.parse(value) as Record<string, unknown>;
+    form.activityIds = arrayOfText(scope.activityIds).join(', ');
+    form.grades = arrayOfText(scope.grades).join(', ');
+    form.classNames = arrayOfText(scope.classNames).join(', ');
+    form.activityPeriodStart = isoToLocalDateTime(typeof scope.activityPeriodStart === 'string' ? scope.activityPeriodStart : null);
+    form.activityPeriodEnd = isoToLocalDateTime(typeof scope.activityPeriodEnd === 'string' ? scope.activityPeriodEnd : null);
+  } catch {
+    return blankScopeForm();
+  }
+  return form;
+}
+
+function arrayOfText(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean);
+}
+
+function hydrateEditForm(authority: L3Authorization | null) {
+  if (!authority) {
+    editForm.value = blankScopeForm();
+    return;
+  }
+  editForm.value = {
+    ...parseScope(authority.dataScope),
+    allowSchoolName: authority.allowSchoolName,
+    allowStudentName: authority.allowStudentName
+  };
 }
 
 function scopeSummary(value: string | null) {
@@ -91,36 +165,48 @@ function dateLabel(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
 }
 
-async function load(selectId = selected.value?.id ?? '') {
-  loading.value = true;
+async function loadAuthorizations(selectId = selected.value?.id ?? '') {
+  authLoading.value = true;
   pageError.value = '';
   try {
-    const [authorizations, publicProjects] = await Promise.all([
-      listSchoolL3Authorizations(page.value, 20, status.value),
-      listPublicProjects(0, 100)
-    ]);
+    const authorizations = await listSchoolL3Authorizations(page.value, 20, status.value);
     result.value = authorizations;
     items.value = authorizations.items;
-    projects.value = publicProjects.items;
-    const next = items.value.find((item) => item.id === selectId) ?? items.value[0] ?? null;
-    selected.value = next ? await getSchoolL3Authorization(next.id) : null;
+    const nextId = selectId || authorizations.items[0]?.id || '';
+    selected.value = nextId ? await getSchoolL3Authorization(nextId) : null;
+    hydrateEditForm(selected.value);
   } catch (error) {
     items.value = [];
     result.value = null;
     selected.value = null;
+    hydrateEditForm(null);
     pageError.value = describeError(error);
   } finally {
-    loading.value = false;
+    authLoading.value = false;
+  }
+}
+
+async function loadProjects() {
+  projectLoading.value = true;
+  projectListError.value = '';
+  try {
+    const publicProjects = await listPublicProjects(0, 100);
+    projects.value = publicProjects.items;
+  } catch (error) {
+    projectListError.value = describeError(error);
+  } finally {
+    projectLoading.value = false;
   }
 }
 
 async function loadProjectDetail() {
   projectDetail.value = null;
-  if (!form.value.projectId) return;
+  projectDetailError.value = '';
+  if (!createForm.value.projectId) return;
   try {
-    projectDetail.value = await getPublicProject(form.value.projectId);
+    projectDetail.value = await getPublicProject(createForm.value.projectId);
   } catch (error) {
-    actionError.value = describeError(error);
+    projectDetailError.value = describeError(error);
   }
 }
 
@@ -128,23 +214,24 @@ async function selectAuthorization(item: L3Authorization) {
   actionError.value = '';
   actionMessage.value = '';
   selected.value = await getSchoolL3Authorization(item.id);
+  hydrateEditForm(selected.value);
 }
 
 async function createAuthorization() {
-  if (!canSave.value) return;
+  if (!canCreate.value) return;
   saving.value = true;
   actionError.value = '';
   actionMessage.value = '';
   try {
     const created = await createL3Authorization({
-      projectId: form.value.projectId,
+      projectId: createForm.value.projectId,
       ruleVersionId: ruleVersionId.value,
-      dataScope: buildScope(),
-      allowSchoolName: form.value.allowSchoolName,
-      allowStudentName: form.value.allowStudentName
+      dataScope: buildScope(createForm.value),
+      allowSchoolName: createForm.value.allowSchoolName,
+      allowStudentName: createForm.value.allowStudentName
     });
     actionMessage.value = 'L3 authorization draft created.';
-    await load(created.id);
+    await loadAuthorizations(created.id);
   } catch (error) {
     actionError.value = describeError(error);
   } finally {
@@ -158,13 +245,14 @@ async function editSelected() {
   actionError.value = '';
   actionMessage.value = '';
   try {
-    await updateL3Authorization(selected.value.id, {
-      dataScope: buildScope(),
-      allowSchoolName: form.value.allowSchoolName,
-      allowStudentName: form.value.allowStudentName
+    const id = selected.value.id;
+    await updateL3Authorization(id, {
+      dataScope: buildScope(editForm.value),
+      allowSchoolName: editForm.value.allowSchoolName,
+      allowStudentName: editForm.value.allowStudentName
     });
     actionMessage.value = 'Draft updated.';
-    await load(selected.value.id);
+    await loadAuthorizations(id);
   } catch (error) {
     actionError.value = describeError(error);
   } finally {
@@ -178,12 +266,13 @@ async function runAction(action: 'submit' | 'return' | 'withdraw') {
   actionError.value = '';
   actionMessage.value = '';
   try {
-    if (action === 'submit') await submitL3Authorization(selected.value.id);
-    if (action === 'return') await returnL3AuthorizationToDraft(selected.value.id);
-    if (action === 'withdraw') await withdrawL3Authorization(selected.value.id, withdrawReason.value.trim());
+    const id = selected.value.id;
+    if (action === 'submit') await submitL3Authorization(id);
+    if (action === 'return') await returnL3AuthorizationToDraft(id);
+    if (action === 'withdraw') await withdrawL3Authorization(id, withdrawReason.value.trim());
     actionMessage.value = 'Authorization updated.';
     withdrawReason.value = '';
-    await load(selected.value.id);
+    await loadAuthorizations(id);
   } catch (error) {
     actionError.value = describeError(error);
   } finally {
@@ -194,12 +283,18 @@ async function runAction(action: 'submit' | 'return' | 'withdraw') {
 function changePage(next: number) {
   if (next < 0 || next >= (result.value?.totalPages ?? 0)) return;
   page.value = next;
-  void load();
+  void loadAuthorizations();
 }
 
-watch(status, () => { page.value = 0; void load(); });
-watch(() => form.value.projectId, () => void loadProjectDetail());
-onMounted(() => void load());
+watch(status, () => {
+  page.value = 0;
+  void loadAuthorizations();
+});
+watch(() => createForm.value.projectId, () => void loadProjectDetail());
+onMounted(() => {
+  void loadAuthorizations();
+  void loadProjects();
+});
 </script>
 
 <template>
@@ -207,13 +302,13 @@ onMounted(() => void load());
     <section class="project-admin-panel l3-auth-panel">
       <div class="project-admin-toolbar">
         <div><p class="eyebrow">L3 AUTHORIZATION</p><h2>School Authorizations</h2><span>{{ result?.totalElements ?? 0 }} records</span></div>
-        <button class="secondary-button" type="button" :disabled="loading" @click="load()">Reload</button>
+        <button class="secondary-button" type="button" :disabled="authLoading" @click="loadAuthorizations()">Reload</button>
       </div>
-      <form class="project-filter-bar project-admin-filter" @submit.prevent="load()">
+      <form class="project-filter-bar project-admin-filter" @submit.prevent="loadAuthorizations()">
         <label>Status<select v-model="status" data-testid="l3-school-status-filter"><option v-for="item in statuses" :key="item || 'ALL'" :value="item">{{ item || 'ALL' }}</option></select></label>
       </form>
-      <div v-if="loading" class="project-state">Loading authorizations...</div>
-      <div v-else-if="pageError" class="project-state project-state-error"><strong>{{ pageError }}</strong><button class="secondary-button" type="button" @click="load()">Retry</button></div>
+      <div v-if="authLoading" class="project-state">Loading authorizations...</div>
+      <div v-else-if="pageError" class="project-state project-state-error"><strong>{{ pageError }}</strong><button class="secondary-button" type="button" @click="loadAuthorizations()">Retry</button></div>
       <div v-else class="l3-auth-grid">
         <div class="l3-auth-list">
           <table class="project-admin-table">
@@ -229,41 +324,71 @@ onMounted(() => void load());
           </table>
           <div v-if="!items.length" class="project-state"><strong>No authorizations yet.</strong></div>
           <div v-if="result && result.totalPages > 1" class="project-pagination">
-            <button class="secondary-button" type="button" :disabled="page === 0 || loading" @click="changePage(page - 1)">Previous</button>
+            <button class="secondary-button" type="button" :disabled="page === 0 || authLoading" @click="changePage(page - 1)">Previous</button>
             <span>{{ page + 1 }} / {{ result.totalPages }}</span>
-            <button class="secondary-button" type="button" :disabled="!result.hasNext || loading" @click="changePage(page + 1)">Next</button>
+            <button class="secondary-button" type="button" :disabled="!result.hasNext || authLoading" @click="changePage(page + 1)">Next</button>
           </div>
         </div>
+
         <form class="l3-auth-form" data-testid="l3-school-form" @submit.prevent="createAuthorization">
           <h3>Create Draft</h3>
-          <label>Challenge Project<select v-model="form.projectId" data-testid="l3-project-select"><option value="">Select project</option><option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option></select></label>
-          <label>Activity IDs<input v-model="form.activityIds" data-testid="l3-activity-ids" type="text"></label>
-          <label>Grades<input v-model="form.grades" data-testid="l3-grades" type="text"></label>
-          <label>Classes<input v-model="form.classNames" data-testid="l3-classes" type="text"></label>
+          <p v-if="projectListError" class="message message-error" data-testid="l3-project-list-error">{{ projectListError }}</p>
+          <p v-if="projectDetailError" class="message message-error" data-testid="l3-project-detail-error">{{ projectDetailError }}</p>
+          <label>Challenge Project
+            <select v-model="createForm.projectId" data-testid="l3-project-select" :disabled="projectLoading">
+              <option value="">Select project</option>
+              <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+            </select>
+          </label>
+          <label>Activity IDs<input v-model="createForm.activityIds" data-testid="l3-activity-ids" type="text"></label>
+          <label>Grades<input v-model="createForm.grades" data-testid="l3-grades" type="text"></label>
+          <label>Classes<input v-model="createForm.classNames" data-testid="l3-classes" type="text"></label>
           <div class="l3-auth-two">
-            <label>Period Start<input v-model="form.activityPeriodStart" data-testid="l3-period-start" type="datetime-local"></label>
-            <label>Period End<input v-model="form.activityPeriodEnd" data-testid="l3-period-end" type="datetime-local"></label>
+            <label>Period Start<input v-model="createForm.activityPeriodStart" data-testid="l3-period-start" type="datetime-local"></label>
+            <label>Period End<input v-model="createForm.activityPeriodEnd" data-testid="l3-period-end" type="datetime-local"></label>
           </div>
-          <label class="l3-auth-check"><input v-model="form.allowSchoolName" type="checkbox"> Allow school display name</label>
-          <label class="l3-auth-check"><input v-model="form.allowStudentName" type="checkbox"> Allow masked student display name</label>
+          <label class="l3-auth-check"><input v-model="createForm.allowSchoolName" data-testid="l3-create-allow-school-name" type="checkbox"> Allow school display name</label>
+          <label class="l3-auth-check"><input v-model="createForm.allowStudentName" data-testid="l3-create-allow-student-name" type="checkbox"> Allow masked student display name</label>
           <div class="project-form-actions">
-            <button class="primary-button" data-testid="l3-create" type="submit" :disabled="!canSave">Create Draft</button>
-            <button class="secondary-button" data-testid="l3-edit" type="button" :disabled="!selected || selected.status !== 'DRAFT' || saving" @click="editSelected">Update Draft</button>
+            <button class="primary-button" data-testid="l3-create" type="submit" :disabled="!canCreate">Create Draft</button>
           </div>
         </form>
+
         <section class="l3-auth-detail" data-testid="l3-school-detail">
           <h3>Selected Authorization</h3>
           <div v-if="!selected" class="project-state"><strong>No record selected.</strong></div>
           <template v-else>
-            <dl>
+            <dl class="l3-auth-summary">
               <div><dt>Status</dt><dd data-testid="l3-selected-status">{{ selected.status }}</dd></div>
               <div><dt>ID</dt><dd>{{ selected.id }}</dd></div>
-              <div><dt>Project</dt><dd>{{ selected.projectName }}</dd></div>
+              <div><dt>Challenge Project</dt><dd>{{ selected.projectName }}</dd></div>
+              <div><dt>Rule Version</dt><dd>V{{ selected.ruleVersionNumber }}</dd></div>
               <div><dt>Scope</dt><dd><code>{{ scopeSummary(selected.dataScope) }}</code></dd></div>
               <div><dt>Privacy</dt><dd>School {{ selected.allowSchoolName ? 'allowed' : 'hidden' }} / Student {{ selected.allowStudentName ? 'masked name allowed' : 'hidden' }}</dd></div>
               <div v-if="selected.rejectReason"><dt>Reject Reason</dt><dd data-testid="l3-reject-reason">{{ selected.rejectReason }}</dd></div>
             </dl>
-            <div class="project-form-actions">
+
+            <form class="l3-auth-edit-form" @submit.prevent="editSelected">
+              <h4>Edit Draft</h4>
+              <div class="l3-auth-readonly">
+                <div><dt>Challenge Project</dt><dd>{{ selected.projectName }}</dd></div>
+                <div><dt>Rule Version</dt><dd>V{{ selected.ruleVersionNumber }}</dd></div>
+              </div>
+              <label>Activity IDs<input v-model="editForm.activityIds" data-testid="l3-edit-activity-ids" type="text" :disabled="selected.status !== 'DRAFT' || saving"></label>
+              <label>Grades<input v-model="editForm.grades" data-testid="l3-edit-grades" type="text" :disabled="selected.status !== 'DRAFT' || saving"></label>
+              <label>Classes<input v-model="editForm.classNames" data-testid="l3-edit-classes" type="text" :disabled="selected.status !== 'DRAFT' || saving"></label>
+              <div class="l3-auth-two">
+                <label>Period Start<input v-model="editForm.activityPeriodStart" data-testid="l3-edit-period-start" type="datetime-local" :disabled="selected.status !== 'DRAFT' || saving"></label>
+                <label>Period End<input v-model="editForm.activityPeriodEnd" data-testid="l3-edit-period-end" type="datetime-local" :disabled="selected.status !== 'DRAFT' || saving"></label>
+              </div>
+              <label class="l3-auth-check"><input v-model="editForm.allowSchoolName" data-testid="l3-edit-allow-school-name" type="checkbox" :disabled="selected.status !== 'DRAFT' || saving"> Allow school display name</label>
+              <label class="l3-auth-check"><input v-model="editForm.allowStudentName" data-testid="l3-edit-allow-student-name" type="checkbox" :disabled="selected.status !== 'DRAFT' || saving"> Allow masked student display name</label>
+              <div class="project-form-actions">
+                <button class="primary-button" data-testid="l3-edit" type="submit" :disabled="!canUpdate">Update Draft</button>
+              </div>
+            </form>
+
+            <div class="project-form-actions l3-auth-actions">
               <button class="primary-button" data-testid="l3-submit" type="button" :disabled="selected.status !== 'DRAFT' || saving" @click="runAction('submit')">Submit</button>
               <button class="secondary-button" data-testid="l3-return" type="button" :disabled="selected.status !== 'REJECTED' || saving" @click="runAction('return')">Return to Draft</button>
             </div>
@@ -287,16 +412,20 @@ onMounted(() => void load());
 .l3-auth-form, .l3-auth-detail { border: 1px solid #dde3ea; border-radius: 8px; padding: 16px; background: #fff; }
 .l3-auth-form { grid-column: 2; }
 .l3-auth-detail { grid-column: 1 / -1; }
-.l3-auth-form h3, .l3-auth-detail h3 { margin: 0 0 12px; font-size: 16px; }
-.l3-auth-form label { display: grid; gap: 6px; margin-bottom: 10px; color: #354155; font-size: 13px; font-weight: 700; }
-.l3-auth-form input, .l3-auth-form select, .l3-auth-withdraw input { min-height: 38px; border: 1px solid #d6dce4; border-radius: 7px; padding: 0 10px; font: inherit; }
+.l3-auth-form h3, .l3-auth-detail h3, .l3-auth-edit-form h4 { margin: 0 0 12px; font-size: 16px; }
+.l3-auth-form label, .l3-auth-edit-form label { display: grid; gap: 6px; margin-bottom: 10px; color: #354155; font-size: 13px; font-weight: 700; }
+.l3-auth-form input, .l3-auth-form select, .l3-auth-edit-form input, .l3-auth-withdraw input { min-height: 38px; border: 1px solid #d6dce4; border-radius: 7px; padding: 0 10px; font: inherit; }
 .l3-auth-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .l3-auth-check { display: flex !important; grid-template-columns: none !important; align-items: center; gap: 8px !important; }
 .l3-auth-check input { min-height: auto; }
 .l3-auth-detail dl { display: grid; gap: 10px; margin: 0 0 14px; }
-.l3-auth-detail div { min-width: 0; }
-.l3-auth-detail dt { color: #687384; font-size: 12px; font-weight: 800; text-transform: uppercase; }
-.l3-auth-detail dd { margin: 3px 0 0; color: #1d2736; overflow-wrap: anywhere; }
+.l3-auth-summary, .l3-auth-readonly { margin: 0 0 14px; }
+.l3-auth-readonly { display: grid; gap: 10px; }
+.l3-auth-readonly div, .l3-auth-summary div { min-width: 0; }
+.l3-auth-readonly dt, .l3-auth-summary dt { color: #687384; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.l3-auth-readonly dd, .l3-auth-summary dd { margin: 3px 0 0; color: #1d2736; overflow-wrap: anywhere; }
+.l3-auth-edit-form { border-top: 1px solid #e5eaf0; padding-top: 14px; margin-bottom: 8px; }
+.l3-auth-actions { margin-bottom: 0; }
 .l3-auth-withdraw { display: flex; gap: 10px; margin-top: 12px; }
 .l3-auth-withdraw input { flex: 1; min-width: 0; }
 @media (max-width: 900px) {

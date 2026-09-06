@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public record L3AuthorizationScope(
@@ -19,6 +20,12 @@ public record L3AuthorizationScope(
         List<String> grades,
         List<String> classNames) {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Set<String> ALLOWED_FIELDS = Set.of(
+            "activityIds",
+            "activityPeriodStart",
+            "activityPeriodEnd",
+            "grades",
+            "classNames");
 
     public static L3AuthorizationScope parse(String raw) {
         if (raw == null || raw.isBlank()) {
@@ -39,6 +46,12 @@ public record L3AuthorizationScope(
         }
         if (!node.isObject()) {
             throw new IllegalStateException("Cannot save L3 authorization: dataScope must be a JSON object.");
+        }
+        for (var fields = node.fieldNames(); fields.hasNext();) {
+            String field = fields.next();
+            if (!ALLOWED_FIELDS.contains(field)) {
+                throw new IllegalStateException("Cannot save L3 authorization: unsupported dataScope field: " + field + ".");
+            }
         }
         Instant start = instant(node, "activityPeriodStart");
         Instant end = instant(node, "activityPeriodEnd");

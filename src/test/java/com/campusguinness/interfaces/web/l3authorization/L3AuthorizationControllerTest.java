@@ -17,6 +17,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,6 +41,18 @@ class L3AuthorizationControllerTest {
                                 """.formatted(UUID.randomUUID(), UUID.randomUUID())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"));
+    }
+
+    @Test void createDefaultsPrivacyFlagsToFailClosedWhenOmitted() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.create(any(), any(), any(), anyBoolean(), anyBoolean()))
+                .thenReturn(new L3AuthorizationResult(id, "DRAFT"));
+        mvc.perform(post("/api/v1/school-admin/l3-authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","ruleVersionId":"%s","dataScope":{"grades":["2026"]}}
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID())))
+                .andExpect(status().isCreated());
+        verify(service).create(any(), any(), any(), eq(false), eq(false));
     }
 
     @Test void submitReturns200() throws Exception {

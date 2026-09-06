@@ -50,7 +50,7 @@ public class L3AuthorizationController {
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<L3AuthorizationResponse> create(@Valid @RequestBody CreateL3AuthorizationRequest req) {
         var result = service.create(req.projectId(), req.ruleVersionId(), req.dataScope(),
-                value(req.allowSchoolName(), true), value(req.allowStudentName(), false));
+                value(req.allowSchoolName(), false), value(req.allowStudentName(), false));
         return ResponseEntity.created(URI.create("/api/v1/school-admin/l3-authorizations/" + result.id()))
                 .body(L3AuthorizationResponse.command(result.id(), result.status()));
     }
@@ -60,7 +60,7 @@ public class L3AuthorizationController {
     public ResponseEntity<L3AuthorizationResponse> edit(@PathVariable UUID id,
                                                         @Valid @RequestBody UpdateL3AuthorizationRequest req) {
         var result = service.editDraft(id, req.dataScope(),
-                value(req.allowSchoolName(), true), value(req.allowStudentName(), false));
+                value(req.allowSchoolName(), false), value(req.allowStudentName(), false));
         return ResponseEntity.ok(L3AuthorizationResponse.command(result.id(), result.status()));
     }
 

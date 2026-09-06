@@ -247,6 +247,13 @@ class L3AuthorizationWorkflowIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
+    void rejectsUnknownScopeFieldsFailClosedAndPersistsNothing() throws Exception {
+        assertUnknownFieldRejected("{\"activityId\":\"" + activityA1 + "\"}", "activityId");
+        assertUnknownFieldRejected("{\"grades\":[\"G5\"],\"unknownKey\":\"x\"}", "unknownKey");
+        assertUnknownFieldRejected("{\"studentIds\":[\"" + UUID.randomUUID() + "\"],\"classNames\":[\"C1\"]}", "studentIds");
+    }
+
+    @Test
     void duplicatePolicyPreservesWithdrawnHistoryAndBlocksActiveDuplicates() throws Exception {
         UUID first = createAsAdminA(payload(projectA, ruleA, "{\"grades\":[\"G5\"]}"));
 
@@ -255,7 +262,12 @@ class L3AuthorizationWorkflowIT extends PostgreSqlIntegrationTestSupport {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload(projectA, ruleA, "{\"grades\":[\"G5\"]}")))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("L3_AUTHORIZATION_ALREADY_EXISTS"));
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM l3_authorizations
+                WHERE school_id = ? AND project_id = ? AND rule_version_id = ?
+                """, Integer.class, schoolA, projectA, ruleA)).isEqualTo(1);
 
         mvc.perform(post("/api/v1/school-admin/l3-authorizations/{id}/withdraw", first)
                         .with(schoolAdmin(adminA, schoolA))
@@ -271,6 +283,41 @@ class L3AuthorizationWorkflowIT extends PostgreSqlIntegrationTestSupport {
                 SELECT COUNT(*) FROM l3_authorizations
                 WHERE school_id = ? AND project_id = ? AND rule_version_id = ?
                 """, Integer.class, schoolA, projectA, ruleA)).isEqualTo(2);
+    }
+
+    @Test
+    void noOpDraftEditPreservesAuthoritativeValues() throws Exception {
+        UUID authorizationId = createAsAdminA("""
+                {
+                  "projectId":"%s",
+                  "ruleVersionId":"%s",
+                  "allowSchoolName":true,
+                  "allowStudentName":false,
+                  "dataScope":{"grades":["G5"],"classNames":["C1"]}
+                }
+                """.formatted(projectA, ruleA));
+
+        String beforeScope = dbValue(authorizationId, "data_scope", String.class);
+        Boolean beforeAllowSchoolName = dbValue(authorizationId, "allow_school_name", Boolean.class);
+        Boolean beforeAllowStudentName = dbValue(authorizationId, "allow_student_name", Boolean.class);
+
+        mvc.perform(put("/api/v1/school-admin/l3-authorizations/{id}", authorizationId)
+                        .with(schoolAdmin(adminA, schoolA))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "allowSchoolName":true,
+                                  "allowStudentName":false,
+                                  "dataScope":{"grades":["G5"],"classNames":["C1"]}
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        assertThat(dbValue(authorizationId, "data_scope", String.class)).isEqualTo(beforeScope);
+        assertThat(dbValue(authorizationId, "allow_school_name", Boolean.class)).isEqualTo(beforeAllowSchoolName);
+        assertThat(dbValue(authorizationId, "allow_student_name", Boolean.class)).isEqualTo(beforeAllowStudentName);
     }
 
     @Test
@@ -352,6 +399,20 @@ class L3AuthorizationWorkflowIT extends PostgreSqlIntegrationTestSupport {
                 .getResponse()
                 .getContentAsString();
         return UUID.fromString(objectMapper.readTree(content).get("id").asText());
+    }
+
+    private void assertUnknownFieldRejected(String dataScopeJson, String fieldName) throws Exception {
+        mvc.perform(post("/api/v1/school-admin/l3-authorizations")
+                        .with(schoolAdmin(adminA, schoolA))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload(projectA, ruleA, dataScopeJson)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot save L3 authorization: unsupported dataScope field: " + fieldName + "."));
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM l3_authorizations
+                WHERE school_id = ?
+                """, Integer.class, schoolA)).isZero();
     }
 
     private String payload(UUID projectId, UUID ruleVersionId, String dataScopeJson) {

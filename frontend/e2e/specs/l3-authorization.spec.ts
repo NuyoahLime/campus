@@ -13,6 +13,8 @@ async function createDraft(page: Parameters<typeof loginUi>[0], grade: string, c
   await page.getByTestId('l3-project-select').selectOption({ label: 'E2E L2 Best Project' });
   await page.getByTestId('l3-grades').fill(grade);
   await page.getByTestId('l3-classes').fill(className);
+  await page.getByTestId('l3-create-allow-school-name').uncheck();
+  await page.getByTestId('l3-create-allow-student-name').check();
   await expect(page.getByTestId('l3-create')).toBeEnabled();
 
   const responsePromise = page.waitForResponse(response =>
@@ -60,7 +62,7 @@ test.describe('L3 data authorization frontend', () => {
     );
     await page.getByTestId('l3-approve').click();
     expect((await approveResponse).status()).toBe(200);
-    await expect(page.getByTestId('l3-review-selected-status')).toHaveText('APPROVED');
+  await expect(page.getByTestId('l3-review-selected-status')).toHaveText('APPROVED');
 
     await loginAs(page, actors.schoolAdminA);
     await page.goto('/school-admin/l3-authorizations');
@@ -68,7 +70,8 @@ test.describe('L3 data authorization frontend', () => {
   });
 
   test('school admin returns a rejected L3 authorization to draft, edits, resubmits, and gets approval', async ({ page }) => {
-    const id = await createDraft(page, `R-${Date.now()}`, 'E2E-B');
+    const grade = `R-${Date.now()}`;
+    const id = await createDraft(page, grade, 'E2E-B');
     await submitSelected(page, id);
 
     await openReview(page, id);
@@ -84,6 +87,10 @@ test.describe('L3 data authorization frontend', () => {
     await loginAs(page, actors.schoolAdminA);
     await page.goto('/school-admin/l3-authorizations');
     await expect(page.getByTestId('l3-selected-status')).toHaveText('REJECTED');
+    await expect(page.getByTestId('l3-edit-grades')).toHaveValue(grade);
+    await expect(page.getByTestId('l3-edit-classes')).toHaveValue('E2E-B');
+    await expect(page.getByTestId('l3-edit-allow-school-name')).not.toBeChecked();
+    await expect(page.getByTestId('l3-edit-allow-student-name')).toBeChecked();
     await expect(page.getByTestId('l3-reject-reason')).toContainText('narrow the class scope');
     const returnResponse = page.waitForResponse(response =>
       response.request().method() === 'POST'
@@ -92,14 +99,22 @@ test.describe('L3 data authorization frontend', () => {
     await page.getByTestId('l3-return').click();
     expect((await returnResponse).status()).toBe(200);
     await expect(page.getByTestId('l3-selected-status')).toHaveText('DRAFT');
+    await expect(page.getByTestId('l3-edit-grades')).toHaveValue(grade);
+    await expect(page.getByTestId('l3-edit-classes')).toHaveValue('E2E-B');
+    await expect(page.getByTestId('l3-edit-allow-school-name')).not.toBeChecked();
+    await expect(page.getByTestId('l3-edit-allow-student-name')).toBeChecked();
 
-    await page.getByTestId('l3-classes').fill('E2E-A');
+    await page.getByTestId('l3-edit-classes').fill('E2E-A');
     const editResponse = page.waitForResponse(response =>
       response.request().method() === 'PUT'
       && response.url().endsWith(`/api/v1/school-admin/l3-authorizations/${id}`)
     );
     await page.getByTestId('l3-edit').click();
     expect((await editResponse).status()).toBe(200);
+    await expect(page.getByTestId('l3-edit-grades')).toHaveValue(grade);
+    await expect(page.getByTestId('l3-edit-classes')).toHaveValue('E2E-A');
+    await expect(page.getByTestId('l3-edit-allow-school-name')).not.toBeChecked();
+    await expect(page.getByTestId('l3-edit-allow-student-name')).toBeChecked();
     await submitSelected(page, id);
 
     await openReview(page, id);
@@ -110,5 +125,15 @@ test.describe('L3 data authorization frontend', () => {
     await page.getByTestId('l3-approve').click();
     expect((await approveResponse).status()).toBe(200);
     await expect(page.getByTestId('l3-review-selected-status')).toHaveText('APPROVED');
+  });
+
+  test('management auxiliary project load failure does not clear existing authorization state', async ({ page }) => {
+    const id = await createDraft(page, `A-${Date.now()}`, 'E2E-C');
+    await page.route('**/api/v1/challenge-projects**', (route) => route.abort());
+    await loginAs(page, actors.schoolAdminA);
+    await page.goto('/school-admin/l3-authorizations');
+    await expect(page.getByTestId('l3-project-list-error')).toBeVisible();
+    await expect(page.getByTestId('l3-selected-status')).toHaveText('DRAFT');
+    await expect(page.locator('[data-testid="l3-school-detail"]')).toContainText(id);
   });
 });

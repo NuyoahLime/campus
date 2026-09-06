@@ -189,8 +189,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(IllegalStateException ex, HttpServletRequest req) {
+        String msg = ex.getMessage();
+        if (msg != null && msg.contains("active authorization already exists")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of(
+                            "L3_AUTHORIZATION_ALREADY_EXISTS",
+                            msg,
+                            req.getRequestURI()));
+        }
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiErrorResponse.of("CONFLICT", ex.getMessage(), req.getRequestURI()));
+                .body(ApiErrorResponse.of("CONFLICT", msg, req.getRequestURI()));
     }
 
     @ExceptionHandler(com.campusguinness.score.internal.persistence.ScoreValuePersistenceException.class)

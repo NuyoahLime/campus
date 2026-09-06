@@ -151,6 +151,10 @@ L3 public ranking output.
 names. It does not permit publishing raw student legal names. Future L3 ranking
 generation must still apply public privacy masking.
 
+When the client omits these flags, the backend defaults them to `false` and the
+UI should treat that as the fail-closed baseline. There is no implicit privacy
+consent in this v1 policy.
+
 ## 10. Duplicate And Historical Policy
 
 `WITHDRAWN` is terminal audit history. A school may create a new authorization
