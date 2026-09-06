@@ -45,6 +45,8 @@ import SchoolAdminFeedbackDetailView from '../views/SchoolAdminFeedbackDetailVie
 import RankingListView from '../views/RankingListView.vue';
 import RankingDetailView from '../views/RankingDetailView.vue';
 import SchoolAdminRankingManagementView from '../views/SchoolAdminRankingManagementView.vue';
+import SchoolAdminL3AuthorizationsView from '../views/SchoolAdminL3AuthorizationsView.vue';
+import SuperAdminL3AuthorizationReviewView from '../views/SuperAdminL3AuthorizationReviewView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -200,6 +202,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {
+      path: '/school-admin/l3-authorizations',
+      name: 'school-admin-l3-authorizations',
+      component: SchoolAdminL3AuthorizationsView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
       path: '/school-admin/rankings/:id',
       name: 'school-admin-ranking-detail',
       component: RankingDetailView,
@@ -252,6 +260,12 @@ const router = createRouter({
       path: '/super-admin/projects/:id',
       name: 'super-admin-project-detail',
       component: SuperAdminProjectDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/l3-authorizations',
+      name: 'super-admin-l3-authorizations',
+      component: SuperAdminL3AuthorizationReviewView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
     },
     {

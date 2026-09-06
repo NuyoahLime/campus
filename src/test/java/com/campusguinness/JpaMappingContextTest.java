@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - EntityManagerFactory starts with PostgreSQL 18.4 Testcontainer.
  * - All 21 entities are scanned and mapped.
  * - Hibernate ddl-auto is 'none' (verified via configuration).
- * - Flyway executed all 19 migrations.
+ * - Flyway executed all 20 migrations.
  */
 class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
 
@@ -51,11 +51,11 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 19 successful migrations")
-    void flywayExecutedAll19Migrations() {
+    @DisplayName("Flyway executed exactly 20 successful migrations")
+    void flywayExecutedAll20Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(19);
+        assertThat(count).isEqualTo(20);
     }
 
     @Test

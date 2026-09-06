@@ -4,6 +4,7 @@ import com.campusguinness.audit.application.port.AuditRecordCommand;
 import com.campusguinness.audit.application.port.AuditRecordCommandPort;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
+import com.campusguinness.ranking.application.service.L3AuthorizationApplicationService;
 import com.campusguinness.school.application.port.SchoolRepository;
 import com.campusguinness.school.application.query.model.SchoolGovernanceDetailResult;
 import com.campusguinness.school.application.query.port.SchoolAdminGovernanceQueryPort;
@@ -37,6 +38,7 @@ class SchoolApplicationServiceTest {
     @Mock SchoolRepository repository;
     @Mock SchoolAdminGovernanceQueryPort governanceQueries;
     @Mock PlatformGovernanceAuthorization authorization;
+    @Mock L3AuthorizationApplicationService l3Authorizations;
     @Mock AuditRecordCommandPort audit;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -51,6 +53,7 @@ class SchoolApplicationServiceTest {
                 repository,
                 governanceQueries,
                 authorization,
+                l3Authorizations,
                 audit,
                 objectMapper
         );
@@ -111,6 +114,7 @@ class SchoolApplicationServiceTest {
         assertThat(service.suspend(id, "platform governance pause").status()).isEqualTo("SUSPENDED");
 
         verifyAuditAction("SCHOOL_SUSPEND");
+        verify(l3Authorizations).suspendApprovedForSchoolPause(id);
     }
 
     @Test
@@ -152,6 +156,8 @@ class SchoolApplicationServiceTest {
 
         verify(repository, org.mockito.Mockito.times(2)).save(any());
         verify(audit, org.mockito.Mockito.times(2)).record(any());
+        verify(l3Authorizations).withdrawNonTerminalForSchoolDisable(normalId, "operations ended");
+        verify(l3Authorizations).withdrawNonTerminalForSchoolDisable(suspendedId, "operations ended");
     }
 
     @Test
@@ -187,7 +193,7 @@ class SchoolApplicationServiceTest {
                 .isInstanceOfSatisfying(IdentityApplicationException.class, ex ->
                         assertThat(ex.code()).isEqualTo("SCHOOL_LIFECYCLE_REASON_INVALID"));
 
-        verifyNoInteractions(repository, audit, governanceQueries);
+        verifyNoInteractions(repository, audit, governanceQueries, l3Authorizations);
     }
 
     @Test

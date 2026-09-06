@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.common;
 import com.campusguinness.interfaces.web.challengeproject.ChallengeProjectController;
 import com.campusguinness.project.application.query.ChallengeProjectQueryService;
 import com.campusguinness.project.application.service.ChallengeProjectApplicationService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,6 +44,15 @@ class GlobalExceptionHandlerTest {
         mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CONFLICT"));
+    }
+
+    @Test void l3DuplicateDataIntegrityMapsToSpecificCode() throws Exception {
+        when(queryService.publicDetail(any())).thenThrow(new DataIntegrityViolationException(
+                "duplicate",
+                new RuntimeException("uq_l3_auth_active_school_project_rule_scope")));
+        mvc.perform(get("/api/v1/challenge-projects/00000000-0000-0000-0000-000000000001"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("L3_AUTHORIZATION_ALREADY_EXISTS"));
     }
 
     @Test void stateConflictReturns409() throws Exception {

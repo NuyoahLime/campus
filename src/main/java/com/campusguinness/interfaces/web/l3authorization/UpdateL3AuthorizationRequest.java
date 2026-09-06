@@ -1,13 +1,8 @@
 package com.campusguinness.interfaces.web.l3authorization;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.validation.constraints.NotNull;
 
-import java.util.UUID;
-
-public record CreateL3AuthorizationRequest(
-        @NotNull UUID projectId,
-        @NotNull UUID ruleVersionId,
+public record UpdateL3AuthorizationRequest(
         JsonNode dataScope,
         Boolean allowSchoolName,
         Boolean allowStudentName) {

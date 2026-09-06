@@ -1,12 +1,15 @@
 package com.campusguinness.ranking.internal.persistence;
 
 import jakarta.persistence.*; import java.time.Instant; import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 @Entity @Table(name = "l3_authorizations")
 public class L3AuthorizationEntity {
     @Id @Column(name = "id", nullable = false, updatable = false) private UUID id;
     @Column(name = "school_id", nullable = false) private UUID schoolId;
     @Column(name = "project_id", nullable = false) private UUID projectId;
     @Column(name = "rule_version_id", nullable = false) private UUID ruleVersionId;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data_scope", columnDefinition = "jsonb") private String dataScope;
     @Column(name = "allow_school_name", nullable = false) private boolean allowSchoolName;
     @Column(name = "allow_student_name", nullable = false) private boolean allowStudentName;

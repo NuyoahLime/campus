@@ -4,6 +4,7 @@ import com.campusguinness.audit.application.port.AuditRecordCommand;
 import com.campusguinness.audit.application.port.AuditRecordCommandPort;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
+import com.campusguinness.ranking.application.service.L3AuthorizationApplicationService;
 import com.campusguinness.school.application.port.SchoolRepository;
 import com.campusguinness.school.application.query.port.SchoolAdminGovernanceQueryPort;
 import com.campusguinness.school.application.result.SchoolResult;
@@ -26,6 +27,7 @@ public class SchoolApplicationService {
     private final SchoolRepository repository;
     private final SchoolAdminGovernanceQueryPort governanceQueries;
     private final PlatformGovernanceAuthorization authorization;
+    private final L3AuthorizationApplicationService l3Authorizations;
     private final AuditRecordCommandPort audit;
     private final ObjectMapper objectMapper;
 
@@ -33,12 +35,14 @@ public class SchoolApplicationService {
             SchoolRepository repository,
             SchoolAdminGovernanceQueryPort governanceQueries,
             PlatformGovernanceAuthorization authorization,
+            L3AuthorizationApplicationService l3Authorizations,
             AuditRecordCommandPort audit,
             ObjectMapper objectMapper
     ) {
         this.repository = repository;
         this.governanceQueries = governanceQueries;
         this.authorization = authorization;
+        this.l3Authorizations = l3Authorizations;
         this.audit = audit;
         this.objectMapper = objectMapper;
     }
@@ -116,6 +120,7 @@ public class SchoolApplicationService {
             }
 
             repository.save(school);
+            coordinateL3AuthorizationLifecycle(school, action, normalizedReason);
             audit.record(auditCommand(
                     school,
                     actorId,
@@ -130,6 +135,15 @@ public class SchoolApplicationService {
             throw error("INVALID_SCHOOL_STATE_TRANSITION", ex.getMessage());
         } catch (ObjectOptimisticLockingFailureException | PessimisticLockingFailureException ex) {
             throw error("SCHOOL_LIFECYCLE_CONFLICT", "School lifecycle update conflict.");
+        }
+    }
+
+    private void coordinateL3AuthorizationLifecycle(School school, LifecycleAction action, String reason) {
+        switch (action) {
+            case SUSPEND -> l3Authorizations.suspendApprovedForSchoolPause(school.id().value());
+            case DISABLE -> l3Authorizations.withdrawNonTerminalForSchoolDisable(school.id().value(), reason);
+            case RESTORE, ACTIVATE, REENABLE -> {
+            }
         }
     }
 
