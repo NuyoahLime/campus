@@ -1,10 +1,12 @@
 # Current Business Capability Inventory v2
 
-> L3 generation product seal state sync
-> Baseline: `530b226f9216a8b5a737491031b42167cdf72c90`
+> L3 publication product seal state sync
+> Baseline: `df67cf7aa1dae81e9af737aca60354e745206558`
 > Evidence: current source, controllers, frontend routes, tests, accepted Stage26
 > E2E, Phase4A-Phase4D L2 ranking closure, L3 authorization closure, L3
-> generation closure, and PR #59 post-merge acceptance.
+> generation closure, PR #61 L3 publication implementation, PR #61 correctness
+> acceptance, PR #61 post-merge exact-SHA acceptance, Backend CI 1309 tests
+> PASS, and Stage26 17/17 PASS.
 
 ## 1. Completion Rule
 
@@ -22,8 +24,8 @@ be implemented.
 
 | Status | Count |
 | --- | ---: |
-| Capability lines audited | 23 |
-| COMPLETE_VERTICAL_SLICE | 18 |
+| Capability lines audited | 24 |
+| COMPLETE_VERTICAL_SLICE | 19 |
 | BACKEND_PARTIAL | 1 |
 | DOMAIN_READY_API_MISSING | 1 |
 | DEFERRED_BY_IDENTITY_MODEL | 1 |
@@ -55,7 +57,8 @@ generic account management UI.
 | L1 Ranking Production | COMPLETE_VERTICAL_SLICE | Definition, generation, immutable generated versions, preview, publication, read, management UI, tests and E2E | Preserve same-school L1 semantics | Preserve |
 | L2 Ranking Production | COMPLETE_VERTICAL_SLICE | Policy baseline, definition, BEST_SCORE generation, same-rule-version guard, publication, same-school read, management UI, tests and E2E | L2 public visibility remains denied; SUPER_ADMIN production-view override is not implemented | L2 product seal |
 | L3 authorization | COMPLETE_VERTICAL_SLICE | Domain, commands, persistence, scoped API/query, validation, SchoolAdmin auth UI, SuperAdmin auth UI, workflow lifecycle, tests and E2E | Manual Activity UUID selector remains deferred | L3 authorization product seal |
-| L3 Generation | COMPLETE_VERTICAL_SLICE | Super-admin generation flow, candidate query, approved usable authorization consumption, BEST_SCORE reduction, immutable snapshot, tests and E2E | L3 publication and management frontend remain separate | L3 generation product seal |
+| L3 Generation | COMPLETE_VERTICAL_SLICE | Super-admin generation flow, candidate query, approved usable authorization consumption, BEST_SCORE reduction, immutable snapshot, tests and E2E | L3 Ranking Management Frontend remains separate | L3 generation product seal |
+| L3 Publication | COMPLETE_VERTICAL_SLICE | SUPER_ADMIN publication API, RankingPublicationApplicationService, generated snapshot publication, current_version_id switch, previous published version replacement, server-derived published_at, immutable ranking snapshot preservation, existing public ranking read integration, PostgreSQL integration tests, and Stage26 product E2E | L3 Ranking Management Frontend remains separate | L3 publication product seal |
 | Media | DEFERRED_BY_IDENTITY_MODEL | Lifecycle domain, persistence, review commands | Uploader/reviewer/publication contract unresolved after Teacher removal | Later product decision |
 | Activity result | BACKEND_PARTIAL | Domain, persistence, publish command/API | Create/read/review/public query and frontend absent | ActivityResult closure |
 | Feedback | COMPLETE_VERTICAL_SLICE | Domain, self-scoped student API/UI, same-school school-admin API/UI, persistence, tests and E2E | Notifications are separate | Preserve |
@@ -96,36 +99,43 @@ and only-end filters remain valid.
 
 | Actor / access path | L1 | L2 | L3 |
 | --- | --- | --- | --- |
-| Anonymous public read | Existing public/global behavior | DENY | ALLOW when implemented and published |
-| Same-school student | ALLOW published same-school snapshot | ALLOW published same-school snapshot | Future L3 policy |
-| Same-school school admin | ALLOW published same-school snapshot | ALLOW published same-school snapshot | Future L3 policy |
-| Other school | DENY | DENY | Future L3 policy |
-| Super Admin production-view override | NOT IMPLEMENTED | NOT IMPLEMENTED | Administrative capability only |
+| Anonymous public read | Existing public/global behavior | DENY | DENY before publication; ALLOW current PUBLISHED L3 through public ranking read |
+| Same-school student | ALLOW published same-school snapshot | ALLOW published same-school snapshot | Published L3 ranking read works through existing read integration |
+| Same-school school admin | ALLOW published same-school snapshot | ALLOW published same-school snapshot | No L3 school-scoped management/read path; published L3 remains public-read integrated |
+| Other school | DENY | DENY | No school-scoped L3 visibility; published L3 public read is global |
+| Super Admin production-view override | NOT IMPLEMENTED | NOT IMPLEMENTED | Administrative generation/publication capability only |
 
 ## 6. L3 Current State
 
-L3 authorization and L3 generation are complete vertical slices. The ranking
-chain remains out of scope here:
+L3 authorization, L3 generation, and L3 publication are complete vertical
+slices. The L3 backend ranking production chain is now complete through
+publication:
+
+```text
+Authorization -> Generation -> Publication -> Published Ranking Read
+```
+
+L3 Ranking Management Frontend remains unimplemented and is not part of this
+current backend chain.
 
 | L3 area | Status |
 | --- | --- |
 | L3 Authorization | COMPLETE_VERTICAL_SLICE |
 | L3 Generation | COMPLETE_VERTICAL_SLICE |
-| L3 Publication | NOT_IMPLEMENTED |
+| L3 Publication | COMPLETE_VERTICAL_SLICE |
 | L3 Management Frontend | NOT_IMPLEMENTED |
 
-SchoolAdmin / SuperAdmin authorization UI and L3 generation are complete on
-master. L3 ranking management frontend remains unimplemented and is not to be
-conflated with authorization workflow closure.
+SchoolAdmin / SuperAdmin authorization UI, L3 generation, and L3 publication
+are complete on master. L3 ranking management frontend remains unimplemented
+and is not to be conflated with authorization workflow or publication closure.
 
 ## 7. Remaining Product Roadmap
 
-1. L3 Publication.
-2. L3 Ranking Management Frontend.
-3. L3 Product Seal.
-4. ActivityResult closure.
-5. Production readiness.
-6. Full real-data E2E / UI closure.
+1. L3 Ranking Management Frontend.
+2. L3 Product Seal.
+3. ActivityResult closure.
+4. Production readiness.
+5. Full real-data E2E / UI closure.
 
 Media and Notification are not inserted into the current main production chain
 until a separate product decision makes them part of that chain.
