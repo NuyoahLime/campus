@@ -236,7 +236,7 @@ test('L3 publication API publishes generated snapshots and preserves public visi
     expect(listOne.items.map(item => item.id)).toContain(definitionId);
 
     expect((await apiRequest(studentContext, 'GET', `/api/v1/student/rankings/${definitionId}`)).status()).toBe(200);
-    expect((await apiRequest(request, 'GET', `/api/v1/school-admin/rankings/${definitionId}`)).status()).toBe(200);
+    expect((await apiRequest(request, 'GET', `/api/v1/school-admin/rankings/${definitionId}`)).status()).toBe(404);
 
     scoreAttemptThree = await createSubmittedAndApproved(
       request,
