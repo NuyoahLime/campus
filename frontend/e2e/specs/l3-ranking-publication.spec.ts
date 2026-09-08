@@ -286,6 +286,9 @@ test('L3 publication API publishes generated snapshots and preserves public visi
     const listTwo = await publicListTwo.json() as { items: Array<{ id: string }> };
     expect(listTwo.items.map(item => item.id)).toContain(definitionId);
   } finally {
+    if (definitionId) {
+      await execDb(`UPDATE ranking_definitions SET current_version_id = NULL WHERE id = '${definitionId}';`);
+    }
     if (versionTwoId) {
       await execDb(`
         DELETE FROM ranking_entry_score_sources
