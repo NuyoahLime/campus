@@ -39,6 +39,9 @@ public class RankingPublicationApplicationService {
             throw new IllegalStateException("Cannot publish ranking: definition is disabled.");
         }
         if (definition.layer() == RankingLayer.L3) {
+            if (definition.schoolId() != null) {
+                throw new IllegalStateException("Cannot publish ranking: L3 definitions must not be school-scoped.");
+            }
             platformAuthorization.requireSuperAdmin();
         } else {
             if (definition.schoolId() == null) {

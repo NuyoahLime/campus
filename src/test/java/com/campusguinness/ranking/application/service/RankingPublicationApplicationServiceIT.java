@@ -260,6 +260,32 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     @Test
+    void schoolScopedL3DefinitionIsRejectedBeforePublicationMutation() {
+        authenticateSuperAdmin(enteredBy);
+        UUID definitionId = createSchoolScopedL3Definition("-l3-school-scoped");
+        UUID existingCurrent = insertVersion(definitionId, "PUBLISHED");
+        jdbc.update("UPDATE ranking_definitions SET current_version_id = ? WHERE id = ?", existingCurrent, definitionId);
+        UUID target = insertVersion(definitionId, "GENERATED");
+
+        assertThatThrownBy(() -> rankingPublication.publish(definitionId, target))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("L3 definitions must not be school-scoped");
+
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?",
+                String.class, target)).isEqualTo("GENERATED");
+        assertThat(jdbc.queryForObject("SELECT published_at FROM ranking_versions WHERE id = ?",
+                Timestamp.class, target)).isNull();
+        assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?",
+                UUID.class, definitionId)).isEqualTo(existingCurrent);
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?",
+                String.class, existingCurrent)).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM ranking_versions
+                WHERE definition_id = ? AND version_status = 'PUBLISHED'
+                """, Integer.class, definitionId)).isEqualTo(1);
+    }
+
+    @Test
     void emptyGeneratedRankingCanPublish() {
         UUID definitionId = createDefinition("-empty");
         var generated = rankingGeneration.generate(definitionId);
@@ -359,6 +385,11 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
         SecurityContextHolder.clearContext();
         assertThatThrownBy(() -> rankingPublication.publish(definitionId, generated))
                 .isInstanceOf(RuntimeException.class);
+
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?",
+                String.class, generated)).isEqualTo("GENERATED");
+        assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?",
+                UUID.class, definitionId)).isNull();
 
         authenticateSchoolAdmin(adminA, schoolA);
         assertThat(rankingPublication.publish(definitionId, generated).status()).isEqualTo("PUBLISHED");
@@ -659,6 +690,15 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
                 INSERT INTO ranking_definitions(id, layer, name, school_id, project_id, created_by)
                 VALUES (?, 'L3', ?, NULL, ?, ?)
                 """, definitionId, runPrefix + suffix, projectId, enteredBy);
+        return definitionId;
+    }
+
+    private UUID createSchoolScopedL3Definition(String suffix) {
+        UUID definitionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO ranking_definitions(id, layer, name, school_id, project_id, created_by)
+                VALUES (?, 'L3', ?, ?, ?, ?)
+                """, definitionId, runPrefix + suffix, schoolA, projectId, enteredBy);
         return definitionId;
     }
 

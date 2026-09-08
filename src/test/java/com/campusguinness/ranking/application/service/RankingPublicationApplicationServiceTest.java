@@ -85,6 +85,27 @@ class RankingPublicationApplicationServiceTest {
     }
 
     @Test
+    void rejectsSchoolScopedL3DefinitionBeforePublication() {
+        UUID schoolId = UUID.randomUUID();
+        UUID definitionId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        RankingDefinition definition = mock(RankingDefinition.class);
+        when(definition.isEnabled()).thenReturn(true);
+        when(definition.layer()).thenReturn(RankingLayer.L3);
+        when(definition.schoolId()).thenReturn(schoolId);
+        when(definitions.findByIdForUpdate(new RankingDefinitionId(definitionId))).thenReturn(Optional.of(definition));
+
+        assertThatThrownBy(() -> new RankingPublicationApplicationService(definitions, publications, authorization, platformAuthorization)
+                .publish(definitionId, versionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("L3 definitions must not be school-scoped");
+
+        verifyNoInteractions(platformAuthorization);
+        verifyNoInteractions(authorization);
+        verifyNoInteractions(publications);
+    }
+
+    @Test
     void disabledDefinitionIsRejectedBeforePersistence() {
         UUID definitionId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
