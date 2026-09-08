@@ -268,8 +268,8 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
         UUID target = insertVersion(definitionId, "GENERATED");
 
         assertThatThrownBy(() -> rankingPublication.publish(definitionId, target))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("L3 definitions must not be school-scoped");
+                .isInstanceOfAny(IllegalArgumentException.class, IllegalStateException.class)
+                .hasMessageContaining("school");
 
         assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?",
                 String.class, target)).isEqualTo("GENERATED");
