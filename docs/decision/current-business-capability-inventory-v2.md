@@ -1,6 +1,6 @@
 # Current Business Capability Inventory v2
 
-> L3 publication product seal state sync
+> L3 publication product seal
 > Baseline: `df67cf7aa1dae81e9af737aca60354e745206558`
 > Evidence: current source, controllers, frontend routes, tests, accepted Stage26
 > E2E, Phase4A-Phase4D L2 ranking closure, L3 authorization closure, L3
@@ -141,4 +141,4 @@ Media and Notification are not inserted into the current main production chain
 until a separate product decision makes them part of that chain.
 
 This inventory is a decision baseline, not permission to implement later
-stages in the L2 product-seal change set.
+stages outside the current accepted roadmap.
