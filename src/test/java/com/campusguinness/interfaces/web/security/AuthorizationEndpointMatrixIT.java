@@ -80,7 +80,7 @@ class AuthorizationEndpointMatrixIT {
     @Test
     void endpointMatrixRows() throws Exception {
         var rows = matrix();
-        assertThat(rows).hasSize(85);
+        assertThat(rows).hasSize(86);
         for (Row row : rows) {
             assertRow(row);
         }
