@@ -9,11 +9,10 @@
 | Area | Status |
 | --- | --- |
 | L3 Publication | COMPLETE_VERTICAL_SLICE |
-| L3 Publication Product Seal | READY_FOR_FINAL_ACCEPTANCE |
+| L3 Publication Product Seal | CLOSED |
 
-This document is a draft product-seal record. The seal becomes `CLOSED` only
-after this docs PR receives exact-head CI, independent review, merge, and
-post-merge verification.
+PR #62 was merged and the Product Seal passed post-merge exact-SHA Backend CI
+and Stage26 Full E2E verification. The L3 Publication Product Seal is `CLOSED`.
 
 ## 2. Product Scope
 
@@ -119,6 +118,37 @@ Skipped = 0
 RankingPublicationApplicationServiceIT = PASS
 
 Stage26 Full E2E = PASS
+Total = 17
+Passed = 17
+Failed = 0
+Skipped = 0
+Product retries = 0
+```
+
+PR #62 product seal acceptance:
+
+```text
+Product Seal PR #62 = MERGED
+
+Accepted seal head =
+d3043fd9975576c31f359ac4d04904614587fd3d
+
+Product Seal merge/master =
+190d952ee6e039a2687cdb3ddb1dcc2cdb40426b
+
+Post-merge Backend CI = PASS
+Run ID = 34253485890
+Head SHA = 190d952ee6e039a2687cdb3ddb1dcc2cdb40426b
+Surefire = 1016
+Failsafe = 293
+Total backend tests = 1309
+Failures = 0
+Errors = 0
+Skipped = 0
+
+Post-merge Stage26 Full E2E = PASS
+Run ID = 34253485933
+Head SHA = 190d952ee6e039a2687cdb3ddb1dcc2cdb40426b
 Total = 17
 Passed = 17
 Failed = 0
