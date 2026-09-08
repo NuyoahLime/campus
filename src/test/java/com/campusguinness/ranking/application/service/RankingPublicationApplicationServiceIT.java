@@ -74,7 +74,7 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
         insertUser(adminB, "admin-b");
         insertUser(studentA, "student-a");
         insertUser(studentB, "student-b");
-        insertUser(enteredBy, "entered-by");
+        insertUser(enteredBy, "entered-by", "SUPER_ADMIN");
         insertMembership(adminA, schoolA, "SCHOOL_ADMIN");
         insertMembership(adminB, schoolB, "SCHOOL_ADMIN");
         insertMembership(studentA, schoolA, "STUDENT");
@@ -239,16 +239,24 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     @Test
-    void l3DefinitionCannotPublish() {
-        UUID definitionId = UUID.randomUUID();
-        jdbc.update("""
-                INSERT INTO ranking_definitions(id, layer, name, school_id, project_id, created_by)
-                VALUES (?, 'L3', ?, ?, ?, ?)
-                """, definitionId, runPrefix + "-l3", null, projectId, adminA);
+    void l3DefinitionPublishesWithSuperAdminAuthorization() {
+        authenticateSuperAdmin(enteredBy);
+        UUID definitionId = createL3Definition("-l3");
         UUID versionId = insertVersion(definitionId, "GENERATED");
+        SnapshotCounts before = counts(versionId);
 
-        assertThatThrownBy(() -> rankingPublication.publish(definitionId, versionId))
-                .isInstanceOf(IllegalStateException.class);
+        var published = rankingPublication.publish(definitionId, versionId);
+
+        assertThat(published.status()).isEqualTo("PUBLISHED");
+        assertThat(published.previousCurrentVersionId()).isNull();
+        assertThat(published.currentVersionId()).isEqualTo(versionId);
+        assertThat(jdbc.queryForObject("SELECT version_status FROM ranking_versions WHERE id = ?", String.class,
+                versionId)).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT published_at FROM ranking_versions WHERE id = ?", Timestamp.class,
+                versionId)).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT current_version_id FROM ranking_definitions WHERE id = ?", UUID.class,
+                definitionId)).isEqualTo(versionId);
+        assertThat(counts(versionId)).isEqualTo(before);
     }
 
     @Test
@@ -645,6 +653,15 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
                 null).id();
     }
 
+    private UUID createL3Definition(String suffix) {
+        UUID definitionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO ranking_definitions(id, layer, name, school_id, project_id, created_by)
+                VALUES (?, 'L3', ?, NULL, ?, ?)
+                """, definitionId, runPrefix + suffix, projectId, enteredBy);
+        return definitionId;
+    }
+
     private UUID insertVersion(UUID definitionId, String status) {
         Integer maxVersion = jdbc.queryForObject(
                 "SELECT COALESCE(MAX(version_number), 0) FROM ranking_versions WHERE definition_id = ?",
@@ -759,8 +776,12 @@ class RankingPublicationApplicationServiceIT extends PostgreSqlIntegrationTestSu
     }
 
     private void insertUser(UUID id, String label) {
-        jdbc.update("INSERT INTO users(id, username, password_hash, account_status) VALUES (?,?,?,?)",
-                id, runPrefix + "-" + label, "{noop}password", "NORMAL");
+        insertUser(id, label, null);
+    }
+
+    private void insertUser(UUID id, String label, String platformRole) {
+        jdbc.update("INSERT INTO users(id, username, password_hash, account_status, platform_role) VALUES (?,?,?,?,?)",
+                id, runPrefix + "-" + label, "{noop}password", "NORMAL", platformRole);
     }
 
     private void insertMembership(UUID userId, UUID schoolId, String role) {

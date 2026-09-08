@@ -1,6 +1,7 @@
 package com.campusguinness.ranking.application.service;
 
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
+import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.ranking.application.port.RankingDefinitionRepository;
 import com.campusguinness.ranking.application.port.RankingPublicationRepository;
 import com.campusguinness.ranking.application.result.RankingPublicationResult;
@@ -24,6 +25,7 @@ class RankingPublicationApplicationServiceTest {
     @Mock RankingDefinitionRepository definitions;
     @Mock RankingPublicationRepository publications;
     @Mock SchoolResourceAuthorization authorization;
+    @Mock PlatformGovernanceAuthorization platformAuthorization;
 
     @Test
     void publishDelegatesExistingGeneratedSnapshotWithoutRecalculation() {
@@ -35,9 +37,11 @@ class RankingPublicationApplicationServiceTest {
         when(publications.publishGeneratedVersion(definition, versionId))
                 .thenReturn(new RankingPublicationResult(definitionId, versionId, null, versionId, "PUBLISHED", Instant.now()));
 
-        new RankingPublicationApplicationService(definitions, publications, authorization).publish(definitionId, versionId);
+        new RankingPublicationApplicationService(definitions, publications, authorization, platformAuthorization)
+                .publish(definitionId, versionId);
 
         verify(authorization).requireSchoolAdmin(schoolId);
+        verifyNoInteractions(platformAuthorization);
         verify(publications).publishGeneratedVersion(definition, versionId);
         verifyNoMoreInteractions(publications);
     }
@@ -52,25 +56,32 @@ class RankingPublicationApplicationServiceTest {
         when(publications.publishGeneratedVersion(definition, versionId))
                 .thenReturn(new RankingPublicationResult(definitionId, versionId, null, versionId, "PUBLISHED", Instant.now()));
 
-        new RankingPublicationApplicationService(definitions, publications, authorization).publish(definitionId, versionId);
+        new RankingPublicationApplicationService(definitions, publications, authorization, platformAuthorization)
+                .publish(definitionId, versionId);
 
         verify(authorization).requireSchoolAdmin(schoolId);
+        verifyNoInteractions(platformAuthorization);
         verify(publications).publishGeneratedVersion(definition, versionId);
         verifyNoMoreInteractions(publications);
     }
 
     @Test
-    void l3DefinitionIsRejectedBeforePersistence() {
+    void l3DefinitionPublishesWithSuperAdminAuthorization() {
         UUID definitionId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
-        when(definitions.findByIdForUpdate(new RankingDefinitionId(definitionId)))
-                .thenReturn(Optional.of(definition(definitionId, UUID.randomUUID(), RankingLayer.L3, true)));
+        UUID superAdminId = UUID.randomUUID();
+        RankingDefinition definition = definition(definitionId, UUID.randomUUID(), RankingLayer.L3, true);
+        when(definitions.findByIdForUpdate(new RankingDefinitionId(definitionId))).thenReturn(Optional.of(definition));
+        when(platformAuthorization.requireSuperAdmin()).thenReturn(superAdminId);
+        when(publications.publishGeneratedVersion(definition, versionId))
+                .thenReturn(new RankingPublicationResult(definitionId, versionId, null, versionId, "PUBLISHED", Instant.now()));
 
-        assertThatThrownBy(() -> new RankingPublicationApplicationService(definitions, publications, authorization)
-                .publish(definitionId, versionId))
-                .isInstanceOf(IllegalStateException.class);
+        new RankingPublicationApplicationService(definitions, publications, authorization, platformAuthorization)
+                .publish(definitionId, versionId);
 
-        verifyNoInteractions(publications);
+        verify(platformAuthorization).requireSuperAdmin();
+        verifyNoInteractions(authorization);
+        verify(publications).publishGeneratedVersion(definition, versionId);
     }
 
     @Test
@@ -80,7 +91,7 @@ class RankingPublicationApplicationServiceTest {
         when(definitions.findByIdForUpdate(new RankingDefinitionId(definitionId)))
                 .thenReturn(Optional.of(definition(definitionId, UUID.randomUUID(), RankingLayer.L1, false)));
 
-        assertThatThrownBy(() -> new RankingPublicationApplicationService(definitions, publications, authorization)
+        assertThatThrownBy(() -> new RankingPublicationApplicationService(definitions, publications, authorization, platformAuthorization)
                 .publish(definitionId, versionId))
                 .isInstanceOf(IllegalStateException.class);
 

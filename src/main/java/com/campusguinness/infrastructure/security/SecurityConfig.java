@@ -191,7 +191,8 @@ public class SecurityConfig {
                         "/api/v1/school-admin-invitations/*/regenerate",
                         "/api/v1/super-admin/l3-authorizations/*/approve",
                         "/api/v1/super-admin/l3-authorizations/*/reject",
-                        "/api/v1/super-admin/l3-authorizations/*/resume"
+                        "/api/v1/super-admin/l3-authorizations/*/resume",
+                        "/api/v1/super-admin/ranking-definitions/*/versions/*/publish"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/challenge-projects/*")
                 .hasRole("SUPER_ADMIN")
