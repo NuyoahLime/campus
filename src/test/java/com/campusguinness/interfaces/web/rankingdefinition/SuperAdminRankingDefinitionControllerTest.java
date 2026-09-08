@@ -2,8 +2,10 @@ package com.campusguinness.interfaces.web.rankingdefinition;
 
 import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.application.result.RankingGenerationResult;
+import com.campusguinness.ranking.application.result.RankingPublicationResult;
 import com.campusguinness.ranking.application.service.L3RankingDefinitionApplicationService;
 import com.campusguinness.ranking.application.service.RankingGenerationApplicationService;
+import com.campusguinness.ranking.application.service.RankingPublicationApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,6 +29,7 @@ class SuperAdminRankingDefinitionControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean L3RankingDefinitionApplicationService service;
     @MockitoBean RankingGenerationApplicationService generationService;
+    @MockitoBean RankingPublicationApplicationService publicationService;
 
     @Test
     void createReturns201() throws Exception {
@@ -49,5 +52,17 @@ class SuperAdminRankingDefinitionControllerTest {
         mvc.perform(post("/api/v1/super-admin/ranking-definitions/" + id + "/generate"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("GENERATED"));
+    }
+
+    @Test
+    void publishReturns200() throws Exception {
+        UUID definitionId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        when(publicationService.publish(definitionId, versionId))
+                .thenReturn(new RankingPublicationResult(definitionId, versionId, null, versionId, "PUBLISHED", java.time.Instant.now()));
+        mvc.perform(post("/api/v1/super-admin/ranking-definitions/" + definitionId + "/versions/" + versionId + "/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.currentVersionId").value(versionId.toString()));
     }
 }

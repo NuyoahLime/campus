@@ -1,6 +1,7 @@
 package com.campusguinness.ranking.application.service;
 
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
+import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.ranking.application.port.RankingDefinitionRepository;
 import com.campusguinness.ranking.application.port.RankingPublicationRepository;
 import com.campusguinness.ranking.application.result.RankingPublicationResult;
@@ -18,29 +19,36 @@ public class RankingPublicationApplicationService {
     private final RankingDefinitionRepository definitions;
     private final RankingPublicationRepository publications;
     private final SchoolResourceAuthorization authorization;
+    private final PlatformGovernanceAuthorization platformAuthorization;
 
     public RankingPublicationApplicationService(
             RankingDefinitionRepository definitions,
             RankingPublicationRepository publications,
-            SchoolResourceAuthorization authorization) {
+            SchoolResourceAuthorization authorization,
+            PlatformGovernanceAuthorization platformAuthorization) {
         this.definitions = definitions;
         this.publications = publications;
         this.authorization = authorization;
+        this.platformAuthorization = platformAuthorization;
     }
 
     public RankingPublicationResult publish(UUID rankingDefinitionId, UUID rankingVersionId) {
         RankingDefinition definition = definitions.findByIdForUpdate(new RankingDefinitionId(rankingDefinitionId))
                 .orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + rankingDefinitionId));
-        if (definition.layer() == RankingLayer.L3) {
-            throw new IllegalStateException("Cannot publish ranking: publication supports only L1 and L2 definitions.");
-        }
         if (!definition.isEnabled()) {
             throw new IllegalStateException("Cannot publish ranking: definition is disabled.");
         }
-        if (definition.schoolId() == null) {
-            throw new IllegalStateException("Cannot publish ranking: publication requires a school-scoped definition.");
+        if (definition.layer() == RankingLayer.L3) {
+            if (definition.schoolId() != null) {
+                throw new IllegalStateException("Cannot publish ranking: L3 definitions must not be school-scoped.");
+            }
+            platformAuthorization.requireSuperAdmin();
+        } else {
+            if (definition.schoolId() == null) {
+                throw new IllegalStateException("Cannot publish ranking: publication requires a school-scoped definition.");
+            }
+            authorization.requireSchoolAdmin(definition.schoolId());
         }
-        authorization.requireSchoolAdmin(definition.schoolId());
         return publications.publishGeneratedVersion(definition, rankingVersionId);
     }
 }

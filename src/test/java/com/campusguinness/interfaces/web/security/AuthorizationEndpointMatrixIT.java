@@ -80,7 +80,7 @@ class AuthorizationEndpointMatrixIT {
     @Test
     void endpointMatrixRows() throws Exception {
         var rows = matrix();
-        assertThat(rows).hasSize(85);
+        assertThat(rows).hasSize(86);
         for (Row row : rows) {
             assertRow(row);
         }
@@ -271,7 +271,8 @@ class AuthorizationEndpointMatrixIT {
                 row(84, "POST", "/api/v1/super-admin/ranking-definitions", Allowed.SUPER_ADMIN, """
                         {"name":"phase11","projectId":"%s","ruleVersionId":"%s"}
                         """.formatted(UUID.randomUUID(), UUID.randomUUID())),
-                row(85, "POST", "/api/v1/super-admin/ranking-definitions/" + id + "/generate", Allowed.SUPER_ADMIN)
+                row(85, "POST", "/api/v1/super-admin/ranking-definitions/" + id + "/generate", Allowed.SUPER_ADMIN),
+                row(86, "POST", "/api/v1/super-admin/ranking-definitions/" + id + "/versions/" + UUID.randomUUID() + "/publish", Allowed.SUPER_ADMIN)
         );
     }
 

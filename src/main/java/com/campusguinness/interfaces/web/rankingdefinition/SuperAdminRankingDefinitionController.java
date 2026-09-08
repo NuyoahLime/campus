@@ -2,8 +2,10 @@ package com.campusguinness.interfaces.web.rankingdefinition;
 
 import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.application.result.RankingGenerationResult;
+import com.campusguinness.ranking.application.result.RankingPublicationResult;
 import com.campusguinness.ranking.application.service.L3RankingDefinitionApplicationService;
 import com.campusguinness.ranking.application.service.RankingGenerationApplicationService;
+import com.campusguinness.ranking.application.service.RankingPublicationApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,12 +23,15 @@ import java.util.UUID;
 public class SuperAdminRankingDefinitionController {
     private final L3RankingDefinitionApplicationService service;
     private final RankingGenerationApplicationService generationService;
+    private final RankingPublicationApplicationService publicationService;
 
     public SuperAdminRankingDefinitionController(
             L3RankingDefinitionApplicationService service,
-            RankingGenerationApplicationService generationService) {
+            RankingGenerationApplicationService generationService,
+            RankingPublicationApplicationService publicationService) {
         this.service = service;
         this.generationService = generationService;
+        this.publicationService = publicationService;
     }
 
     @PostMapping
@@ -42,5 +47,14 @@ public class SuperAdminRankingDefinitionController {
     public ResponseEntity<RankingGenerationResponse> generate(@PathVariable UUID id) {
         RankingGenerationResult result = generationService.generate(id);
         return ResponseEntity.ok(RankingGenerationResponse.from(result));
+    }
+
+    @PostMapping("/{definitionId}/versions/{versionId}/publish")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<RankingPublicationResponse> publish(
+            @PathVariable UUID definitionId,
+            @PathVariable UUID versionId) {
+        RankingPublicationResult result = publicationService.publish(definitionId, versionId);
+        return ResponseEntity.ok(RankingPublicationResponse.from(result));
     }
 }
