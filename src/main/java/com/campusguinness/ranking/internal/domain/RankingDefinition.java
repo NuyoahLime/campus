@@ -24,24 +24,30 @@ public final class RankingDefinition {
     private boolean enabled;
     private UUID currentVersionId;
     private final UUID createdBy;
+    private final int version;
     private final List<Object> domainEvents;
 
-    private RankingDefinition(Builder b, boolean enabled) {
+    private RankingDefinition(Builder b, boolean enabled, int version) {
         this.id = b.id; this.layer = b.layer; this.name = b.name;
         this.schoolId = b.schoolId; this.projectId = b.projectId;
         this.dimensionFilters = b.dimensionFilters; this.tieBreakRule = b.tieBreakRule;
-        this.enabled = enabled; this.createdBy = b.createdBy;
+        this.enabled = enabled; this.createdBy = b.createdBy; this.version = version;
         this.domainEvents = new ArrayList<>();
     }
 
     public static RankingDefinition create(Builder builder) {
         validate(builder);
-        return new RankingDefinition(builder, true);
+        return new RankingDefinition(builder, true, 0);
     }
 
     public static RankingDefinition reconstitute(Builder builder, boolean enabled, UUID currentVersionId) {
+        return reconstitute(builder, enabled, currentVersionId, 0);
+    }
+
+    public static RankingDefinition reconstitute(
+            Builder builder, boolean enabled, UUID currentVersionId, int version) {
         validate(builder);
-        var r = new RankingDefinition(builder, enabled);
+        var r = new RankingDefinition(builder, enabled, version);
         r.currentVersionId = currentVersionId;
         return r;
     }
@@ -89,6 +95,7 @@ public final class RankingDefinition {
     public boolean isEnabled() { return enabled; }
     public UUID currentVersionId() { return currentVersionId; }
     public UUID createdBy() { return createdBy; }
+    public int version() { return version; }
 
     public List<Object> domainEvents() { return Collections.unmodifiableList(domainEvents); }
 

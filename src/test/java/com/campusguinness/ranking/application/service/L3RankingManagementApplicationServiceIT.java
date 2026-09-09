@@ -118,7 +118,7 @@ class L3RankingManagementApplicationServiceIT extends PostgreSqlIntegrationTestS
         assertThatThrownBy(() -> l3Management.disable(l2Id))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> l3Management.disable(corruptL3Id))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalArgumentException.class);
         assertThat(enabled(l1Id)).isTrue();
         assertThat(enabled(l2Id)).isTrue();
         assertThat(enabled(corruptL3Id)).isTrue();

@@ -20,6 +20,11 @@ class RankingDefinitionPersistenceMapperTest {
             var r = RankingDefinitionPersistenceMapper.toDomain(e);
             assertThat(r.isEnabled()).isFalse(); assertThat(r.domainEvents()).isEmpty();
         }
+        @Test void restoresOptimisticLockVersion() {
+            var e = entity(); e.setVersion(7);
+            var r = RankingDefinitionPersistenceMapper.toDomain(e);
+            assertThat(r.version()).isEqualTo(7);
+        }
     }
     @Nested class ToEntity {
         @Test void mapsToEntity() {
@@ -28,6 +33,7 @@ class RankingDefinitionPersistenceMapperTest {
                     .name("test").projectId(UUID.randomUUID()).createdBy(UUID.randomUUID()));
             var e = RankingDefinitionPersistenceMapper.toEntity(r);
             assertThat(e.isEnabled()).isTrue(); assertThat(e.getLayer()).isEqualTo("L1");
+            assertThat(e.getVersion()).isZero();
         }
     }
     private RankingDefinitionEntity entity() {
