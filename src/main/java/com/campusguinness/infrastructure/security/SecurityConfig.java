@@ -192,6 +192,10 @@ public class SecurityConfig {
                         "/api/v1/super-admin/l3-authorizations/*/approve",
                         "/api/v1/super-admin/l3-authorizations/*/reject",
                         "/api/v1/super-admin/l3-authorizations/*/resume",
+                        "/api/v1/super-admin/ranking-definitions",
+                        "/api/v1/super-admin/ranking-definitions/*/generate",
+                        "/api/v1/super-admin/ranking-definitions/*/enable",
+                        "/api/v1/super-admin/ranking-definitions/*/disable",
                         "/api/v1/super-admin/ranking-definitions/*/versions/*/publish"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/challenge-projects/*")
@@ -202,7 +206,9 @@ public class SecurityConfig {
                         "/api/v1/schools/*/school-admin-invitations",
                         "/api/v1/schools/*/school-admin-invitations/*",
                         "/api/v1/super-admin/l3-authorizations",
-                        "/api/v1/super-admin/l3-authorizations/*"
+                        "/api/v1/super-admin/l3-authorizations/*",
+                        "/api/v1/super-admin/ranking-definitions",
+                        "/api/v1/super-admin/ranking-definitions/*"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/score-appeals",

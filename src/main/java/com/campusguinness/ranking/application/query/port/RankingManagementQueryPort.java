@@ -10,4 +10,8 @@ public interface RankingManagementQueryPort {
     QueryPage<RankingManagementDefinitionResult> list(UUID schoolId, int page, int size);
 
     Optional<RankingManagementDefinitionResult> detail(UUID definitionId, UUID schoolId);
+
+    QueryPage<RankingManagementDefinitionResult> listL3(int page, int size);
+
+    Optional<RankingManagementDefinitionResult> detailL3(UUID definitionId);
 }

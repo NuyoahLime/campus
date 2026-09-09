@@ -69,18 +69,25 @@ public class RankingDefinitionApplicationService {
     }
 
     public RankingDefinitionResult disable(UUID id) {
-        var r = find(id);
-        if (r.schoolId() != null) authorization.requireSchoolAdmin(r.schoolId());
+        var r = findSchoolScoped(id);
         r.disable();
         repo.save(r);
         return new RankingDefinitionResult(id, r.isEnabled());
     }
     public RankingDefinitionResult enable(UUID id) {
-        var r = find(id);
-        if (r.schoolId() != null) authorization.requireSchoolAdmin(r.schoolId());
+        var r = findSchoolScoped(id);
         r.enable();
         repo.save(r);
         return new RankingDefinitionResult(id, r.isEnabled());
+    }
+    private RankingDefinition findSchoolScoped(UUID id) {
+        var r = find(id);
+        if (r.layer() == RankingLayer.L3 || r.schoolId() == null) {
+            throw new IllegalStateException(
+                    "Cannot change ranking definition: only enabled school-scoped L1 and L2 definitions are supported.");
+        }
+        authorization.requireSchoolAdmin(r.schoolId());
+        return r;
     }
     private RankingDefinition find(UUID id) { return repo.findById(new RankingDefinitionId(id)).orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + id)); }
 }

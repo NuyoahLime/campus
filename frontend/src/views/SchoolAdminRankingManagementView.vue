@@ -22,7 +22,7 @@ import type { RankingDetail } from '../types/ranking';
 import type {
   RankingDefinitionCreateForm,
   RankingManagementDefinition,
-  RankingManagementLayer,
+  SchoolRankingManagementLayer,
   RankingManagementVersion
 } from '../types/rankingManagement';
 import { labelForCategory } from '../utils/challengeProjectLabels';
@@ -44,7 +44,7 @@ const actionMessage = ref('');
 const actionError = ref('');
 const publishCandidate = ref<RankingManagementVersion | null>(null);
 const form = ref({
-  layer: 'L1' as RankingManagementLayer,
+  layer: 'L1' as SchoolRankingManagementLayer,
   name: '',
   activityId: '',
   activityProjectId: '',
@@ -79,7 +79,7 @@ const canCreate = computed(() => {
     : Boolean(selectedChallengeProject.value);
 });
 
-function resetCreateFields(layer: RankingManagementLayer = 'L1', keepName = true) {
+function resetCreateFields(layer: SchoolRankingManagementLayer = 'L1', keepName = true) {
   form.value = {
     layer,
     name: keepName ? form.value.name : '',
