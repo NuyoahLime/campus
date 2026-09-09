@@ -123,8 +123,8 @@ class L3RankingManagementApplicationServiceIT extends PostgreSqlIntegrationTestS
         assertThat(enabled(l2Id)).isTrue();
         assertThat(enabled(corruptL3Id)).isTrue();
 
-        authenticateSchoolAdmin();
         UUID validId = definitions.create(runPrefix + "-school-admin-target", projectId, ruleVersionId).id();
+        authenticateSchoolAdmin();
         assertThatThrownBy(() -> schoolManagement.disable(validId))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(enabled(validId)).isTrue();
