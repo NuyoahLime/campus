@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import WorkspaceShell from '../components/WorkspaceShell.vue';
 import RankingEntriesTable from '../components/RankingEntriesTable.vue';
-import { ApiError } from '../api/http';
 import {
   createL3RankingDefinition,
   disableL3RankingDefinition,
@@ -22,6 +21,7 @@ import type {
   L3RankingManagementDefinition,
   RankingManagementVersion
 } from '../types/rankingManagement';
+import { describeL3RankingManagementError as describeError } from '../utils/l3RankingManagementError';
 
 const definitions = ref<L3RankingManagementDefinition[]>([]);
 const selected = ref<L3RankingManagementDefinition | null>(null);
@@ -61,16 +61,6 @@ const canCreate = computed(() =>
   && form.value.name.trim().length > 0
   && Boolean(form.value.projectId)
   && Boolean(selectedRuleVersion.value));
-
-function describeError(value: unknown) {
-  if (value instanceof ApiError) {
-    if (value.status === 401) return 'Please sign in again.';
-    if (value.status === 403) return 'This account cannot manage platform rankings.';
-    if (value.status === 404) return 'The ranking resource was not found.';
-    if (value.status === 409) return 'The ranking state changed. Refresh and try again.';
-  }
-  return 'The request failed. Try again shortly.';
-}
 
 function formatDate(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString() : 'Not recorded';

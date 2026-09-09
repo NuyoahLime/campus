@@ -4,6 +4,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { actors, apiRequest, loginApi, loginUi } from '../support/auth';
 import type { FixtureState } from '../support/fixture';
+import { ApiError } from '../../src/api/http';
+import { describeL3RankingManagementError } from '../../src/utils/l3RankingManagementError';
 
 async function fixture(): Promise<FixtureState> {
   return JSON.parse(await fs.readFile(
@@ -61,6 +63,92 @@ async function createApprovedScore(
 
 test.describe('L3 ranking management frontend', () => {
   test.describe.configure({ mode: 'serial' });
+
+  test('maps L3 ranking request errors by structured status and code', () => {
+    const noAuthorization = new ApiError(409, {
+      code: 'L3_RANKING_NO_USABLE_AUTHORIZATION',
+      message: 'Cannot generate ranking: no usable L3 authorization.'
+    });
+    expect(describeL3RankingManagementError(noAuthorization)).toBe(
+      'No approved usable L3 authorization currently matches this project and RuleVersion.'
+    );
+
+    const conflict = new ApiError(409, { code: 'CONFLICT', message: 'Conflict.' });
+    expect(describeL3RankingManagementError(conflict)).toBe(
+      'The ranking state changed. Refresh and try again.'
+    );
+
+    const badRequest = new ApiError(400, {
+      code: 'BAD_REQUEST',
+      message: 'The selected RuleVersion does not belong to this project.'
+    });
+    expect(describeL3RankingManagementError(badRequest)).toBe(
+      'The selected RuleVersion does not belong to this project.'
+    );
+  });
+
+  test('shows an explicit message when generation has no usable L3 authorization', async ({ page, request }) => {
+    const ids = await fixture();
+    const superAdminContext = await playwrightRequest.newContext({ baseURL: 'http://127.0.0.1:5173' });
+    let definitionId = '';
+
+    try {
+      expect((await loginApi(request, actors.schoolAdminA)).status()).toBe(200);
+      const projectResponse = await apiRequest(request, 'GET', `/api/v1/challenge-projects/${ids.lifecycleProject}`);
+      expect(projectResponse.status()).toBe(200);
+      const project = await projectResponse.json() as { currentRuleVersionId: string };
+
+      expect((await loginApi(superAdminContext, actors.superAdmin)).status()).toBe(200);
+      await loginUi(page, actors.superAdmin);
+      await page.goto('/super-admin/ranking-management');
+
+      const name = `E2E L3 No Authorization ${Date.now()}`;
+      await page.getByTestId('l3-ranking-name').fill(name);
+      await page.getByTestId('l3-ranking-project').selectOption(ids.lifecycleProject);
+      await page.getByTestId('l3-ranking-rule-version').selectOption(project.currentRuleVersionId);
+      await page.getByTestId('l3-ranking-create').click();
+      await expect(page.getByRole('heading', { name })).toBeVisible();
+
+      definitionId = (await (await apiRequest(
+        superAdminContext,
+        'GET',
+        '/api/v1/super-admin/ranking-definitions'
+      )).json() as { items: Array<{ id: string; name: string }> }).items.find(item => item.name === name)!.id;
+
+      const generateResponse = page.waitForResponse(response =>
+        response.request().method() === 'POST'
+        && response.url().endsWith(`/api/v1/super-admin/ranking-definitions/${definitionId}/generate`)
+      );
+      await page.getByTestId('l3-ranking-generate').click();
+      const response = await generateResponse;
+      expect(response.status()).toBe(409);
+      expect((await response.json() as { code: string }).code).toBe('L3_RANKING_NO_USABLE_AUTHORIZATION');
+      await expect(page.getByTestId('l3-ranking-action-error')).toHaveText(
+        'No approved usable L3 authorization currently matches this project and RuleVersion.'
+      );
+      await expect(page.getByTestId('l3-ranking-action-error')).not.toContainText(
+        'The ranking state changed. Refresh and try again.'
+      );
+
+      const detail = await apiRequest(
+        superAdminContext,
+        'GET',
+        `/api/v1/super-admin/ranking-definitions/${definitionId}`
+      );
+      expect(detail.status()).toBe(200);
+      const detailBody = await detail.json() as {
+        latestGeneratedVersion: unknown | null;
+        currentPublishedVersion: unknown | null;
+      };
+      expect(detailBody.latestGeneratedVersion).toBeNull();
+      expect(detailBody.currentPublishedVersion).toBeNull();
+    } finally {
+      if (definitionId) {
+        await execDb(`DELETE FROM ranking_definitions WHERE id = '${definitionId}';`);
+      }
+      await superAdminContext.dispose();
+    }
+  });
 
   test('super admin creates, generates, publishes, reloads, disables, and enables an L3 ranking', async ({
     page,

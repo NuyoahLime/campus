@@ -18,6 +18,14 @@ export class ApiError extends Error {
     }
     return undefined;
   }
+
+  get responseMessage(): string | undefined {
+    if (this.body && typeof this.body === 'object' && 'message' in this.body) {
+      const message = (this.body as ApiErrorResponse).message;
+      return typeof message === 'string' && message.trim() ? message : undefined;
+    }
+    return undefined;
+  }
 }
 
 async function readJson(response: Response): Promise<unknown> {
