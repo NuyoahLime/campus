@@ -6,5 +6,6 @@ export const superAdminNavigation: WorkspaceNavigationItem[] = [
   { label: 'Schools', to: '/super-admin/schools' },
   { label: 'Challenge Projects', to: '/super-admin/projects' },
   { label: 'L3 Authorization Review', to: '/super-admin/l3-authorizations' },
+  { label: 'L3 Ranking Management', to: '/super-admin/ranking-management' },
   { label: 'Platform Ops', disabled: true }
 ];

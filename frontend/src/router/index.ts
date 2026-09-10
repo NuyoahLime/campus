@@ -47,6 +47,7 @@ import RankingDetailView from '../views/RankingDetailView.vue';
 import SchoolAdminRankingManagementView from '../views/SchoolAdminRankingManagementView.vue';
 import SchoolAdminL3AuthorizationsView from '../views/SchoolAdminL3AuthorizationsView.vue';
 import SuperAdminL3AuthorizationReviewView from '../views/SuperAdminL3AuthorizationReviewView.vue';
+import SuperAdminRankingManagementView from '../views/SuperAdminRankingManagementView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -266,6 +267,12 @@ const router = createRouter({
       path: '/super-admin/l3-authorizations',
       name: 'super-admin-l3-authorizations',
       component: SuperAdminL3AuthorizationReviewView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/ranking-management',
+      name: 'super-admin-ranking-management',
+      component: SuperAdminRankingManagementView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
     },
     {

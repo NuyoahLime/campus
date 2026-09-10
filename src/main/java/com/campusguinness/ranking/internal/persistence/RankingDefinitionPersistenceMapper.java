@@ -13,6 +13,7 @@ final class RankingDefinitionPersistenceMapper {
         e.setProjectId(domain.projectId()); e.setDimensionFilters(domain.dimensionFilters());
         e.setTieBreakRule(domain.tieBreakRule()); e.setEnabled(domain.isEnabled());
         e.setCurrentVersionId(domain.currentVersionId()); e.setCreatedBy(domain.createdBy());
+        e.setVersion(domain.version());
         e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
         return e;
     }
@@ -23,6 +24,6 @@ final class RankingDefinitionPersistenceMapper {
                 .name(e.getName()).schoolId(e.getSchoolId()).projectId(e.getProjectId())
                 .dimensionFilters(e.getDimensionFilters()).tieBreakRule(e.getTieBreakRule())
                 .createdBy(e.getCreatedBy()),
-                e.isEnabled(), e.getCurrentVersionId());
+                e.isEnabled(), e.getCurrentVersionId(), e.getVersion());
     }
 }

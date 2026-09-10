@@ -1,5 +1,6 @@
 package com.campusguinness.ranking.application.service;
 
+import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.project.application.query.model.QueryPage;
 import com.campusguinness.ranking.application.query.model.RankingManagementDefinitionResult;
@@ -14,12 +15,15 @@ import java.util.UUID;
 public class RankingManagementQueryService {
     private final RankingManagementQueryPort queryPort;
     private final SchoolResourceAuthorization authorization;
+    private final PlatformGovernanceAuthorization platformAuthorization;
 
     public RankingManagementQueryService(
             RankingManagementQueryPort queryPort,
-            SchoolResourceAuthorization authorization) {
+            SchoolResourceAuthorization authorization,
+            PlatformGovernanceAuthorization platformAuthorization) {
         this.queryPort = queryPort;
         this.authorization = authorization;
+        this.platformAuthorization = platformAuthorization;
     }
 
     public QueryPage<RankingManagementDefinitionResult> list(int page, int size) {
@@ -33,6 +37,21 @@ public class RankingManagementQueryService {
         }
         UUID schoolId = authorization.requireUniqueSchoolAdminSchool();
         return queryPort.detail(definitionId, schoolId)
+                .orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + definitionId));
+    }
+
+    public QueryPage<RankingManagementDefinitionResult> listL3(int page, int size) {
+        validatePage(page, size);
+        platformAuthorization.requireSuperAdmin();
+        return queryPort.listL3(page, size);
+    }
+
+    public RankingManagementDefinitionResult detailL3(UUID definitionId) {
+        if (definitionId == null) {
+            throw new IllegalArgumentException("rankingDefinitionId required");
+        }
+        platformAuthorization.requireSuperAdmin();
+        return queryPort.detailL3(definitionId)
                 .orElseThrow(() -> new IllegalArgumentException("RankingDefinition not found: " + definitionId));
     }
 

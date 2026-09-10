@@ -4,8 +4,12 @@ import com.campusguinness.ranking.application.result.RankingDefinitionResult;
 import com.campusguinness.ranking.application.result.RankingGenerationResult;
 import com.campusguinness.ranking.application.result.RankingPublicationResult;
 import com.campusguinness.ranking.application.service.L3RankingDefinitionApplicationService;
+import com.campusguinness.ranking.application.service.L3RankingManagementApplicationService;
 import com.campusguinness.ranking.application.service.RankingGenerationApplicationService;
+import com.campusguinness.ranking.application.service.RankingManagementQueryService;
 import com.campusguinness.ranking.application.service.RankingPublicationApplicationService;
+import com.campusguinness.ranking.application.query.model.RankingManagementDefinitionResult;
+import com.campusguinness.project.application.query.model.QueryPage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +34,8 @@ class SuperAdminRankingDefinitionControllerTest {
     @MockitoBean L3RankingDefinitionApplicationService service;
     @MockitoBean RankingGenerationApplicationService generationService;
     @MockitoBean RankingPublicationApplicationService publicationService;
+    @MockitoBean RankingManagementQueryService managementQuery;
+    @MockitoBean L3RankingManagementApplicationService managementService;
 
     @Test
     void createReturns201() throws Exception {
@@ -64,5 +70,40 @@ class SuperAdminRankingDefinitionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.currentVersionId").value(versionId.toString()));
+    }
+
+    @Test
+    void listReturnsPlatformL3Definitions() throws Exception {
+        when(managementQuery.listL3(0, 20)).thenReturn(new QueryPage<>(
+                java.util.List.of(new RankingManagementDefinitionResult(
+                        UUID.randomUUID(), "L3", "L3", true, null, null,
+                        UUID.randomUUID(), "Project", UUID.randomUUID(), 1,
+                        null, null, null, null, null, null, null, null, null, null, null)),
+                0, 20, 1));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/super-admin/ranking-definitions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].layer").value("L3"));
+    }
+
+    @Test
+    void enableReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(managementService.enable(id)).thenReturn(new RankingDefinitionResult(id, true));
+
+        mvc.perform(post("/api/v1/super-admin/ranking-definitions/" + id + "/enable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+    }
+
+    @Test
+    void disableReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(managementService.disable(id)).thenReturn(new RankingDefinitionResult(id, false));
+
+        mvc.perform(post("/api/v1/super-admin/ranking-definitions/" + id + "/disable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
     }
 }

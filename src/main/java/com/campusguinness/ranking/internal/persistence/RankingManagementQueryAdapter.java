@@ -47,10 +47,33 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
                 definitionId, schoolId);
     }
 
+    @Override
+    public QueryPage<RankingManagementDefinitionResult> listL3(int page, int size) {
+        String from = platformFromClause() + " WHERE d.layer = 'L3' AND d.school_id IS NULL AND rv.id IS NOT NULL";
+        List<RankingManagementDefinitionResult> items = jdbc.query(
+                selectClause() + from + " ORDER BY d.updated_at DESC, d.name ASC, d.id ASC LIMIT ? OFFSET ?",
+                (rs, row) -> mapDefinition(rs, false),
+                size, page * size);
+        Long total = jdbc.queryForObject("SELECT COUNT(*)" + from, Long.class);
+        return new QueryPage<>(items, page, size, total == null ? 0 : total);
+    }
+
+    @Override
+    public Optional<RankingManagementDefinitionResult> detailL3(UUID definitionId) {
+        return jdbc.query(selectClause() + platformFromClause()
+                        + " WHERE d.id = ? AND d.layer = 'L3' AND d.school_id IS NULL AND rv.id IS NOT NULL",
+                rs -> {
+                    if (!rs.next()) return Optional.empty();
+                    return Optional.of(mapDefinition(rs, true));
+                },
+                definitionId);
+    }
+
     private String selectClause() {
         return """
                 SELECT d.id, d.name, d.layer, d.is_enabled, d.school_id, s.name AS school_name,
                        d.project_id, p.name AS project_name,
+                       rv.id AS rule_version_id, rv.version_number AS rule_version_number,
                        d.dimension_filters::text AS dimension_filters,
                        d.dimension_filters ->> 'selectionPolicy' AS selection_policy,
                        d.dimension_filters ->> 'grade' AS grade,
@@ -72,6 +95,39 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
                  FROM ranking_definitions d
                  JOIN challenge_projects p ON p.id = d.project_id
                  JOIN schools s ON s.id = d.school_id
+                 LEFT JOIN project_rule_versions rv
+                   ON rv.id = NULLIF(d.dimension_filters ->> 'ruleVersionId', '')::uuid
+                  AND rv.project_id = d.project_id
+                 LEFT JOIN activity_projects ap ON ap.id = (d.dimension_filters ->> 'activityProjectId')::uuid
+                 LEFT JOIN activities a ON a.id = ap.activity_id
+                 LEFT JOIN LATERAL (
+                     SELECT v.id, v.version_number, v.version_status, v.generated_at, v.published_at,
+                            (SELECT COUNT(*) FROM ranking_entries e WHERE e.version_id = v.id) AS entry_count
+                     FROM ranking_versions v
+                     WHERE v.definition_id = d.id AND v.version_status = 'GENERATED'
+                     ORDER BY v.version_number DESC, v.created_at DESC, v.id DESC
+                     LIMIT 1
+                 ) gv ON true
+                 LEFT JOIN LATERAL (
+                     SELECT v.id, v.version_number, v.version_status, v.generated_at, v.published_at,
+                            (SELECT COUNT(*) FROM ranking_entries e WHERE e.version_id = v.id) AS entry_count
+                     FROM ranking_versions v
+                     WHERE v.id = d.current_version_id
+                       AND v.definition_id = d.id
+                       AND v.version_status = 'PUBLISHED'
+                     LIMIT 1
+                 ) cv ON true
+                """;
+    }
+
+    private String platformFromClause() {
+        return """
+                 FROM ranking_definitions d
+                 JOIN challenge_projects p ON p.id = d.project_id
+                 LEFT JOIN schools s ON s.id = d.school_id
+                 LEFT JOIN project_rule_versions rv
+                   ON rv.id = NULLIF(d.dimension_filters ->> 'ruleVersionId', '')::uuid
+                  AND rv.project_id = d.project_id
                  LEFT JOIN activity_projects ap ON ap.id = (d.dimension_filters ->> 'activityProjectId')::uuid
                  LEFT JOIN activities a ON a.id = ap.activity_id
                  LEFT JOIN LATERAL (
@@ -107,6 +163,8 @@ class RankingManagementQueryAdapter implements RankingManagementQueryPort {
                 rs.getString("school_name"),
                 rs.getObject("project_id", UUID.class),
                 rs.getString("project_name"),
+                rs.getObject("rule_version_id", UUID.class),
+                rs.getObject("rule_version_number", Integer.class),
                 rs.getObject("activity_id", UUID.class),
                 rs.getString("activity_title"),
                 rs.getObject("activity_project_id", UUID.class),

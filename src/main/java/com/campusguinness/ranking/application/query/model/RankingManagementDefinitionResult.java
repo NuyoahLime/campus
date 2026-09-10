@@ -12,6 +12,8 @@ public record RankingManagementDefinitionResult(
         String schoolName,
         UUID projectId,
         String projectName,
+        UUID ruleVersionId,
+        Integer ruleVersionNumber,
         UUID activityId,
         String activityTitle,
         UUID activityProjectId,
