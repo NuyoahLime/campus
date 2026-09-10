@@ -1,13 +1,15 @@
 # Current Business Capability Inventory v2
 
 > L3 ranking management frontend implementation acceptance
-> Baseline: `4cd8780bcf83509a184f9752fd71ed9833b7e50b`
+> Baseline: `3d09b41c94b873819c6d54b3fc07a00ad4f214fd`
 > Evidence: current source, controllers, frontend routes, tests, accepted Stage26
 > E2E, Phase4A-Phase4D L2 ranking closure, L3 authorization closure, L3
 > generation closure, PR #61 L3 publication implementation, PR #64 L3 ranking
 > management frontend implementation, PR #64 correctness closure, PR #64 final
 > acceptance, PR #64 merge, post-merge Backend CI 1316 tests PASS, and
-> post-merge Stage26 21/21 PASS.
+> post-merge Stage26 21/21 PASS, PR #65 Product Seal review and final
+> acceptance, PR #65 merge, and post-merge exact-SHA Backend/Stage26
+> verification.
 
 ## 1. Completion Rule
 
@@ -134,15 +136,34 @@ SuperAdmin L3 ranking management frontend are complete on master. SchoolAdmin
 cannot mutate platform L3 definitions, and SuperAdmin L3 management does not
 create an L1/L2 production-view override.
 
-The Product Seal for the management frontend still requires its own final
-acceptance and state sync before it becomes durably `CLOSED`.
+The L3 Ranking Management Frontend Product Seal is `CLOSED` as the proposed
+durable state recorded by the State Sync PR. The State Sync PR must itself be
+independently accepted, merged, and post-merge verified before this status is
+durable on master.
+
+The complete L3 ranking product chain is sealed:
+
+```text
+Authorization -> Generation -> Management -> Publication -> Published Ranking Read
+```
+
+Product Seal evidence:
+
+```text
+PR #65 Product Seal
+Independent review = PASS
+Product Seal final acceptance = PASS
+Accepted Product Seal head = 3afbdcb9962cb5a7f6b46f5ac1032bc51b54fc40
+Product Seal merge/master = 3d09b41c94b873819c6d54b3fc07a00ad4f214fd
+Post-merge Backend CI = 1316 / 1316 PASS
+Post-merge Stage26 = 21 / 21 PASS
+```
 
 ## 7. Remaining Product Roadmap
 
-1. L3 Ranking Management Frontend Product Seal final acceptance/state sync.
-2. ActivityResult closure.
-3. Production readiness.
-4. Full real-data E2E / UI closure.
+1. ActivityResult closure.
+2. Production readiness.
+3. Full real-data E2E / UI closure.
 
 Media and Notification are not inserted into the current main production chain
 until a separate product decision makes them part of that chain.

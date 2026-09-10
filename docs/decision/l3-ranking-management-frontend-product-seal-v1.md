@@ -1,6 +1,7 @@
 # L3 Ranking Management Frontend Product Seal v1
 
 > Baseline: `4cd8780bcf83509a184f9752fd71ed9833b7e50b`
+> State Sync Baseline: `3d09b41c94b873819c6d54b3fc07a00ad4f214fd`
 > Scope: durable product seal for the completed L3 ranking management
 > frontend after PR #64 implementation, merge, and post-merge exact-SHA
 > acceptance.
@@ -10,11 +11,15 @@
 | Area | Status |
 | --- | --- |
 | L3 Ranking Management Frontend | COMPLETE_VERTICAL_SLICE |
-| L3 Ranking Management Frontend Product Seal | READY_FOR_FINAL_ACCEPTANCE |
+| L3 Ranking Management Frontend Product Seal | CLOSED |
 
-The implementation is accepted on master. This Product Seal remains
-`READY_FOR_FINAL_ACCEPTANCE` until this documentation PR completes independent
-review, exact-head CI, merge, post-merge verification, and state sync.
+The L3 Ranking Management Frontend implementation, Product Seal review,
+Product Seal final acceptance, merge, and post-merge exact-SHA verification
+are complete.
+
+This state-sync change records the accepted durable Product Seal state as
+`CLOSED` once the state-sync PR itself is independently accepted and merged.
+Until then, the state remains a proposed durable status for master.
 
 ## 2. Product Scope
 
@@ -213,6 +218,50 @@ resolution before product verification. The same exact master SHA was rerun
 without code, document, workflow, or migration changes and passed on attempt 2.
 This infrastructure rerun is not a product retry.
 
+Product Seal PR = #65
+
+Accepted Product Seal head =
+3afbdcb9962cb5a7f6b46f5ac1032bc51b54fc40
+
+Product Seal merge/master =
+3d09b41c94b873819c6d54b3fc07a00ad4f214fd
+
+Post-merge Backend CI:
+
+```text
+Run ID = 34443178580
+Head SHA = 3d09b41c94b873819c6d54b3fc07a00ad4f214fd
+Event = push
+Branch = master
+Conclusion = success
+
+Surefire = 1020
+Failsafe = 296
+Total backend tests = 1316
+Failures = 0
+Errors = 0
+Skipped = 0
+```
+
+Post-merge Stage26 Full E2E:
+
+```text
+Run ID = 34443178603
+Head SHA = 3d09b41c94b873819c6d54b3fc07a00ad4f214fd
+Event = push
+Branch = master
+Conclusion = success
+
+Total = 21
+Passed = 21
+Failed = 0
+Skipped = 0
+Product retries = 0
+TRACE_FAILURE_GUARD = PASS
+```
+
+The trace-guard intentional probe failure/retry is not a product retry.
+
 ## 9. Explicit No-Migration / No-Rewrite
 
 ```text
@@ -257,32 +306,28 @@ These are not Product Seal PR-specific minors. The validator baseline remains
 10 warnings; warnings are not renamed as minors. CI action deprecation notices
 remain Production Readiness debt and are not changed here.
 
-## 12. Next Stage
+## 12. Closure And Next Stage
 
-This documentation PR is currently awaiting independent review:
+Product Seal Review = PASS
 
-```text
-RANKING_PRODUCTION_L3_RANKING_MANAGEMENT_FRONTEND_PRODUCT_SEAL_REVIEW
-```
+Product Seal Final Acceptance = PASS
 
-After independent review passes, the next gate is:
+Product Seal PR = MERGED
 
-```text
-RANKING_PRODUCTION_L3_RANKING_MANAGEMENT_FRONTEND_PRODUCT_SEAL_FINAL_ACCEPTANCE
-```
+Post-merge Backend = PASS
 
-After this Product Seal PR is merged and post-merge exact-SHA verification
-passes, a docs-only state sync is required:
+Post-merge Stage26 = PASS
 
-```text
-RANKING_PRODUCTION_L3_RANKING_MANAGEMENT_FRONTEND_PRODUCT_SEAL_STATE_SYNC
-```
+State Sync = CURRENT
 
-Only after the state-sync stage is independently accepted and merged may the
-durable Product Seal status become:
+After this state-sync PR is independently reviewed, finally accepted, merged,
+and post-merge verified, the durable L3 Ranking Management Frontend Product
+Seal status is `CLOSED`.
+
+The next core product stage is:
 
 ```text
-CLOSED
+ACTIVITY_RESULT_CLOSURE
 ```
 
-The Product Seal must not be marked `CLOSED` by this document alone.
+This document does not start ActivityResult implementation.
