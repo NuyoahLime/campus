@@ -259,11 +259,30 @@ remain Production Readiness debt and are not changed here.
 
 ## 12. Next Stage
 
-After this documentation PR is independently reviewed, merged, and
-post-merge verified:
+This documentation PR is currently awaiting independent review:
 
 ```text
 RANKING_PRODUCTION_L3_RANKING_MANAGEMENT_FRONTEND_PRODUCT_SEAL_REVIEW
+```
+
+After independent review passes, the next gate is:
+
+```text
+RANKING_PRODUCTION_L3_RANKING_MANAGEMENT_FRONTEND_PRODUCT_SEAL_FINAL_ACCEPTANCE
+```
+
+After this Product Seal PR is merged and post-merge exact-SHA verification
+passes, a docs-only state sync is required:
+
+```text
+RANKING_PRODUCTION_L3_RANKING_MANAGEMENT_FRONTEND_PRODUCT_SEAL_STATE_SYNC
+```
+
+Only after the state-sync stage is independently accepted and merged may the
+durable Product Seal status become:
+
+```text
+CLOSED
 ```
 
 The Product Seal must not be marked `CLOSED` by this document alone.
