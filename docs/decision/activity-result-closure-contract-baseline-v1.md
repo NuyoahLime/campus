@@ -200,6 +200,10 @@ SUMMARY_TEXT_POLICY = FROZEN
 SCORE_HIGHLIGHT_POLICY = FROZEN
 MEDIA_REFS_LIMIT_POLICY = FROZEN
 PUBLIC_POINTER_STATUS_MATRIX = FROZEN
+CURRENT_CANDIDATE_VERSION_REQUIRED = YES
+CURRENT_CANDIDATE_VERSION_BINDING = activity_results.currentCandidateVersionId
+PUBLIC_VISIBILITY_BLOCK_REQUIRED = YES
+PUBLIC_VISIBILITY_BLOCK = activity_results.publicVisibilityBlocked
 REPLACEMENT_REVIEW_VISIBILITY = FROZEN
 INTERNAL_WITHDRAW_REPLACEMENT_EFFECT = FROZEN
 SUPERADMIN_TAKEDOWN_REPLACEMENT_EFFECT = FROZEN
@@ -436,16 +440,22 @@ ResultReviewRecord = append-only history and exact candidate binding
 currentPublicVersionId = currently exposed immutable public snapshot
 ```
 
-The two pointers have separate meanings:
+The three pointers have separate meanings:
 
 | Pointer | Meaning |
 | --- | --- |
+| `currentCandidateVersionId` | Current editable/review candidate ResultVersion; authoritative after draft save |
 | `currentInternalVersionId` | Latest version published internally |
 | `currentPublicVersionId` | Authoritative pointer to the currently public immutable ResultVersion |
 
-Candidate identity is not inferred from `MAX(version_number)` or the latest
-row. Candidate binding is authoritative only through candidate-bound workflow
-state and append-only review/action history.
+`currentCandidateVersionId` is required additive V1 persistence. The later
+migration must add a nullable UUID column with a same-result foreign key to
+`result_versions`; V010 remains unchanged in this stage.
+
+Candidate identity is never inferred from `MAX(version_number)`, timestamps,
+UUID ordering, or the latest row. Editor reload reads
+`currentCandidateVersionId` directly; candidate-bound workflow state and
+append-only review/action history must agree, otherwise fail closed.
 
 Required rules:
 
@@ -470,15 +480,37 @@ Required rules:
 Therefore:
 
 ```text
+PUBLIC_BASE_VISIBILITY =
+currentPublicVersionId != null AND publicVisibilityBlocked == false
+
 PUBLIC_VISIBILITY_AUTHORITY =
-currentPublicVersionId + takedown/anomaly protection
+PUBLIC_BASE_VISIBILITY + separately frozen anomaly/media protection
 
 OLD_PUBLIC_VERSION_DURING_REVIEW = KEEP_VISIBLE
 REJECTED_NEW_VERSION_DOES_NOT_REPLACE_OLD_PUBLIC_VERSION = YES
 ```
 
 Public reads do not use `result_public_status == PUBLIC` as the only authority.
+After successful `makePublic`, `currentCandidateVersionId` is set to `null`.
+Takedown sets `publicVisibilityBlocked = true` while preserving the historical
+public pointer; reset to `NOT_SUBMITTED` does not clear the block. Only a
+successful new `makePublic` clears it.
 The pointer/status/candidate matrix is:
+
+The V1 matrix additionally freezes the persisted candidate and visibility
+block columns:
+
+| Status | `currentCandidateVersionId` | `currentInternalVersionId` | `currentPublicVersionId` | `publicVisibilityBlocked` | Public read |
+| --- | --- | --- | --- | --- | --- |
+| `NOT_SUBMITTED` | null | any | null | false | deny |
+| `NOT_SUBMITTED` normal replacement | rejected/new candidate | any | old public | false | allow old public |
+| `NOT_SUBMITTED` after takedown | null | any | historical | true | deny |
+| `PENDING_PUBLIC_REVIEW` | exact submitted candidate | internal version | old public or null | false | old public only |
+| `PLATFORM_APPROVED` | exact approved candidate | internal version | old public or null | false | old public only |
+| `PLATFORM_REJECTED` replacement | rejected candidate | internal version | old public | false | allow old public |
+| `PUBLIC` | null | public version | public version | false | allow current public |
+| `ANOMALY_PENDING` | candidate or null | internal version | public version | policy block | anomaly protection applies |
+| `PLATFORM_TAKEDOWN` | null | any | historical | true | deny |
 
 | `result_public_status` | `currentPublicVersionId` | Candidate version | Anonymous/public read result | Management meaning |
 | --- | --- | --- | --- | --- |
@@ -787,6 +819,14 @@ The implementation must verify at least:
     fields.
 20. Candidate/public pointer changes and status changes are transactionally
     consistent.
+21. Draft save -> process/page reload reads `currentCandidateVersionId` and
+    returns that exact ResultVersion; no latest-row inference is permitted.
+22. Takedown -> `NOT_SUBMITTED` preserves `currentPublicVersionId`, keeps
+    `publicVisibilityBlocked = true`, and denies anonymous and student reads.
+23. A new candidate must complete internal publish -> submit -> approve before
+    `makePublic`; reads remain denied until successful publication.
+24. Successful replacement publication switches to the new candidate, clears
+    the visibility block, sets `PUBLIC`, and clears the candidate pointer.
 
 ## 21. Browser E2E Requirements
 
@@ -809,6 +849,11 @@ The final browser acceptance must cover:
 | E2E-13 | Format-only correction overlays presentation without mutating the published ResultVersion row |
 | E2E-14 | Cancelled Activity preserves existing result/history but denies new result creation and content mutation |
 | E2E-15 | Page reload preserves authoritative result, version, review, and format-edit state |
+
+The browser suite must explicitly prove that draft candidate recovery uses
+`currentCandidateVersionId`, and that takedown followed by
+`NOT_SUBMITTED` does not resurrect old public content. It must also prove that
+only successful new `makePublic` clears `publicVisibilityBlocked`.
 
 E2E must also prove no public response leaks rejected candidate content,
 review comments, or internal-only fields.
@@ -852,7 +897,7 @@ Every slice must preserve the contract in the use-case table below.
 The following table is the authoritative V1 use-case contract. Future
 implementation must not diverge from it without a new accepted decision.
 
-| Use Case | Actor | Activity State | Internal State | Public Workflow State | `currentInternalVersionId` Effect | `currentPublicVersionId` Effect | Review / Format Record Effect | Visibility Effect | API Requirement | Frontend Requirement | V1 Status | Evidence |
+| Use Case | Actor | Activity State | Internal State | Public Workflow State | `currentCandidateVersionId` Effect | `currentInternalVersionId` Effect | `currentPublicVersionId` Effect | `publicVisibilityBlocked` Effect | Review / Format Record Effect | Visibility Effect | API Requirement | Frontend Requirement | V1 Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Editor read before first save | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No row | No row | No effect | No effect | No record | Empty editor model only; no public visibility | Read existing or empty model without side effects | SchoolAdmin editor entry | Required | Interface planning; lazy-create decision |
 | First result save / lazy create | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No row -> `DRAFT` | No row -> `NOT_SUBMITTED` | Remains null until internal publish | Remains null | Create first immutable ResultVersion; no review record | Same-school SchoolAdmin can read draft; Student/anonymous cannot read | Authorized create-or-edit save; no anonymous/generic create | Save action in SchoolAdmin editor | Required | ADR-004; V010; this contract |
