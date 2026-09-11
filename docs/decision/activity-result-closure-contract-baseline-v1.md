@@ -431,13 +431,16 @@ APPEND_ONLY_FORMAT_EDIT_RECORD_OVER_IMMUTABLE_RESULT_VERSION
 
 ## 11. Version Pointer Semantics
 
-ActivityResult has three distinct public-publication concepts. They must not
-substitute for one another:
+ActivityResult has three distinct version pointers and one persisted public
+visibility guard. They must not substitute for one another:
 
 ```text
 ActivityResult.resultPublicStatus = current workflow/governance state
 ResultReviewRecord = append-only history and exact candidate binding
+currentCandidateVersionId = current editable/review candidate
+currentInternalVersionId = latest internally published version
 currentPublicVersionId = currently exposed immutable public snapshot
+publicVisibilityBlocked = persisted public visibility block
 ```
 
 The three pointers have separate meanings:
@@ -450,7 +453,17 @@ The three pointers have separate meanings:
 
 `currentCandidateVersionId` is required additive V1 persistence. The later
 migration must add a nullable UUID column with a same-result foreign key to
-`result_versions`; V010 remains unchanged in this stage.
+`result_versions`; V010 remains unchanged in this stage. The public visibility
+block is also required additive V1 persistence:
+
+```text
+CURRENT_CANDIDATE_VERSION_REQUIRED = YES
+CURRENT_CANDIDATE_VERSION_BINDING = activity_results.currentCandidateVersionId
+PUBLIC_VISIBILITY_BLOCK_REQUIRED = YES
+PUBLIC_VISIBILITY_BLOCK = activity_results.publicVisibilityBlocked
+DRAFT_RELOAD_CANDIDATE_RECOVERY = currentCandidateVersionId
+CANDIDATE_INFERENCE_BY_MAX_OR_LATEST = DENIED
+```
 
 Candidate identity is never inferred from `MAX(version_number)`, timestamps,
 UUID ordering, or the latest row. Editor reload reads
@@ -459,23 +472,35 @@ append-only review/action history must agree, otherwise fail closed.
 
 Required rules:
 
-1. Creating or editing a draft creates or updates a candidate ResultVersion
-   according to the ResultVersion rules; it does not change the public pointer.
-2. Internal publication points `currentInternalVersionId` to the version
-   published internally.
-3. Public review is bound to the exact candidate version submitted by the
-   SchoolAdmin.
-4. Platform approval is bound to that same candidate version.
-5. `makePublic` switches `currentPublicVersionId` to the approved candidate in
-   the same transaction as the public status transition.
-6. While a new candidate is under review, the old
-   `currentPublicVersionId` remains in place and remains visible.
-7. Rejecting a candidate never replaces or mutates the old public pointer.
-8. A core edit of a public result creates a new candidate and requires public
+1. The first valid SchoolAdmin save creates ActivityResult and ResultVersion V1
+   atomically, sets `currentCandidateVersionId = V1`, and leaves both
+   publication pointers null with `publicVisibilityBlocked = false`.
+2. A draft or core edit creates a new immutable ResultVersion Vn and sets
+   `currentCandidateVersionId = Vn`; older ResultVersion rows are never mutated.
+3. Editor reload recovers the exact candidate through
+   `currentCandidateVersionId`; it never infers a candidate from a latest row.
+4. `publishInternal` requires a non-null candidate belonging to the same
+   ActivityResult, then atomically sets `currentInternalVersionId` to that
+   candidate and records the server timestamp on that exact ResultVersion.
+   The candidate pointer remains bound to that version through public review.
+5. Public review submission binds `SUBMITTED(resultId, resultVersionId =
+   currentCandidateVersionId)`. Approval and rejection must match that exact
+   candidate-bound history; a mismatch fails closed.
+6. `makePublic` requires `result_public_status = PLATFORM_APPROVED` and the
+   exact approved `currentCandidateVersionId`. It atomically sets
+   `currentPublicVersionId = currentCandidateVersionId`,
+   `result_public_status = PUBLIC`, `publicVisibilityBlocked = false`, and
+   `currentCandidateVersionId = null`.
+7. While a normal replacement candidate is under review, the old
+   `currentPublicVersionId` remains in place and visible with
+   `publicVisibilityBlocked = false`.
+8. Rejecting a replacement candidate never replaces or mutates the old public
+   pointer; the rejected candidate and review history remain immutable history.
+9. A core edit of a public result creates a new candidate and requires public
    re-review; it must not mutate the published version.
-9. A format-only edit may keep the current public pointer, but its edit record
-   must remain queryable.
-10. A published ResultVersion is immutable.
+10. A format-only edit may keep the current public pointer, but its append-only
+    edit record must remain queryable.
+11. A published ResultVersion is immutable.
 
 Therefore:
 
@@ -484,7 +509,7 @@ PUBLIC_BASE_VISIBILITY =
 currentPublicVersionId != null AND publicVisibilityBlocked == false
 
 PUBLIC_VISIBILITY_AUTHORITY =
-PUBLIC_BASE_VISIBILITY + separately frozen anomaly/media protection
+PUBLIC_BASE_VISIBILITY + separately frozen anomaly/media projection protection
 
 OLD_PUBLIC_VERSION_DURING_REVIEW = KEEP_VISIBLE
 REJECTED_NEW_VERSION_DOES_NOT_REPLACE_OLD_PUBLIC_VERSION = YES
@@ -492,45 +517,35 @@ REJECTED_NEW_VERSION_DOES_NOT_REPLACE_OLD_PUBLIC_VERSION = YES
 
 Public reads do not use `result_public_status == PUBLIC` as the only authority.
 After successful `makePublic`, `currentCandidateVersionId` is set to `null`.
-Takedown sets `publicVisibilityBlocked = true` while preserving the historical
-public pointer; reset to `NOT_SUBMITTED` does not clear the block. Only a
-successful new `makePublic` clears it.
-The pointer/status/candidate matrix is:
+Internal withdrawal or platform takedown with an active public pointer sets
+`publicVisibilityBlocked = true`, preserves the historical public pointer, and
+sets `currentCandidateVersionId = null` after invalidating any actionable
+candidate. Reset to `NOT_SUBMITTED` does not clear the block. Only a successful
+new `makePublic` clears it.
 
-The V1 matrix additionally freezes the persisted candidate and visibility
-block columns:
+The authoritative pointer/status/block matrix is:
 
-| Status | `currentCandidateVersionId` | `currentInternalVersionId` | `currentPublicVersionId` | `publicVisibilityBlocked` | Public read |
-| --- | --- | --- | --- | --- | --- |
-| `NOT_SUBMITTED` | null | any | null | false | deny |
-| `NOT_SUBMITTED` normal replacement | rejected/new candidate | any | old public | false | allow old public |
-| `NOT_SUBMITTED` after takedown | null | any | historical | true | deny |
-| `PENDING_PUBLIC_REVIEW` | exact submitted candidate | internal version | old public or null | false | old public only |
-| `PLATFORM_APPROVED` | exact approved candidate | internal version | old public or null | false | old public only |
-| `PLATFORM_REJECTED` replacement | rejected candidate | internal version | old public | false | allow old public |
-| `PUBLIC` | null | public version | public version | false | allow current public |
-| `ANOMALY_PENDING` | candidate or null | internal version | public version | policy block | anomaly protection applies |
-| `PLATFORM_TAKEDOWN` | null | any | historical | true | deny |
-
-| `result_public_status` | `currentPublicVersionId` | Candidate version | Anonymous/public read result | Management meaning |
-| --- | --- | --- | --- | --- |
-| `NOT_SUBMITTED` | `null` | None or draft-only | No public result | First publication has not started |
-| `NOT_SUBMITTED` | Non-null | None or rejected/reset candidate | Old public version remains readable unless takedown protection applies | Replacement work has not started or was reset; public pointer remains authoritative |
-| `PENDING_PUBLIC_REVIEW` | `null` | Candidate bound by submit record | No public result | First publication under review |
-| `PENDING_PUBLIC_REVIEW` | Non-null | Replacement candidate bound by submit record | Old public version remains readable | Replacement under review |
-| `PLATFORM_APPROVED` | `null` | Approved first-publication candidate | No public result until SchoolAdmin `makePublic` | Approval granted; ordinary publication pending |
-| `PLATFORM_APPROVED` | Non-null | Approved replacement candidate | Old public version remains readable | Replacement approved; ordinary publication pending |
-| `PLATFORM_REJECTED` | `null` | Rejected first-publication candidate | No public result | Rejected candidate preserved in history |
-| `PLATFORM_REJECTED` | Non-null | Rejected replacement candidate | Old public version remains readable | Rejected replacement preserved; old public pointer authoritative |
-| `PUBLIC` | Non-null | None | Current public version readable | Public version is live |
-| `ANOMALY_PENDING` | Non-null | Optional repair candidate | Public result visibility follows anomaly protection; unsafe referenced material is hidden or protected | Published result needs remediation |
-| `PLATFORM_TAKEDOWN` | Any historical pointer value | Any historical candidate | Public read denied | Public visibility closed; pointer/history preserved as evidence |
+| `result_public_status` | `currentCandidateVersionId` | `currentInternalVersionId` | `currentPublicVersionId` | `publicVisibilityBlocked` | Public read | Management meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| `NOT_SUBMITTED` with no public pointer | Exact draft/review candidate or null | Null or internal version | `null` | `false` | Deny | First publication is not public; editor reload uses the exact candidate pointer |
+| `NOT_SUBMITTED` normal replacement | Rejected/current correction candidate or null | Internal version | Old public version | `false` | Allow old public version | Normal replacement work has not started or was reset; old pointer remains authoritative |
+| `NOT_SUBMITTED` after takedown reset | `null` | Historical internal version | Historical old public pointer | `true` | Deny anonymous and student public reads | Historical pointer is retained for evidence and cannot be re-exposed by reset |
+| `PENDING_PUBLIC_REVIEW` with no public pointer | Exact submitted candidate | Internal version | `null` | `false` | Deny | First publication candidate is under review |
+| `PENDING_PUBLIC_REVIEW` with old public pointer | Exact submitted candidate | Internal version | Old public version | `false` | Allow old public version | Replacement candidate is under review |
+| `PLATFORM_APPROVED` with no public pointer | Exact approved candidate | Internal version | `null` | `false` | Deny | Approved first candidate awaits SchoolAdmin publication |
+| `PLATFORM_APPROVED` with old public pointer | Exact approved candidate | Internal version | Old public version | `false` | Allow old public version | Approved replacement awaits SchoolAdmin publication |
+| `PLATFORM_REJECTED` replacement | Exact rejected candidate | Internal version | Old public version | `false` | Allow old public version | Rejected candidate remains immutable history; old pointer is authoritative |
+| `PUBLIC` | `null` | Publicly published version | Public version | `false` | Allow current public version | Current public publication is live |
+| `ANOMALY_PENDING` | Candidate or null | Internal version | Public version | `false` or `true` as persisted by the anomaly action | Allow only when block is false and anomaly/media projection permits; otherwise deny | Published result is under remediation and unsafe projection is never exposed |
+| `PLATFORM_TAKEDOWN` | `null` | Historical internal version | Historical public pointer | `true` | Deny | Public visibility is closed; pointer, candidate history, and reasons are preserved |
 
 For first publication, `currentPublicVersionId = null` until SchoolAdmin
 `makePublic`. For replacement publication, `currentPublicVersionId` remains the
 old version until successful SchoolAdmin `makePublic` switches it to the new
 approved candidate. Platform takedown does not physically clear
-`currentPublicVersionId`; it overrides visibility.
+`currentPublicVersionId`; it sets the persisted visibility block and overrides
+visibility. `PLATFORM_TAKEDOWN -> NOT_SUBMITTED` preserves both the historical
+pointer and `publicVisibilityBlocked = true`.
 
 ## 12. Review History
 
@@ -683,25 +698,45 @@ Current schema evidence:
   cycle-safe foreign keys;
 - no result review-history schema exists;
 - no JPA or repository mapping exists for `result_versions`;
-- no candidate-version review binding or format-edit history is persisted.
+- no candidate-version pointer, public visibility block, candidate-bound review
+  binding, or format-edit history is persisted.
 
 ```text
 ACTIVITY_RESULT_CLOSURE_MIGRATION_REQUIRED = YES
 MIGRATION_REQUIRED = YES
 RESULT_REVIEW_HISTORY_STORAGE = NEW_ADDITIVE_SCHEMA_REQUIRED
 RESULT_FORMAT_EDIT_HISTORY_STORAGE = NEW_ADDITIVE_APPEND_ONLY_SCHEMA
+HISTORICAL_V010_CHANGED = NO
 ```
 
 No migration is created in this phase. The implementation phase must plan a
 new additive migration because the current schema lacks:
 
-1. candidate-bound public review history;
-2. reviewer, decision, reason, and timestamp fields for result review;
-3. append-only format-edit history independent of immutable ResultVersion
+1. `current_candidate_version_id UUID NULL`;
+2. `public_visibility_blocked BOOLEAN NOT NULL DEFAULT FALSE`;
+3. a same-result candidate foreign-key invariant equivalent to
+   `(current_candidate_version_id, id) REFERENCES result_versions(id, result_id)`;
+4. candidate-bound public review history;
+5. reviewer, decision, reason, and timestamp fields for result review;
+6. append-only format-edit history independent of immutable ResultVersion
    rows;
-4. durable takedown reason/history;
-5. an explicit persistence structure that binds workflow actions to the exact
+7. durable rejection and takedown reason/history;
+8. an explicit persistence structure that binds workflow actions to the exact
    candidate ResultVersion.
+
+The later physical persistence contract is frozen as:
+
+```text
+current_candidate_version_id UUID NULL
+public_visibility_blocked BOOLEAN NOT NULL DEFAULT FALSE
+
+(current_candidate_version_id, id)
+REFERENCES result_versions(id, result_id)
+```
+
+An equivalent same-result relational constraint is acceptable if it preserves
+the same invariant. The exact migration filename and number are deferred to
+implementation after inspecting the then-current migration head.
 
 V010 must remain unchanged. The future migration number must be selected from
 the then-current migration head.
@@ -817,15 +852,26 @@ The implementation must verify at least:
 18. Same-school and cross-school queries are isolated.
 19. Public reads exclude candidates, drafts, review history, and internal
     fields.
-20. Candidate/public pointer changes and status changes are transactionally
-    consistent.
-21. Draft save -> process/page reload reads `currentCandidateVersionId` and
-    returns that exact ResultVersion; no latest-row inference is permitted.
-22. Takedown -> `NOT_SUBMITTED` preserves `currentPublicVersionId`, keeps
+20. The three version pointers and visibility block are transactionally
+    consistent and round-trip through persistence, domain, application, and
+    query paths: `currentCandidateVersionId`,
+    `currentInternalVersionId`, `currentPublicVersionId`, and
+    `publicVisibilityBlocked`.
+21. First save creates V1, sets `currentCandidateVersionId = V1`, reloads the
+    exact V1, and never infers the candidate from a latest row.
+22. A draft edit creates V2, sets `currentCandidateVersionId = V2`, and leaves
+    V1 immutable.
+23. Internal publication requires a non-null candidate and sets
+    `currentInternalVersionId` to that exact candidate.
+24. Submit and approve records bind to the exact candidate pointer; mismatches
+    fail closed without latest-version fallback.
+25. `makePublic` switches the public pointer to the approved candidate and
+    atomically clears the candidate pointer and visibility block.
+26. Takedown -> `NOT_SUBMITTED` preserves `currentPublicVersionId`, keeps
     `publicVisibilityBlocked = true`, and denies anonymous and student reads.
-23. A new candidate must complete internal publish -> submit -> approve before
-    `makePublic`; reads remain denied until successful publication.
-24. Successful replacement publication switches to the new candidate, clears
+27. A new candidate after takedown must complete internal publish -> submit ->
+    approve before `makePublic`; public reads remain denied while blocked.
+28. Successful post-takedown `makePublic` switches to the new candidate, clears
     the visibility block, sets `PUBLIC`, and clears the candidate pointer.
 
 ## 21. Browser E2E Requirements
@@ -849,6 +895,8 @@ The final browser acceptance must cover:
 | E2E-13 | Format-only correction overlays presentation without mutating the published ResultVersion row |
 | E2E-14 | Cancelled Activity preserves existing result/history but denies new result creation and content mutation |
 | E2E-15 | Page reload preserves authoritative result, version, review, and format-edit state |
+| E2E-16 | Draft save survives process/page reload through `currentCandidateVersionId` and recovers the exact candidate |
+| E2E-17 | Takedown followed by `NOT_SUBMITTED` does not resurrect the historical public pointer; only a new approved publication restores visibility |
 
 The browser suite must explicitly prove that draft candidate recovery uses
 `currentCandidateVersionId`, and that takedown followed by
@@ -898,26 +946,29 @@ The following table is the authoritative V1 use-case contract. Future
 implementation must not diverge from it without a new accepted decision.
 
 | Use Case | Actor | Activity State | Internal State | Public Workflow State | `currentCandidateVersionId` Effect | `currentInternalVersionId` Effect | `currentPublicVersionId` Effect | `publicVisibilityBlocked` Effect | Review / Format Record Effect | Visibility Effect | API Requirement | Frontend Requirement | V1 Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Editor read before first save | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No row | No row | No effect | No effect | No record | Empty editor model only; no public visibility | Read existing or empty model without side effects | SchoolAdmin editor entry | Required | Interface planning; lazy-create decision |
-| First result save / lazy create | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No row -> `DRAFT` | No row -> `NOT_SUBMITTED` | Remains null until internal publish | Remains null | Create first immutable ResultVersion; no review record | Same-school SchoolAdmin can read draft; Student/anonymous cannot read | Authorized create-or-edit save; no anonymous/generic create | Save action in SchoolAdmin editor | Required | ADR-004; V010; this contract |
-| Core edit with no public version | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | Existing editable result | `NOT_SUBMITTED` | Preserve current internal pointer until publish | Remains null | Create new candidate ResultVersion | No anonymous public version exists | Authorized core edit command | Result editor | Required | 08 §6.3; ADR-004 |
-| Publish internally | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `DRAFT` -> `INTERNAL_PUBLISHED` | Preserve current workflow state | Set to internally published version | No change | Optional action history; no public review record | Same-school internal visibility opens | Internal publish command | Publish action | Required | 08 §6.5; ADR-004 |
-| Submit first-publication candidate | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `NOT_SUBMITTED` -> `PENDING_PUBLIC_REVIEW` | No change | Remains null | Append candidate-bound `SUBMITTED` record | Anonymous/public read remains denied | Submit-review command | Submit action | Required | 08 §6.5 |
-| Approve first-publication candidate | SuperAdmin | Any allowed governance context | `INTERNAL_PUBLISHED` | `PENDING_PUBLIC_REVIEW` -> `PLATFORM_APPROVED` | No change | Remains null | Append candidate-bound `APPROVED` record | Anonymous/public read remains denied until SchoolAdmin publishes | Approve command | Review queue/detail | Required | 08 §6.3/6.5 |
-| Make first version public | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `PLATFORM_APPROVED` -> `PUBLIC` | No change | Set to approved candidate | Append ordinary publication action if modeled | Anonymous/public read returns the newly public version | Ordinary make-public command | Publish action | Required | 08 §6.2/6.3; ADR-004 |
-| Core edit when old public version exists | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | Existing editable result | Reset/enter replacement workflow | Preserve or later update internal pointer per internal publish | Keep old public version | Create new candidate ResultVersion | Old public version remains readable | Authorized core edit command | Result editor | Required | 08 §6.3; ADR-004 |
-| Submit replacement candidate | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `NOT_SUBMITTED` -> `PENDING_PUBLIC_REVIEW` | No change | Keep old public version | Append candidate-bound `SUBMITTED` record | Old public version remains readable | Submit-review command | Submit action | Required | 08 §6.5; this contract |
-| Reject replacement candidate | SuperAdmin | Any allowed governance context | No change | `PENDING_PUBLIC_REVIEW` -> `PLATFORM_REJECTED` | No change | Keep old public version | Append candidate-bound `REJECTED` record with reason | Old public version remains authoritative | Reject command | Reject-with-reason action | Required | 08 §6.3/6.5; this contract |
-| Approve replacement candidate | SuperAdmin | Any allowed governance context | No change | `PENDING_PUBLIC_REVIEW` -> `PLATFORM_APPROVED` | No change | Keep old public version until SchoolAdmin publish | Append candidate-bound `APPROVED` record | Old public version remains readable | Approve command | Review action | Required | 08 §6.3/6.5; this contract |
-| Make replacement public | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `PLATFORM_APPROVED` -> `PUBLIC` | No change | Switch atomically to approved replacement | Append ordinary publication action if modeled | Public read switches to new version; old version remains immutable history | Ordinary make-public command | Publish action | Required | 08 §6.2/6.3; ADR-004 |
-| Internal withdraw with active public pointer and candidate pending | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` -> `INTERNAL_WITHDRAWN` | Candidate state -> `PLATFORM_TAKEDOWN` | Preserve historical internal pointer | Preserve historical public pointer but close visibility | Append withdrawal/takedown action; invalidate pending/approved candidate | Public read denied despite stored pointer | Internal withdraw command with atomic takedown | Withdraw action | Required | ADR-004; this contract |
-| SuperAdmin emergency takedown while replacement pending | SuperAdmin | Any allowed governance context | No internal change unless policy requires | Replacement workflow -> `PLATFORM_TAKEDOWN` | No change | Preserve historical public pointer but close visibility | Append takedown action with reason; invalidate pending/approved candidate | Public read denied despite stored pointer | Takedown command allowed for active public pointer | Takedown action | Required | 08 §6.3; this contract |
-| Format-only correction over published version | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No change | No workflow change | No change | No change | Append format-edit record; do not update published ResultVersion row | Public/internal read may apply latest valid overlay | Format-edit command | Format correction UI/history | Required | 08 §6.3; immutability decision |
-| Cancelled Activity preservation / mutation denial | SchoolAdmin or SuperAdmin | `CANCELLED` | Preserve existing state | Preserve existing workflow unless platform takedown occurs | Preserve pointer | Preserve pointer | Preserve history; SuperAdmin takedown may append reasoned action | Existing reads follow result visibility; content mutation and new result creation denied | Deny create/edit; allow platform safety governance | Read-only state plus governance actions | Required | 04 §3; 11 lifecycle spec |
-| Same-school result read | Student or SchoolAdmin | Any allowed by visibility | Current internal state | Current workflow state | No effect | No effect | No effect | Return only allowed internal/public version/content | Scoped list/detail query | Student/SchoolAdmin read UI | Required | Identity baseline; 08 |
-| Public result read | Anonymous | Any | Any | Any non-takedown state with authorized public pointer | No effect | Read authoritative current public pointer | No effect | Return current public version; deny if pointer null or takedown override active | Public list/detail query | Public result UI | Required | 08 §6.4/6.5; this contract |
-| Cross-school access | Non-governance actor | Any | Any | Any | No effect | No effect | No effect | Deny without existence/content leakage | Scoped denial contract | No visible management path | Required | Identity baseline; ADR-004 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Editor read before first save | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No row | No row | No effect | No effect | No effect | `false` | No record | Empty editor model only; no public visibility | Read existing or empty model without side effects | SchoolAdmin editor entry | Required | Interface planning; lazy-create decision |
+| First result save / lazy create | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No row -> `DRAFT` | No row -> `NOT_SUBMITTED` | Set to newly created ResultVersion V1 | `null` | `null` | `false` | Create immutable ResultVersion V1; no public-review record yet | Same-school SchoolAdmin may read draft; Student and anonymous public read denied | Authorized create-or-edit save; no generic public create | Save action in SchoolAdmin editor | Required | ADR-004; V010; this contract |
+| Core edit with no public version | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | Existing editable result | `NOT_SUBMITTED` | Set to new immutable ResultVersion Vn | Preserve current internal pointer or `null` until publish | `null` | `false` | Create Vn; do not mutate an older ResultVersion | No anonymous public version exists | Authorized core edit command | Result editor | Required | 08 §6.3; ADR-004 |
+| Publish internally | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `DRAFT` -> `INTERNAL_PUBLISHED` | Preserve current workflow state | Require and retain exact current candidate | Set to candidate; `publishedInternallyAt` is server time on that exact version | No change | `false` | No public-review record | Same-school internal visibility opens | Internal publish command | Publish action | Required | 08 §6.5; ADR-004 |
+| Submit first-publication candidate | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `NOT_SUBMITTED` -> `PENDING_PUBLIC_REVIEW` | Bind exact current candidate as review subject | No change | `null` | `false` | Append `SUBMITTED(resultId, resultVersionId = currentCandidateVersionId)` | Anonymous/public read denied | Submit-review command | Submit action | Required | 08 §6.5 |
+| Approve first-publication candidate | SuperAdmin | Any allowed governance context | `INTERNAL_PUBLISHED` | `PENDING_PUBLIC_REVIEW` -> `PLATFORM_APPROVED` | Must match exact submitted candidate; mismatch fails closed | No change | `null` | `false` | Append candidate-bound `APPROVED` record | Anonymous/public read denied until SchoolAdmin publishes | Approve command | Review queue/detail | Required | 08 §6.3/6.5 |
+| Make first version public | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `PLATFORM_APPROVED` -> `PUBLIC` | Clear to `null` after successful pointer switch | No change | Set to exact approved current candidate | `false` | Append ordinary publication action if modeled | Anonymous/public read returns the newly public version | Ordinary make-public command | Publish action | Required | 08 §6.2/6.3; ADR-004 |
+| Core edit when old public version exists | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | Existing editable result | Enter replacement workflow | Set to new immutable candidate Vn | No change until internal publication | Keep old public version | `false` | Create Vn; old ResultVersion remains immutable | Old public version remains readable | Authorized core edit command | Result editor | Required | 08 §6.3; ADR-004 |
+| Submit replacement candidate | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `NOT_SUBMITTED` -> `PENDING_PUBLIC_REVIEW` | Bind exact current candidate as review subject | No change | Keep old public version | `false` | Append candidate-bound `SUBMITTED` record | Old public version remains readable | Submit-review command | Submit action | Required | 08 §6.5; this contract |
+| Reject replacement candidate | SuperAdmin | Any allowed governance context | No change | `PENDING_PUBLIC_REVIEW` -> `PLATFORM_REJECTED` | Retain exact rejected candidate until correction | No change | Keep old public version | `false` | Append candidate-bound `REJECTED` record with reason | Old public version remains authoritative | Reject command; exact candidate required | Reject-with-reason action | Required | 08 §6.3/6.5; this contract |
+| Approve replacement candidate | SuperAdmin | Any allowed governance context | No change | `PENDING_PUBLIC_REVIEW` -> `PLATFORM_APPROVED` | Must match exact approved candidate-bound history | No change | Keep old public version until SchoolAdmin publishes | `false` | Append candidate-bound `APPROVED` record | Old public version remains readable | Approve command; mismatch fails closed | Review action | Required | 08 §6.3/6.5; this contract |
+| Make replacement public | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `PLATFORM_APPROVED` -> `PUBLIC` | Clear to `null` after successful publication | No change | Atomically set to exact approved current candidate | `false` | Append ordinary publication action if modeled | Public read switches to new version; old version remains immutable history | Ordinary make-public command | Publish action | Required | 08 §6.2/6.3; ADR-004 |
+| Internal withdraw with active public pointer | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` -> `INTERNAL_WITHDRAWN` | Any active workflow -> `PLATFORM_TAKEDOWN` | Clear to `null` after candidate invalidation | Preserve historical internal pointer | Preserve historical public pointer | Set `true` atomically | Append withdrawal/takedown action; candidate and review history preserved | Public read denied despite stored pointer | Internal withdraw with atomic takedown | Withdraw action | Required | ADR-004; this contract |
+| SuperAdmin emergency takedown | SuperAdmin | Any allowed governance context | No internal change unless policy requires | Replacement workflow -> `PLATFORM_TAKEDOWN` | Clear to `null` after candidate invalidation | No change | Preserve historical public pointer | Set `true` atomically | Append takedown action with reason; candidate and history preserved | Public read denied | Takedown command allowed for active public pointer | Takedown action | Required | 08 §6.3; this contract |
+| `PLATFORM_TAKEDOWN` -> `NOT_SUBMITTED` reset | SchoolAdmin or SuperAdmin | Any governance-allowed reset context | Preserve historical internal state | `PLATFORM_TAKEDOWN` -> `NOT_SUBMITTED` | `null` | Preserve historical internal pointer | Preserve historical old public pointer | Remains `true` | Preserve takedown reason and all candidate/review history | Anonymous and student public reads denied; reset does not resurrect old content | Reset command must not clear the visibility block | Read-only blocked state plus legal retry entry | Required | This contract |
+| Post-takedown new candidate before `makePublic` | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | Existing result -> candidate -> `INTERNAL_PUBLISHED` | `NOT_SUBMITTED` -> `PENDING_PUBLIC_REVIEW` -> `PLATFORM_APPROVED` | Set to new immutable V2 and retain exact candidate through review | Set to V2 on internal publish | Historical pointer remains until publication | Remains `true` before `makePublic` | Append exact V2 `SUBMITTED` and `APPROVED` records | Public read denied while block is `true` | New candidate must complete internal publish, submit, and approve | Candidate editor and review controls | Required | Takedown recovery contract |
+| Make new post-takedown candidate public | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | `INTERNAL_PUBLISHED` | `PLATFORM_APPROVED` -> `PUBLIC` | Clear to `null` | No change | Atomically set to approved V2 | Clear to `false` | Append ordinary publication action | Public read returns V2 | Make-public command requires exact approved candidate | Publish action | Required | Takedown recovery contract |
+| Format-only correction over published version | Same-school SchoolAdmin | `PUBLISHED` / `IN_PROGRESS` / `ENDED` | No core state change | No workflow change | No change | No change | No change | No change | Append format-edit record; never update published ResultVersion row | Reads may apply valid format overlay without changing snapshot meaning | Format-edit command | Format correction UI/history | Required | 08 §6.3; immutability decision |
+| Cancelled Activity preservation / mutation denial | SchoolAdmin or SuperAdmin | `CANCELLED` | Preserve existing state | Preserve existing workflow unless platform takedown occurs | Preserve historical state unless takedown invalidates it | Preserve pointer | Preserve pointer | Preserve unless platform governance changes it | Preserve all history; takedown may append reasoned action | Reads use authoritative pointers and block; new create/core mutation denied | Deny create/edit; allow platform safety governance | Read-only state plus governance actions | Required | 04 §3; 11 lifecycle spec |
+| Same-school result read | Student or SchoolAdmin | Any allowed by visibility | Current internal state | Current workflow state | Read exact `currentCandidateVersionId` for editor; no mutation | Read authoritative internal pointer; no mutation | Read authoritative public pointer where allowed; no mutation | Apply persisted block without mutation | No record | Return only the version/content allowed by authoritative pointers and scope | Scoped list/detail query | Student/SchoolAdmin read UI | Required | Identity baseline; 08 |
+| Public result read | Anonymous | Any | Any | Any | Candidate is never exposed | No effect | Read exact `currentPublicVersionId` | Require `currentPublicVersionId != null` and `publicVisibilityBlocked == false` | No record | Allow only when anomaly/media projection protection also permits exposure; otherwise deny | Public list/detail query | Public result UI | Required | 08 §6.4/6.5; this contract |
+| Cross-school access | Non-governance actor | Any | Any | Any | No effect | No effect | No effect | No effect | No record | Deny without existence or content leakage | Scoped denial contract | No visible management path | Required | Identity baseline; ADR-004 |
 
 The acceptance gate is not passed until all of the following are true:
 
@@ -926,7 +977,9 @@ The acceptance gate is not passed until all of the following are true:
 - ResultVersion is implemented as an immutable, candidate-bound snapshot;
 - content and JSON validation are explicit and fail closed;
 - review history is durable, append-only, and queryable;
-- both version pointers are transactionally correct;
+- all three version pointers and `publicVisibilityBlocked` round-trip correctly
+  through persistence, domain, application, and query paths and remain
+  transactionally consistent;
 - SchoolAdmin and SuperAdmin responsibilities remain separate;
 - same-school, cross-school, student, anonymous, and pending-review visibility
   are tested;
