@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
+import java.time.Instant;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ActivityResultRepositoryAdapterTest {
     @Mock ActivityResultJpaRepository jpa;
+    @Mock ResultVersionJpaRepository versions;
     @InjectMocks ActivityResultRepositoryAdapter adapter;
 
     @Test void saveCallsJpa() { adapter.save(draft()); verify(jpa).save(any()); }
@@ -25,5 +27,5 @@ class ActivityResultRepositoryAdapterTest {
         assertThat(r.get().domainEvents()).isEmpty();
     }
     private ActivityResult draft() { return ActivityResult.create(new ActivityResult.Builder().id(new ActivityResultId(UUID.randomUUID())).schoolId(UUID.randomUUID()).activityId(UUID.randomUUID())); }
-    private ActivityResultEntity entity(String i, String p) { var e = new ActivityResultEntity(); e.setId(UUID.randomUUID()); e.setSchoolId(UUID.randomUUID()); e.setActivityId(UUID.randomUUID()); e.setResultInternalStatus(i); e.setResultPublicStatus(p); return e; }
+    private ActivityResultEntity entity(String i, String p) { var e = new ActivityResultEntity(); e.setId(UUID.randomUUID()); e.setSchoolId(UUID.randomUUID()); e.setActivityId(UUID.randomUUID()); e.setResultInternalStatus(i); e.setResultPublicStatus(p); e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now()); return e; }
 }
