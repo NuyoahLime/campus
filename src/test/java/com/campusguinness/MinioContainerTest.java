@@ -7,13 +7,16 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
 class MinioContainerTest {
 
-    private static final String MINIO_IMAGE = "minio/minio:RELEASE.2025-02-28T09-55-16Z";
+    private static final DockerImageName MINIO_IMAGE = DockerImageName
+            .parse("quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z")
+            .asCompatibleSubstituteFor("minio/minio");
 
     @Container
     static MinIOContainer minio = new MinIOContainer(MINIO_IMAGE);
