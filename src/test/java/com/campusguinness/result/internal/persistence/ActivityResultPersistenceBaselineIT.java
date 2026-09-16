@@ -223,6 +223,66 @@ class ActivityResultPersistenceBaselineIT extends PostgreSqlIntegrationTestSuppo
         assertThat(resultVersions.findById(original.id()).orElseThrow().title()).isEqualTo("Original");
     }
 
+    @Test
+    void internalPublicationStampPreservesCoreSnapshot() {
+        ActivityResult result = createResult(createActivity());
+        ResultVersion before = createVersion(result, 1, "Original");
+        Instant publishedAt = Instant.parse("2026-09-16T12:00:00Z");
+
+        resultVersions.markPublishedInternally(before.id(), publishedAt);
+
+        ResultVersion after = resultVersions.findById(before.id()).orElseThrow();
+        assertThat(after.publishedInternallyAt()).isEqualTo(publishedAt);
+        assertThat(after.resultId()).isEqualTo(before.resultId());
+        assertThat(after.versionNumber()).isEqualTo(before.versionNumber());
+        assertThat(after.title()).isEqualTo(before.title());
+        assertThat(after.summaryText()).isEqualTo(before.summaryText());
+        assertThat(after.scoreHighlights()).isEqualTo(before.scoreHighlights());
+        assertThat(after.mediaRefs()).isEqualTo(before.mediaRefs());
+        assertThat(after.coreContentModified()).isEqualTo(before.coreContentModified());
+        assertThat(after.formatChangeLog()).isEqualTo(before.formatChangeLog());
+        assertThat(after.createdAt()).isEqualTo(before.createdAt());
+    }
+
+    @Test
+    void internalPublicationStampTargetsExactVersionOnly() {
+        ActivityResult result = createResult(createActivity());
+        ResultVersion v1 = createVersion(result, 1, "V1");
+        ResultVersion v2 = createVersion(result, 2, "V2");
+        Instant publishedAt = Instant.parse("2026-09-16T12:01:00Z");
+
+        resultVersions.markPublishedInternally(v2.id(), publishedAt);
+
+        assertThat(resultVersions.findById(v1.id()).orElseThrow().publishedInternallyAt()).isNull();
+        assertThat(resultVersions.findById(v2.id()).orElseThrow().publishedInternallyAt())
+                .isEqualTo(publishedAt);
+    }
+
+    @Test
+    void internalPublicationStampCannotBeOverwritten() {
+        ActivityResult result = createResult(createActivity());
+        ResultVersion version = createVersion(result, 1, "V1");
+        Instant firstStamp = Instant.parse("2026-09-16T12:02:00Z");
+        Instant replacementStamp = Instant.parse("2026-09-16T12:03:00Z");
+        resultVersions.markPublishedInternally(version.id(), firstStamp);
+
+        assertThatThrownBy(() -> resultVersions.markPublishedInternally(version.id(), replacementStamp))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already published internally");
+        assertThat(resultVersions.findById(version.id()).orElseThrow().publishedInternallyAt())
+                .isEqualTo(firstStamp);
+    }
+
+    @Test
+    void internalPublicationStampRejectsMissingVersion() {
+        ResultVersionId missingId = new ResultVersionId(UUID.randomUUID());
+
+        assertThatThrownBy(() -> resultVersions.markPublishedInternally(
+                missingId, Instant.parse("2026-09-16T12:04:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not exist");
+    }
+
     private ActivityResult createResult(UUID activityId) {
         ActivityResult result = ActivityResult.create(new ActivityResult.Builder()
                 .id(new ActivityResultId(UUID.randomUUID()))

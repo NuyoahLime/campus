@@ -7,6 +7,8 @@ import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 @Component
@@ -29,5 +31,17 @@ class ResultVersionRepositoryAdapter implements ResultVersionRepository {
     @Transactional(readOnly = true)
     public Optional<ResultVersion> findById(ResultVersionId id) {
         return jpaRepository.findById(id.value()).map(ResultVersionPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public void markPublishedInternally(ResultVersionId id, Instant publishedAt) {
+        Objects.requireNonNull(id, "id required");
+        Objects.requireNonNull(publishedAt, "publishedAt required");
+        int updated = jpaRepository.markPublishedInternallyIfUnpublished(id.value(), publishedAt);
+        if (updated != 1) {
+            throw new IllegalStateException(
+                    "ResultVersion does not exist or is already published internally: " + id.value());
+        }
     }
 }
