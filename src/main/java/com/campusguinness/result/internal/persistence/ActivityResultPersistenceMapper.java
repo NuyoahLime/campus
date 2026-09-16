@@ -1,7 +1,6 @@
 package com.campusguinness.result.internal.persistence;
 
 import com.campusguinness.result.internal.domain.*;
-import java.time.Instant;
 
 final class ActivityResultPersistenceMapper {
     private ActivityResultPersistenceMapper() {}
@@ -12,9 +11,12 @@ final class ActivityResultPersistenceMapper {
         e.setActivityId(domain.activityId());
         e.setResultInternalStatus(domain.internalStatus().name());
         e.setResultPublicStatus(domain.publicStatus().name());
+        e.setCurrentCandidateVersionId(domain.currentCandidateVersionId());
         e.setCurrentInternalVersionId(domain.currentInternalVersionId());
         e.setCurrentPublicVersionId(domain.currentPublicVersionId());
-        e.setCreatedAt(Instant.now()); e.setUpdatedAt(Instant.now());
+        e.setPublicVisibilityBlocked(domain.publicVisibilityBlocked());
+        e.setCreatedAt(domain.createdAt()); e.setUpdatedAt(domain.updatedAt());
+        e.setVersion(domain.persistenceVersion());
         return e;
     }
 
@@ -24,6 +26,8 @@ final class ActivityResultPersistenceMapper {
                 .activityId(e.getActivityId()),
                 ResultInternalStatus.valueOf(e.getResultInternalStatus()),
                 ResultPublicStatus.valueOf(e.getResultPublicStatus()),
-                e.getCurrentInternalVersionId(), e.getCurrentPublicVersionId());
+                e.getCurrentCandidateVersionId(), e.getCurrentInternalVersionId(),
+                e.getCurrentPublicVersionId(), e.isPublicVisibilityBlocked(),
+                e.getCreatedAt(), e.getUpdatedAt(), e.getVersion());
     }
 }

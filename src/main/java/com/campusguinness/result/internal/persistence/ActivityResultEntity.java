@@ -8,8 +8,10 @@ public class ActivityResultEntity {
     @Column(name = "activity_id", nullable = false) private UUID activityId;
     @Column(name = "result_internal_status", nullable = false, length = 32) private String resultInternalStatus;
     @Column(name = "result_public_status", nullable = false, length = 32) private String resultPublicStatus;
+    @Column(name = "current_candidate_version_id") private UUID currentCandidateVersionId;
     @Column(name = "current_internal_version_id") private UUID currentInternalVersionId;
     @Column(name = "current_public_version_id") private UUID currentPublicVersionId;
+    @Column(name = "public_visibility_blocked", nullable = false) private boolean publicVisibilityBlocked;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Version @Column(name = "version", nullable = false) private int version;
@@ -20,8 +22,10 @@ public class ActivityResultEntity {
     void setActivityId(UUID v) { activityId = v; } public UUID getActivityId() { return activityId; }
     void setResultInternalStatus(String v) { resultInternalStatus = v; } public String getResultInternalStatus() { return resultInternalStatus; }
     void setResultPublicStatus(String v) { resultPublicStatus = v; } public String getResultPublicStatus() { return resultPublicStatus; }
+    void setCurrentCandidateVersionId(UUID v) { currentCandidateVersionId = v; } public UUID getCurrentCandidateVersionId() { return currentCandidateVersionId; }
     void setCurrentInternalVersionId(UUID v) { currentInternalVersionId = v; } public UUID getCurrentInternalVersionId() { return currentInternalVersionId; }
     void setCurrentPublicVersionId(UUID v) { currentPublicVersionId = v; } public UUID getCurrentPublicVersionId() { return currentPublicVersionId; }
+    void setPublicVisibilityBlocked(boolean v) { publicVisibilityBlocked = v; } public boolean isPublicVisibilityBlocked() { return publicVisibilityBlocked; }
     void setCreatedAt(Instant v) { createdAt = v; } public Instant getCreatedAt() { return createdAt; }
     void setUpdatedAt(Instant v) { updatedAt = v; } public Instant getUpdatedAt() { return updatedAt; }
     void setVersion(int v) { version = v; } public int getVersion() { return version; }
