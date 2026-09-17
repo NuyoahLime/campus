@@ -12,4 +12,5 @@ public interface ResultVersionRepository {
     Optional<ResultVersion> findById(ResultVersionId id);
     int nextVersionNumberFor(ActivityResultId resultId);
     void markPublishedInternally(ResultVersionId id, Instant publishedAt);
+    void markPublishedPublicly(ResultVersionId id, Instant publishedAt);
 }

@@ -177,11 +177,28 @@ class ActivityResultTest {
         @DisplayName("PLATFORM_APPROVED → PUBLIC")
         void shouldMakePublic() {
             var r = createInternalPublished();
+            UUID candidateId = r.currentCandidateVersionId();
             r.submitForReview();
             r.platformApprove();
-            r.makePublic();
+            r.makePublic(candidateId);
             assertThat(r.publicStatus()).isEqualTo(ResultPublicStatus.PUBLIC);
+            assertThat(r.currentPublicVersionId()).isEqualTo(candidateId);
+            assertThat(r.currentCandidateVersionId()).isNull();
+            assertThat(r.currentInternalVersionId()).isEqualTo(candidateId);
+            assertThat(r.publicVisibilityBlocked()).isFalse();
             assertThat(r.domainEvents()).anyMatch(e -> e instanceof ResultMadePublic);
+        }
+
+        @Test
+        @DisplayName("makePublic rejects a version other than the exact current candidate")
+        void shouldRejectWrongPublicCandidate() {
+            var r = createInternalPublished();
+            r.submitForReview();
+            r.platformApprove();
+
+            assertThatThrownBy(() -> r.makePublic(UUID.randomUUID()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("current candidate");
         }
 
         @Test

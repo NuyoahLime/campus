@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.activityresult;
 import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.result.ActivityResultEditorResult;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
+import com.campusguinness.result.application.service.ActivityResultPublicationApplicationService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,9 +16,13 @@ import java.util.UUID;
 public class ActivityResultController {
 
     private final ActivityResultApplicationService service;
+    private final ActivityResultPublicationApplicationService publicationService;
 
-    public ActivityResultController(ActivityResultApplicationService service) {
+    public ActivityResultController(
+            ActivityResultApplicationService service,
+            ActivityResultPublicationApplicationService publicationService) {
         this.service = service;
+        this.publicationService = publicationService;
     }
 
     @GetMapping("/activities/{activityId}/result")
@@ -52,6 +57,13 @@ public class ActivityResultController {
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     public ResponseEntity<ActivityResultResponse> returnToDraft(@PathVariable UUID id) {
         ActivityResultResult r = service.returnToDraft(id);
+        return ResponseEntity.ok(new ActivityResultResponse(r.id(), r.internalStatus(), r.publicStatus()));
+    }
+
+    @PostMapping("/activity-results/{id}/make-public")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    public ResponseEntity<ActivityResultResponse> makePublic(@PathVariable UUID id) {
+        ActivityResultResult r = publicationService.makePublic(id);
         return ResponseEntity.ok(new ActivityResultResponse(r.id(), r.internalStatus(), r.publicStatus()));
     }
 }

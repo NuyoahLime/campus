@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.activityresult;
 import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.result.ActivityResultEditorResult;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
+import com.campusguinness.result.application.service.ActivityResultPublicationApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ActivityResultControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityResultApplicationService service;
+    @MockitoBean ActivityResultPublicationApplicationService publicationService;
 
     @Test void publishReturns200() throws Exception {
         UUID id = UUID.randomUUID();
@@ -57,6 +59,14 @@ class ActivityResultControllerTest {
         when(service.returnToDraft(id)).thenReturn(new ActivityResultResult(id, "DRAFT", "PLATFORM_TAKEDOWN"));
         mvc.perform(post("/api/v1/activity-results/" + id + "/return-to-draft"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.internalStatus").value("DRAFT"));
+    }
+    @Test void makePublicReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(publicationService.makePublic(id))
+                .thenReturn(new ActivityResultResult(id, "INTERNAL_PUBLISHED", "PUBLIC"));
+        mvc.perform(post("/api/v1/activity-results/" + id + "/make-public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicStatus").value("PUBLIC"));
     }
     @Test void notFoundReturns404() throws Exception {
         when(service.publishInternal(any())).thenThrow(new IllegalArgumentException("not found"));

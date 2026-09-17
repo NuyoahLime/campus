@@ -178,6 +178,47 @@ class ActivityResultReviewAuthorizationIT extends PostgreSqlIntegrationTestSuppo
                 """, String.class, fixture.resultId())).isEqualTo("not ready");
     }
 
+    @Test
+    void makePublicEndpointRequiresCsrfSameSchoolAdminAndApprovedCandidate() throws Exception {
+        Fixture fixture = insertPublishedResult();
+        submit(fixture.resultId());
+        mvc.perform(post("/api/v1/super-admin/activity-results/{id}/approve-public-review", fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+        String path = "/api/v1/activity-results/{id}/make-public";
+
+        mvc.perform(post(path, fixture.resultId()).with(csrf()))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(studentA, "STUDENT", studentMembership, schoolA, "STUDENT"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(adminB, "SCHOOL_ADMIN", adminBMembership, schoolB, "SCHOOL_ADMIN"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SCHOOL_ADMIN_SCOPE_DENIED"));
+
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicStatus").value("PUBLIC"));
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN"))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"));
+    }
+
     private void submit(UUID resultId) throws Exception {
         mvc.perform(post("/api/v1/activity-results/{id}/submit-public-review", resultId)
                         .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN"))

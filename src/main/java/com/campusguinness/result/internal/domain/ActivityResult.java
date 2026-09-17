@@ -235,14 +235,27 @@ public final class ActivityResult {
         platformReject(currentCandidateVersionId);
     }
 
-    /** PLATFORM_APPROVED → PUBLIC */
-    public void makePublic() {
+    /** PLATFORM_APPROVED → PUBLIC for the exact approved candidate. */
+    public void makePublic(UUID candidateVersionId) {
         if (publicStatus != ResultPublicStatus.PLATFORM_APPROVED) {
             throw new InvalidResultStateTransitionException(publicStatus, "make public");
         }
+        requireCurrentCandidate(candidateVersionId, "make public");
+        if (!candidateVersionId.equals(currentInternalVersionId)) {
+            throw new IllegalStateException("Public candidate must be the current internal version");
+        }
         this.publicStatus = ResultPublicStatus.PUBLIC;
+        this.currentPublicVersionId = candidateVersionId;
+        this.currentCandidateVersionId = null;
+        this.publicVisibilityBlocked = false;
         touch();
         domainEvents.add(new ResultMadePublic(id));
+    }
+
+    /** @deprecated use makePublic(UUID) so the exact candidate pointer is explicit. */
+    @Deprecated(forRemoval = false)
+    public void makePublic() {
+        makePublic(currentCandidateVersionId);
     }
 
     /** PUBLIC → ANOMALY_PENDING (referenced media taken down) */
