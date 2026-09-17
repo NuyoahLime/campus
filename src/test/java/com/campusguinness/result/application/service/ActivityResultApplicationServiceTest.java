@@ -6,6 +6,7 @@ import com.campusguinness.activity.internal.domain.ActivityId;
 import com.campusguinness.activity.internal.domain.ExecutionStatus;
 import com.campusguinness.activity.internal.domain.PublicStatus;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
+import com.campusguinness.media.application.service.MediaEligibilityValidator;
 import com.campusguinness.result.application.command.SaveActivityResultContentCommand;
 import com.campusguinness.result.application.port.ActivityResultRepository;
 import com.campusguinness.result.application.port.ResultVersionRepository;
@@ -38,13 +39,15 @@ class ActivityResultApplicationServiceTest {
     @Mock ResultVersionRepository resultVersions;
     @Mock ActivityRepository activities;
     @Mock SchoolResourceAuthorization authorization;
+    @Mock MediaEligibilityValidator mediaEligibilityValidator;
 
     ActivityResultApplicationService svc;
 
     @BeforeEach
     void setUp() {
         svc = new ActivityResultApplicationService(
-                activityResults, resultVersions, activities, authorization, new ObjectMapper());
+                activityResults, resultVersions, activities, authorization,
+                mediaEligibilityValidator, new ObjectMapper());
     }
 
     @Test

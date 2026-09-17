@@ -5,6 +5,7 @@ import com.campusguinness.activity.internal.domain.Activity;
 import com.campusguinness.activity.internal.domain.ActivityId;
 import com.campusguinness.activity.internal.domain.ExecutionStatus;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
+import com.campusguinness.media.application.service.MediaEligibilityValidator;
 import com.campusguinness.result.application.command.SaveActivityResultContentCommand;
 import com.campusguinness.result.application.port.ActivityResultRepository;
 import com.campusguinness.result.application.port.ResultVersionRepository;
@@ -44,6 +45,7 @@ public class ActivityResultApplicationService {
     private final ResultVersionRepository resultVersions;
     private final ActivityRepository activities;
     private final SchoolResourceAuthorization authorization;
+    private final MediaEligibilityValidator mediaEligibilityValidator;
     private final ObjectMapper objectMapper;
 
     public ActivityResultApplicationService(
@@ -51,11 +53,13 @@ public class ActivityResultApplicationService {
             ResultVersionRepository resultVersions,
             ActivityRepository activities,
             SchoolResourceAuthorization authorization,
+            MediaEligibilityValidator mediaEligibilityValidator,
             ObjectMapper objectMapper) {
         this.activityResults = activityResults;
         this.resultVersions = resultVersions;
         this.activities = activities;
         this.authorization = authorization;
+        this.mediaEligibilityValidator = mediaEligibilityValidator;
         this.objectMapper = objectMapper;
     }
 
@@ -73,6 +77,8 @@ public class ActivityResultApplicationService {
         authorization.requireSchoolAdmin(activity.schoolId());
         requireEditableActivity(activity);
         NormalizedContent content = normalize(command);
+        mediaEligibilityValidator.requireEligibleForActivity(
+                content.mediaRefs(), activity.schoolId(), activity.id().value());
 
         return activityResults.findByActivityId(activityId)
                 .map(result -> saveExisting(result, content))
@@ -235,10 +241,7 @@ public class ActivityResultApplicationService {
             if (value == null) throw new IllegalArgumentException("mediaRefs must not contain null");
             if (!seen.add(value)) throw new IllegalArgumentException("duplicate mediaRef rejected");
         }
-        if (!values.isEmpty()) {
-            throw new IllegalArgumentException("mediaRefs are not supported until same-activity media validation is available");
-        }
-        return List.of();
+        return List.copyOf(values);
     }
 
     private boolean contentMatches(ResultVersion version, NormalizedContent content) {

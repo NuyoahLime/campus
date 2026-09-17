@@ -5,6 +5,12 @@ import com.campusguinness.identity.application.exception.IdentityApplicationExce
 import com.campusguinness.infrastructure.security.AuthenticatedSchoolMembership;
 import com.campusguinness.infrastructure.security.CampusGuinnessUserDetails;
 import com.campusguinness.result.application.command.SaveActivityResultContentCommand;
+import com.campusguinness.result.application.port.ResultVersionRepository;
+import com.campusguinness.result.internal.domain.ActivityResultId;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,26 +18,36 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
 
     @Autowired private ActivityResultApplicationService service;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private ObjectMapper objectMapper;
+    @MockitoSpyBean private ResultVersionRepository resultVersions;
 
     private final String runPrefix = "slice-b-" + UUID.randomUUID();
     private UUID schoolA;
@@ -62,6 +78,7 @@ class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
         jdbc.update("DELETE FROM result_versions WHERE result_id IN "
                 + "(SELECT id FROM activity_results WHERE school_id IN (?, ?))", schoolA, schoolB);
         jdbc.update("DELETE FROM activity_results WHERE school_id IN (?, ?)", schoolA, schoolB);
+        jdbc.update("DELETE FROM media WHERE school_id IN (?, ?)", schoolA, schoolB);
         jdbc.update("DELETE FROM activities WHERE school_id IN (?, ?)", schoolA, schoolB);
         jdbc.update("DELETE FROM school_memberships WHERE user_id IN (?, ?, ?)", adminA, adminB, studentA);
         jdbc.update("DELETE FROM schools WHERE id IN (?, ?)", schoolA, schoolB);
@@ -176,9 +193,170 @@ class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
         assertThatThrownBy(() -> service.saveEditorContent(activityId,
                 new SaveActivityResultContentCommand("Title", "Summary", List.of(), List.of(duplicate, duplicate))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("duplicate mediaRef");
-        assertThatThrownBy(() -> service.saveEditorContent(activityId,
-                new SaveActivityResultContentCommand("Title", "Summary", List.of(), List.of(UUID.randomUUID()))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("mediaRefs are not supported");
+    }
+
+    @Test
+    void nullMediaRefsAreNormalizedAndPersistedAsEmpty() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+
+        var saved = saveWithMedia(activityId, "V1", null);
+
+        assertThat(saved.candidateContent().mediaRefs()).isEmpty();
+        assertThat(readMediaRefs(saved.currentCandidateVersionId())).isEmpty();
+    }
+
+    @Test
+    void emptyMediaRefsAreAccepted() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+
+        var saved = saveWithMedia(activityId, "V1", List.of());
+
+        assertThat(saved.candidateContent().mediaRefs()).isEmpty();
+        assertThat(countVersions(saved.resultId())).isOne();
+    }
+
+    @Test
+    void eligibleMediaRefIsAcceptedOnFirstSaveAndRoundTrips() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        UUID mediaId = insertMedia(schoolA, activityId, adminA);
+
+        var saved = saveWithMedia(activityId, "V1", List.of(mediaId));
+
+        assertThat(saved.candidateContent().mediaRefs()).containsExactly(mediaId);
+        assertThat(readMediaRefs(saved.currentCandidateVersionId())).containsExactly(mediaId);
+        assertThat(service.readEditor(activityId).candidateContent().mediaRefs()).containsExactly(mediaId);
+    }
+
+    @Test
+    void multipleEligibleMediaRefsRoundTripInOrder() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        List<UUID> mediaIds = List.of(
+                insertMedia(schoolA, activityId, adminA),
+                insertMedia(schoolA, activityId, adminA),
+                insertMedia(schoolA, activityId, adminA));
+
+        var saved = saveWithMedia(activityId, "V1", mediaIds);
+
+        assertThat(readMediaRefs(saved.currentCandidateVersionId())).containsExactlyElementsOf(mediaIds);
+    }
+
+    @Test
+    void coreEditWithEligibleMediaCreatesNewVersionAndPreservesOldSnapshot() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        UUID firstMedia = insertMedia(schoolA, activityId, adminA);
+        UUID secondMedia = insertMedia(schoolA, activityId, adminA);
+        var first = saveWithMedia(activityId, "V1", List.of(firstMedia));
+
+        var edited = saveWithMedia(activityId, "V2", List.of(firstMedia, secondMedia));
+
+        assertThat(countVersions(first.resultId())).isEqualTo(2);
+        assertThat(edited.currentCandidateVersionId()).isNotEqualTo(first.currentCandidateVersionId());
+        assertThat(readMediaRefs(first.currentCandidateVersionId())).containsExactly(firstMedia);
+        assertThat(readMediaRefs(edited.currentCandidateVersionId())).containsExactly(firstMedia, secondMedia);
+    }
+
+    @Test
+    void missingMediaRefIsRejectedWithoutPersistence() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V1", List.of(UUID.randomUUID())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid or ineligible media reference");
+        assertThat(countResultRows(activityId)).isZero();
+    }
+
+    @Test
+    void crossSchoolMediaRefIsRejectedWithoutLeakingOwnership() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        UUID otherActivityId = insertActivity(schoolB, "PUBLISHED");
+        UUID mediaId = insertMedia(schoolB, otherActivityId, adminB);
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V1", List.of(mediaId)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid or ineligible media reference");
+        assertThat(countResultRows(activityId)).isZero();
+    }
+
+    @Test
+    void crossActivityMediaRefIsRejected() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        UUID otherActivityId = insertActivity(schoolA, "PUBLISHED");
+        UUID mediaId = insertMedia(schoolA, otherActivityId, adminA);
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V1", List.of(mediaId)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid or ineligible media reference");
+        assertThat(countResultRows(activityId)).isZero();
+    }
+
+    @Test
+    void duplicateEligibleMediaRefIsRejectedWithoutSilentDeduplication() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        UUID mediaId = insertMedia(schoolA, activityId, adminA);
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V1", List.of(mediaId, mediaId)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate mediaRef");
+        assertThat(countResultRows(activityId)).isZero();
+    }
+
+    @Test
+    void twentyOneMediaRefsAreRejectedBeforeLookup() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        List<UUID> mediaIds = java.util.stream.Stream.generate(UUID::randomUUID).limit(21).toList();
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V1", mediaIds))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mediaRefs max 20");
+        assertThat(countResultRows(activityId)).isZero();
+    }
+
+    @Test
+    void twentyEligibleMediaRefsAreAccepted() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        List<UUID> mediaIds = java.util.stream.IntStream.range(0, 20)
+                .mapToObj(ignored -> insertMedia(schoolA, activityId, adminA))
+                .toList();
+
+        var saved = saveWithMedia(activityId, "V1", mediaIds);
+
+        assertThat(readMediaRefs(saved.currentCandidateVersionId())).containsExactlyElementsOf(mediaIds);
+    }
+
+    @Test
+    void firstSaveMediaValidationFailureLeavesNoPartialRowsOrPointers() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        long resultsBefore = count("activity_results");
+        long versionsBefore = count("result_versions");
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V1", List.of(UUID.randomUUID())))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(count("activity_results")).isEqualTo(resultsBefore);
+        assertThat(count("result_versions")).isEqualTo(versionsBefore);
+    }
+
+    @Test
+    void coreEditMediaValidationFailurePreservesAggregateAndVersionHistory() {
+        UUID activityId = insertActivity(schoolA, "PUBLISHED");
+        UUID mediaId = insertMedia(schoolA, activityId, adminA);
+        var first = saveWithMedia(activityId, "V1", List.of(mediaId));
+        int persistenceVersion = resultIntColumn(first.resultId(), "version");
+        String internalStatus = resultStringColumn(first.resultId(), "result_internal_status");
+        String publicStatus = resultStringColumn(first.resultId(), "result_public_status");
+
+        assertThatThrownBy(() -> saveWithMedia(activityId, "V2", List.of(UUID.randomUUID())))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(countVersions(first.resultId())).isOne();
+        assertThat(resultColumn(first.resultId(), "current_candidate_version_id"))
+                .isEqualTo(first.currentCandidateVersionId());
+        assertThat(resultColumn(first.resultId(), "current_internal_version_id")).isNull();
+        assertThat(resultColumn(first.resultId(), "current_public_version_id")).isNull();
+        assertThat(resultStringColumn(first.resultId(), "result_internal_status")).isEqualTo(internalStatus);
+        assertThat(resultStringColumn(first.resultId(), "result_public_status")).isEqualTo(publicStatus);
+        assertThat(resultIntColumn(first.resultId(), "version")).isEqualTo(persistenceVersion);
+        assertThat(title(first.currentCandidateVersionId())).isEqualTo("V1");
     }
 
     @Test
@@ -336,23 +514,35 @@ class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    void concurrentSavesLeaveOneAuthoritativeCandidateAndNoDuplicateVersionNumber() throws Exception {
+    void concurrentSavesCommitExactlyOneV2AndRejectTheCompetingSave() throws Exception {
         UUID activityId = insertActivity(schoolA, "PUBLISHED");
         var first = save(activityId, "V1", "Summary V1");
+        int initialPersistenceVersion = resultIntColumn(first.resultId(), "version");
+        CyclicBarrier versionAllocationBarrier = new CyclicBarrier(2);
+        doAnswer(invocation -> {
+            int nextVersion = (int) invocation.callRealMethod();
+            versionAllocationBarrier.await(10, TimeUnit.SECONDS);
+            return nextVersion;
+        }).when(resultVersions).nextVersionNumberFor(any(ActivityResultId.class));
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
-        Future<Throwable> left = executor.submit(() -> concurrentSave(
-                activityId, "V2-left", ready, start));
-        Future<Throwable> right = executor.submit(() -> concurrentSave(
-                activityId, "V2-right", ready, start));
+        Throwable leftFailure;
+        Throwable rightFailure;
+        try {
+            Future<Throwable> left = executor.submit(() -> concurrentSave(
+                    activityId, "V2-left", ready, start));
+            Future<Throwable> right = executor.submit(() -> concurrentSave(
+                    activityId, "V2-right", ready, start));
 
-        assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-        start.countDown();
-        Throwable leftFailure = left.get();
-        Throwable rightFailure = right.get();
-        executor.shutdownNow();
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            leftFailure = left.get(20, TimeUnit.SECONDS);
+            rightFailure = right.get(20, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
 
         int versionCount = jdbc.queryForObject(
                 "SELECT count(*) FROM result_versions WHERE result_id = ?", Integer.class, first.resultId());
@@ -363,20 +553,36 @@ class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
                 "SELECT current_candidate_version_id FROM activity_results WHERE id = ?",
                 UUID.class, first.resultId());
 
-        assertThat(versionCount).isEqualTo(distinctVersionCount);
+        int successCount = (leftFailure == null ? 1 : 0) + (rightFailure == null ? 1 : 0);
+        Throwable conflict = leftFailure == null ? rightFailure : leftFailure;
+        assertThat(successCount).isOne();
+        assertThat(conflict).isNotNull();
+        assertThat(isRecognizedConcurrencyConflict(conflict)).isTrue();
+        assertThat(countResultRows(activityId)).isOne();
+        assertThat(versionCount).isEqualTo(2);
+        assertThat(distinctVersionCount).isEqualTo(2);
+        assertThat(jdbc.queryForList(
+                "SELECT version_number FROM result_versions WHERE result_id = ? ORDER BY version_number",
+                Integer.class, first.resultId())).containsExactly(1, 2);
         assertThat(candidateId).isNotNull();
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM result_versions WHERE id = ? AND result_id = ?",
                 Integer.class, candidateId, first.resultId())).isOne();
-        assertThat(leftFailure == null || rightFailure == null
-                || leftFailure instanceof RuntimeException
-                || rightFailure instanceof RuntimeException).isTrue();
+        assertThat(title(candidateId)).isIn("V2-left", "V2-right");
+        assertThat(title(first.currentCandidateVersionId())).isEqualTo("V1");
+        assertThat(resultIntColumn(first.resultId(), "version")).isGreaterThan(initialPersistenceVersion);
     }
 
     private com.campusguinness.result.application.result.ActivityResultEditorResult save(
             UUID activityId, String title, String summary) {
         return service.saveEditorContent(activityId,
                 new SaveActivityResultContentCommand(title, summary, List.of(), List.of()));
+    }
+
+    private com.campusguinness.result.application.result.ActivityResultEditorResult saveWithMedia(
+            UUID activityId, String title, List<UUID> mediaRefs) {
+        return service.saveEditorContent(activityId,
+                new SaveActivityResultContentCommand(title, "Summary " + title, List.of(), mediaRefs));
     }
 
     private Throwable concurrentSave(
@@ -403,6 +609,18 @@ class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
                 INSERT INTO activities(id, school_id, title, execution_status, public_status, created_by)
                 VALUES (?, ?, ?, ?, 'NOT_SUBMITTED', ?)
                 """, id, schoolId, runPrefix + "-activity-" + id, executionStatus, adminA);
+        return id;
+    }
+
+    private UUID insertMedia(UUID schoolId, UUID activityId, UUID uploaderId) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO media(
+                    id, school_id, activity_id, uploader_id, file_key, file_name,
+                    file_type, file_format, file_size_bytes
+                ) VALUES (?, ?, ?, ?, ?, ?, 'IMAGE', 'PNG', 1024)
+                """, id, schoolId, activityId, uploaderId,
+                runPrefix + "/" + id, id + ".png");
         return id;
     }
 
@@ -481,5 +699,39 @@ class ActivityResultSliceBIT extends PostgreSqlIntegrationTestSupport {
 
     private Object resultColumn(UUID resultId, String column) {
         return jdbc.queryForObject("SELECT " + column + " FROM activity_results WHERE id = ?", Object.class, resultId);
+    }
+
+    private int resultIntColumn(UUID resultId, String column) {
+        return jdbc.queryForObject(
+                "SELECT " + column + " FROM activity_results WHERE id = ?", Integer.class, resultId);
+    }
+
+    private String resultStringColumn(UUID resultId, String column) {
+        return jdbc.queryForObject(
+                "SELECT " + column + " FROM activity_results WHERE id = ?", String.class, resultId);
+    }
+
+    private List<UUID> readMediaRefs(UUID versionId) {
+        String json = jdbc.queryForObject(
+                "SELECT media_refs::text FROM result_versions WHERE id = ?", String.class, versionId);
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            throw new AssertionError("Stored media_refs must be valid UUID JSON", e);
+        }
+    }
+
+    private boolean isRecognizedConcurrencyConflict(Throwable failure) {
+        for (Throwable current = failure; current != null; current = current.getCause()) {
+            if (current instanceof ObjectOptimisticLockingFailureException
+                    || current instanceof OptimisticLockException
+                    || current instanceof DataIntegrityViolationException) {
+                return true;
+            }
+            if (current instanceof SQLException sqlException && "23505".equals(sqlException.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
