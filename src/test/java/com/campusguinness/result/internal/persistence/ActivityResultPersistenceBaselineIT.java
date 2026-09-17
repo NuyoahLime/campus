@@ -153,11 +153,13 @@ class ActivityResultPersistenceBaselineIT extends PostgreSqlIntegrationTestSuppo
     @Test
     void staleAggregateSaveRaisesRealOptimisticLockConflict() {
         ActivityResult original = createResult(createActivity());
+        ResultVersion v1 = createVersion(original, 1, "V1");
+        activityResults.save(withPointers(original, v1.id().value(), null, null, false));
         ActivityResult copyA = reload(original);
         ActivityResult copyB = reload(original);
 
-        copyA.publishInternal();
-        copyB.publishInternal();
+        copyA.publishInternal(v1.id().value());
+        copyB.publishInternal(v1.id().value());
         activityResults.save(copyA);
 
         assertThatThrownBy(() -> activityResults.save(copyB))

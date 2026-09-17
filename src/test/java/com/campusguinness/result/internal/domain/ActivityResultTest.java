@@ -25,8 +25,26 @@ class ActivityResultTest {
 
     private ActivityResult createInternalPublished() {
         var r = createDraft();
-        r.publishInternal();
+        UUID candidateId = UUID.randomUUID();
+        r.createFirstCandidate(candidateId);
+        r.publishInternal(candidateId);
         return r;
+    }
+
+    private ActivityResult withPublicPointer(ActivityResult source, UUID publicVersionId) {
+        return ActivityResult.reconstitute(new ActivityResult.Builder()
+                        .id(source.id())
+                        .schoolId(source.schoolId())
+                        .activityId(source.activityId()),
+                source.internalStatus(),
+                source.publicStatus(),
+                source.currentCandidateVersionId(),
+                source.currentInternalVersionId(),
+                publicVersionId,
+                source.publicVisibilityBlocked(),
+                source.createdAt(),
+                source.updatedAt(),
+                source.persistenceVersion());
     }
 
     @Nested
@@ -71,8 +89,11 @@ class ActivityResultTest {
         @DisplayName("DRAFT → INTERNAL_PUBLISHED")
         void shouldPublishInternal() {
             var r = createDraft();
-            r.publishInternal();
+            UUID candidateId = UUID.randomUUID();
+            r.createFirstCandidate(candidateId);
+            r.publishInternal(candidateId);
             assertThat(r.internalStatus()).isEqualTo(ResultInternalStatus.INTERNAL_PUBLISHED);
+            assertThat(r.currentInternalVersionId()).isEqualTo(candidateId);
             assertThat(r.domainEvents()).anyMatch(e -> e instanceof ResultInternalPublished);
         }
 
@@ -92,9 +113,11 @@ class ActivityResultTest {
             r.submitForReview();
             r.platformApprove();
             r.makePublic();
+            r = withPublicPointer(r, UUID.randomUUID());
             r.withdrawInternal();
             assertThat(r.internalStatus()).isEqualTo(ResultInternalStatus.INTERNAL_WITHDRAWN);
             assertThat(r.publicStatus()).isEqualTo(ResultPublicStatus.PLATFORM_TAKEDOWN);
+            assertThat(r.publicVisibilityBlocked()).isTrue();
             assertThat(r.domainEvents()).anyMatch(e -> e instanceof ResultPlatformTakenDown);
         }
 

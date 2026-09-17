@@ -101,14 +101,57 @@ public final class ActivityResult {
 
     // ── result_internal_status transitions ──
 
+    public void createFirstCandidate(UUID candidateVersionId) {
+        requireVersionId(candidateVersionId, "candidateVersionId");
+        if (currentCandidateVersionId != null) {
+            throw new IllegalStateException("ActivityResult already has a candidate version");
+        }
+        this.currentCandidateVersionId = candidateVersionId;
+        this.internalStatus = ResultInternalStatus.DRAFT;
+        this.publicStatus = ResultPublicStatus.NOT_SUBMITTED;
+        this.publicVisibilityBlocked = false;
+        touch();
+    }
+
+    public void replaceCandidateAfterCoreEdit(UUID candidateVersionId) {
+        requireVersionId(candidateVersionId, "candidateVersionId");
+        if (internalStatus == ResultInternalStatus.INTERNAL_WITHDRAWN) {
+            throw new InvalidResultStateTransitionException(internalStatus, "edit core content");
+        }
+        if (publicStatus == ResultPublicStatus.PENDING_PUBLIC_REVIEW
+                || publicStatus == ResultPublicStatus.PLATFORM_APPROVED) {
+            throw new InvalidResultStateTransitionException(publicStatus, "edit core content");
+        }
+        this.currentCandidateVersionId = candidateVersionId;
+        this.internalStatus = ResultInternalStatus.DRAFT;
+        if (publicStatus != ResultPublicStatus.PLATFORM_TAKEDOWN) {
+            this.publicStatus = ResultPublicStatus.NOT_SUBMITTED;
+        }
+        touch();
+    }
+
     /** DRAFT → INTERNAL_PUBLISHED */
-    public void publishInternal() {
+    public void publishInternal(UUID candidateVersionId) {
         if (internalStatus != ResultInternalStatus.DRAFT) {
             throw new InvalidResultStateTransitionException(internalStatus, "publish internal");
         }
+        requireVersionId(candidateVersionId, "candidateVersionId");
+        if (!candidateVersionId.equals(currentCandidateVersionId)) {
+            throw new IllegalStateException("Internal publication must use the current candidate version");
+        }
+        this.currentInternalVersionId = candidateVersionId;
         this.internalStatus = ResultInternalStatus.INTERNAL_PUBLISHED;
         touch();
         domainEvents.add(new ResultInternalPublished(id));
+    }
+
+    /** @deprecated use publishInternal(UUID) so the exact candidate pointer is explicit. */
+    @Deprecated(forRemoval = false)
+    public void publishInternal() {
+        if (currentCandidateVersionId == null) {
+            throw new IllegalStateException("currentCandidateVersionId required");
+        }
+        publishInternal(currentCandidateVersionId);
     }
 
     /** INTERNAL_PUBLISHED → INTERNAL_WITHDRAWN.
@@ -120,9 +163,10 @@ public final class ActivityResult {
         this.internalStatus = ResultInternalStatus.INTERNAL_WITHDRAWN;
         touch();
         domainEvents.add(new ResultInternalWithdrawn(id));
-        if (publicStatus == ResultPublicStatus.PUBLIC
-                || publicStatus == ResultPublicStatus.ANOMALY_PENDING) {
+        if (currentPublicVersionId != null && !publicVisibilityBlocked) {
+            currentCandidateVersionId = null;
             this.publicStatus = ResultPublicStatus.PLATFORM_TAKEDOWN;
+            this.publicVisibilityBlocked = true;
             domainEvents.add(new ResultPlatformTakenDown(id));
         }
     }
@@ -221,6 +265,10 @@ public final class ActivityResult {
     }
 
     private void touch() { updatedAt = Instant.now(); }
+
+    private static void requireVersionId(UUID value, String name) {
+        if (value == null) throw new IllegalArgumentException(name + " required");
+    }
 
     public void clearDomainEvents() { domainEvents.clear(); }
 
