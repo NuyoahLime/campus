@@ -17,9 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies the JPA mapping context is correctly configured:
  * - EntityManagerFactory starts with PostgreSQL 18.4 Testcontainer.
- * - All 22 entities are scanned and mapped.
+ * - All 23 entities are scanned and mapped.
  * - Hibernate ddl-auto is 'none' (verified via configuration).
- * - Flyway executed all 21 migrations.
+ * - Flyway executed all 22 migrations.
  */
 class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
 
@@ -36,12 +36,12 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("All 22 entities are scanned by JPA metamodel")
-    void all22EntitiesAreScanned() {
+    @DisplayName("All 23 entities are scanned by JPA metamodel")
+    void all23EntitiesAreScanned() {
         Set<EntityType<?>> entities = em.getMetamodel().getEntities();
         assertThat(entities)
-                .as("Expected 22 JPA entities, found %d", entities.size())
-                .hasSize(22);
+                .as("Expected 23 JPA entities, found %d", entities.size())
+                .hasSize(23);
     }
 
     @Test
@@ -51,22 +51,22 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 21 successful migrations")
-    void flywayExecutedAll21Migrations() {
+    @DisplayName("Flyway executed exactly 22 successful migrations")
+    void flywayExecutedAll22Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(21);
+        assertThat(count).isEqualTo(22);
     }
 
     @Test
     @DisplayName("Hibernate did not create or alter any tables")
     void hibernateDidNotCreateTables() {
-        // 35 business tables + 2 spring_session tables + 1 flyway_schema_history = 38
+        // 36 business tables + 2 spring_session tables + 1 flyway_schema_history = 39
         Integer totalTables = jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables " +
                         "WHERE table_schema='public' AND table_type='BASE TABLE'", Integer.class);
         // flyway_schema_history is in public schema
-        assertThat(totalTables).isEqualTo(38);
+        assertThat(totalTables).isEqualTo(39);
     }
 
     @Test
