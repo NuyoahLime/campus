@@ -11,6 +11,9 @@ import java.util.UUID;
 interface ResultVersionJpaRepository extends JpaRepository<ResultVersionEntity, UUID> {
     boolean existsByIdAndResultId(UUID id, UUID resultId);
 
+    @Query("select coalesce(max(v.versionNumber), 0) from ResultVersionEntity v where v.resultId = :resultId")
+    int maxVersionNumber(@Param("resultId") UUID resultId);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE result_versions

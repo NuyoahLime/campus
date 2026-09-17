@@ -1,6 +1,7 @@
 package com.campusguinness.result.internal.persistence;
 
 import com.campusguinness.result.application.port.ResultVersionRepository;
+import com.campusguinness.result.internal.domain.ActivityResultId;
 import com.campusguinness.result.internal.domain.ResultVersion;
 import com.campusguinness.result.internal.domain.ResultVersionId;
 import jakarta.persistence.EntityManager;
@@ -31,6 +32,13 @@ class ResultVersionRepositoryAdapter implements ResultVersionRepository {
     @Transactional(readOnly = true)
     public Optional<ResultVersion> findById(ResultVersionId id) {
         return jpaRepository.findById(id.value()).map(ResultVersionPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int nextVersionNumberFor(ActivityResultId resultId) {
+        Objects.requireNonNull(resultId, "resultId required");
+        return jpaRepository.maxVersionNumber(resultId.value()) + 1;
     }
 
     @Override

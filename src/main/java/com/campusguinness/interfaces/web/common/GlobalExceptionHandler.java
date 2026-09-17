@@ -177,6 +177,15 @@ public class GlobalExceptionHandler {
                             req.getRequestURI()
                     ));
         }
+        if (containsInCauseChain(ex, "uq_result_activity")
+                || containsInCauseChain(ex, "uq_result_version_result_num")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of(
+                            "ACTIVITY_RESULT_CONCURRENT_UPDATE",
+                            "The ActivityResult was changed by another request.",
+                            req.getRequestURI()
+                    ));
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));
     }

@@ -6,6 +6,7 @@ import com.campusguinness.result.internal.domain.ActivityResultId;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class ActivityResultRepositoryAdapter implements ActivityResultRepository {
@@ -36,5 +37,11 @@ class ActivityResultRepositoryAdapter implements ActivityResultRepository {
     }
     @Override @Transactional(readOnly = true) public Optional<ActivityResult> findById(ActivityResultId id) {
         return jpaRepository.findById(id.value()).map(ActivityResultPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ActivityResult> findByActivityId(UUID activityId) {
+        return jpaRepository.findByActivityId(activityId).map(ActivityResultPersistenceMapper::toDomain);
     }
 }
