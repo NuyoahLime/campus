@@ -183,35 +183,56 @@ public final class ActivityResult {
     // ── result_public_status transitions ──
 
     /** NOT_SUBMITTED → PENDING_PUBLIC_REVIEW. Precondition: internal must be INTERNAL_PUBLISHED. */
-    public void submitForReview() {
+    public void submitForReview(UUID candidateVersionId) {
         if (publicStatus != ResultPublicStatus.NOT_SUBMITTED) {
             throw new InvalidResultStateTransitionException(publicStatus, "submit for review");
         }
         if (internalStatus != ResultInternalStatus.INTERNAL_PUBLISHED) {
             throw new InvalidResultStateTransitionException(internalStatus, "submit for review");
         }
+        requireVersionId(candidateVersionId, "candidateVersionId");
+        if (!candidateVersionId.equals(currentCandidateVersionId)) {
+            throw new IllegalStateException("Public review submission must use the current candidate version");
+        }
+        if (!candidateVersionId.equals(currentInternalVersionId)) {
+            throw new IllegalStateException("Public review candidate must be the current internal version");
+        }
         this.publicStatus = ResultPublicStatus.PENDING_PUBLIC_REVIEW;
         touch();
         domainEvents.add(new ResultSubmittedForReview(id));
     }
 
+    public void submitForReview() {
+        submitForReview(currentCandidateVersionId);
+    }
+
     /** PENDING_PUBLIC_REVIEW → PLATFORM_APPROVED */
-    public void platformApprove() {
+    public void platformApprove(UUID candidateVersionId) {
         if (publicStatus != ResultPublicStatus.PENDING_PUBLIC_REVIEW) {
             throw new InvalidResultStateTransitionException(publicStatus, "platform approve");
         }
+        requireCurrentCandidate(candidateVersionId, "approve public review");
         this.publicStatus = ResultPublicStatus.PLATFORM_APPROVED;
         touch();
         domainEvents.add(new ResultPlatformApproved(id));
     }
 
+    public void platformApprove() {
+        platformApprove(currentCandidateVersionId);
+    }
+
     /** PENDING_PUBLIC_REVIEW → PLATFORM_REJECTED */
-    public void platformReject() {
+    public void platformReject(UUID candidateVersionId) {
         if (publicStatus != ResultPublicStatus.PENDING_PUBLIC_REVIEW) {
             throw new InvalidResultStateTransitionException(publicStatus, "platform reject");
         }
+        requireCurrentCandidate(candidateVersionId, "reject public review");
         this.publicStatus = ResultPublicStatus.PLATFORM_REJECTED;
         touch();
+    }
+
+    public void platformReject() {
+        platformReject(currentCandidateVersionId);
     }
 
     /** PLATFORM_APPROVED → PUBLIC */
@@ -268,6 +289,13 @@ public final class ActivityResult {
 
     private static void requireVersionId(UUID value, String name) {
         if (value == null) throw new IllegalArgumentException(name + " required");
+    }
+
+    private void requireCurrentCandidate(UUID candidateVersionId, String operation) {
+        requireVersionId(candidateVersionId, "candidateVersionId");
+        if (!candidateVersionId.equals(currentCandidateVersionId)) {
+            throw new IllegalStateException(operation + " must use the current candidate version");
+        }
     }
 
     public void clearDomainEvents() { domainEvents.clear(); }

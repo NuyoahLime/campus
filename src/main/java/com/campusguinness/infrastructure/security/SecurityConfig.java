@@ -153,6 +153,7 @@ public class SecurityConfig {
                         "/api/v1/activity-applications/*/approve",
                         "/api/v1/activity-applications/*/reject",
                         "/api/v1/activity-results/*/publish",
+                        "/api/v1/activity-results/*/submit-public-review",
                         "/api/v1/score-appeals/*/begin-processing",
                         "/api/v1/score-appeals/*/reject",
                         "/api/v1/school-admin/appeals/*/begin-processing",
@@ -196,7 +197,9 @@ public class SecurityConfig {
                         "/api/v1/super-admin/ranking-definitions/*/generate",
                         "/api/v1/super-admin/ranking-definitions/*/enable",
                         "/api/v1/super-admin/ranking-definitions/*/disable",
-                        "/api/v1/super-admin/ranking-definitions/*/versions/*/publish"
+                        "/api/v1/super-admin/ranking-definitions/*/versions/*/publish",
+                        "/api/v1/super-admin/activity-results/*/approve-public-review",
+                        "/api/v1/super-admin/activity-results/*/reject-public-review"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/challenge-projects/*")
                 .hasRole("SUPER_ADMIN")
@@ -208,7 +211,9 @@ public class SecurityConfig {
                         "/api/v1/super-admin/l3-authorizations",
                         "/api/v1/super-admin/l3-authorizations/*",
                         "/api/v1/super-admin/ranking-definitions",
-                        "/api/v1/super-admin/ranking-definitions/*"
+                        "/api/v1/super-admin/ranking-definitions/*",
+                        "/api/v1/super-admin/activity-results/public-reviews",
+                        "/api/v1/super-admin/activity-results/*/public-review"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/score-appeals",
