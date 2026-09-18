@@ -1,9 +1,10 @@
 package com.campusguinness.interfaces.web.activityresult;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
@@ -16,6 +17,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ActivityResultReadConcurrencyIT extends ActivityResultReadTestSupport {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Test
     void read19MakePublicRaceReturnsCompleteOldOrNewPublicSnapshot() throws Exception {
         Fixture fixture = insertResult(
@@ -37,13 +40,9 @@ class ActivityResultReadConcurrencyIT extends ActivityResultReadTestSupport {
             }, barrier));
             publish.get();
             MvcResult result = read.get();
-            assertThat(result.getResponse().getStatus()).isIn(200, 404);
-            if (result.getResponse().getStatus() == 200) {
-                String body = result.getResponse().getContentAsString();
-                assertThat(body).containsAnyOf(
-                        fixture.v1().toString(), fixture.v2().toString());
-                assertThat(body).doesNotContain("V1 make-public-race\".*V2 make-public-race");
-            }
+            assertThat(result.getResponse().getStatus()).isEqualTo(200);
+            assertCompleteMakePublicSnapshot(
+                    objectMapper.readTree(result.getResponse().getContentAsString()), fixture);
         } finally {
             executor.shutdownNow();
         }
@@ -120,5 +119,28 @@ class ActivityResultReadConcurrencyIT extends ActivityResultReadTestSupport {
             barrier.await();
             return action.call();
         };
+    }
+
+    private void assertCompleteMakePublicSnapshot(JsonNode json, Fixture fixture) {
+        String versionId = json.path("versionId").asText();
+        int versionNumber = json.path("versionNumber").asInt();
+        String title = json.path("title").asText();
+        String summary = json.path("summaryText").asText();
+        String highlight = json.path("scoreHighlights").path(0).asText();
+
+        boolean completeV1 = versionId.equals(fixture.v1().toString())
+                && versionNumber == 1
+                && title.equals("V1 make-public-race")
+                && summary.equals("Summary V1 make-public-race")
+                && highlight.equals("highlight 1");
+        boolean completeV2 = versionId.equals(fixture.v2().toString())
+                && versionNumber == 2
+                && title.equals("V2 make-public-race")
+                && summary.equals("Summary V2 make-public-race")
+                && highlight.equals("highlight 2");
+
+        assertThat(completeV1 || completeV2)
+                .as("expected a complete V1 or V2 public snapshot, got %s", json)
+                .isTrue();
     }
 }
