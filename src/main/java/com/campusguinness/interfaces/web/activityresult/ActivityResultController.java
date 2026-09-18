@@ -3,6 +3,7 @@ package com.campusguinness.interfaces.web.activityresult;
 import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.query.ActivityResultReadQueryService;
 import com.campusguinness.result.application.query.model.ManagementActivityResultDetail;
+import com.campusguinness.result.application.result.ActivityResultEditorResult;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
 import com.campusguinness.result.application.service.ActivityResultPublicationApplicationService;
 
@@ -37,11 +38,10 @@ public class ActivityResultController {
 
     @PutMapping("/activities/{activityId}/result")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    public ResponseEntity<ManagementActivityResultDetail> saveEditor(
+    public ResponseEntity<ActivityResultEditorResult> saveEditor(
             @PathVariable UUID activityId,
             @RequestBody ActivityResultSaveRequest request) {
-        service.saveEditorContent(activityId, request.toCommand());
-        return ResponseEntity.ok(readQueryService.managementDetail(activityId));
+        return ResponseEntity.ok(service.saveEditorContent(activityId, request.toCommand()));
     }
 
     @PostMapping("/activity-results/{id}/publish")

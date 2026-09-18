@@ -14,6 +14,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -45,11 +47,15 @@ class ActivityResultControllerTest {
         UUID resultId = UUID.randomUUID();
         when(service.saveEditorContent(org.mockito.Mockito.eq(activityId), any())).thenReturn(new ActivityResultEditorResult(
                 activityId, resultId, "DRAFT", "NOT_SUBMITTED", UUID.randomUUID(), null, null, false, null));
-        when(readQueryService.managementDetail(activityId)).thenReturn(detail(activityId, resultId));
         mvc.perform(put("/api/v1/activities/" + activityId + "/result")
                         .contentType("application/json")
                         .content("{\"title\":\"T\",\"summaryText\":\"S\",\"scoreHighlights\":[],\"mediaRefs\":[]}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.resultId").value(resultId.toString()));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultId").value(resultId.toString()))
+                .andExpect(jsonPath("$.internalStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.publicStatus").value("NOT_SUBMITTED"))
+                .andExpect(jsonPath("$.currentCandidateVersionId").isNotEmpty());
+        verify(readQueryService, never()).managementDetail(activityId);
     }
     @Test void withdrawReturns200() throws Exception {
         UUID id = UUID.randomUUID();
