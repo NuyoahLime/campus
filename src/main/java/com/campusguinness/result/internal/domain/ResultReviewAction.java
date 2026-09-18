@@ -4,5 +4,6 @@ public enum ResultReviewAction {
     SUBMITTED,
     APPROVED,
     REJECTED,
-    TAKEDOWN
+    TAKEDOWN,
+    RESET
 }

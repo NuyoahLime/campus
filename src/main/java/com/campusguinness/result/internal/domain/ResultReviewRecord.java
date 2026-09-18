@@ -82,6 +82,17 @@ public final class ResultReviewRecord {
                 null, null, reviewerId, reviewedAt, reason, reviewedAt);
     }
 
+    public static ResultReviewRecord reset(
+            ResultReviewRecordId id,
+            ActivityResultId resultId,
+            ResultVersionId exactHistoricalPublicVersionId,
+            UUID reviewerId,
+            Instant reviewedAt,
+            String reason) {
+        return new ResultReviewRecord(id, resultId, exactHistoricalPublicVersionId,
+                ResultReviewAction.RESET, null, null, reviewerId, reviewedAt, reason, reviewedAt);
+    }
+
     public static ResultReviewRecord reconstitute(
             ResultReviewRecordId id,
             ActivityResultId resultId,
@@ -121,7 +132,9 @@ public final class ResultReviewRecord {
         if (action == ResultReviewAction.APPROVED && reason != null) {
             throw new IllegalArgumentException("approved record must not contain a reason");
         }
-        if ((action == ResultReviewAction.REJECTED || action == ResultReviewAction.TAKEDOWN)
+        if ((action == ResultReviewAction.REJECTED
+                || action == ResultReviewAction.TAKEDOWN
+                || action == ResultReviewAction.RESET)
                 && (reason == null || reason.isBlank())) {
             throw new IllegalArgumentException("reason required");
         }

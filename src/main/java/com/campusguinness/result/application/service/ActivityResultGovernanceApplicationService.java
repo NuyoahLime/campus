@@ -9,6 +9,7 @@ import com.campusguinness.result.internal.domain.ActivityResult;
 import com.campusguinness.result.internal.domain.ActivityResultId;
 import com.campusguinness.result.internal.domain.ResultReviewRecord;
 import com.campusguinness.result.internal.domain.ResultReviewRecordId;
+import com.campusguinness.result.internal.domain.ResultPublicStatus;
 import com.campusguinness.result.internal.domain.ResultVersion;
 import com.campusguinness.result.internal.domain.ResultVersionId;
 import org.springframework.stereotype.Service;
@@ -62,6 +63,26 @@ public class ActivityResultGovernanceApplicationService {
                 result.id().value(), result.internalStatus().name(), result.publicStatus().name());
     }
 
+    public ActivityResultResult resetTakedown(UUID resultId, String reason) {
+        String normalizedReason = normalizeReason(reason);
+        ActivityResult result = findResult(resultId);
+        UUID reviewerId = platformAuthorization.requireSuperAdmin();
+        ResultVersion publicVersion = requireResetPublicVersion(result);
+
+        result.resetPlatformTakedown(publicVersion.id().value());
+        Instant now = clock.instant();
+        activityResults.save(result);
+        reviewRecords.append(ResultReviewRecord.reset(
+                new ResultReviewRecordId(UUID.randomUUID()),
+                result.id(),
+                publicVersion.id(),
+                reviewerId,
+                now,
+                normalizedReason));
+        return new ActivityResultResult(
+                result.id().value(), result.internalStatus().name(), result.publicStatus().name());
+    }
+
     private ActivityResult findResult(UUID resultId) {
         if (resultId == null) throw new IllegalArgumentException("ActivityResult id required");
         return activityResults.findById(new ActivityResultId(resultId))
@@ -75,6 +96,28 @@ public class ActivityResultGovernanceApplicationService {
         }
         if (result.publicVisibilityBlocked()) {
             throw new IllegalStateException("Public visibility is already blocked");
+        }
+        ResultVersion publicVersion = resultVersions.findById(new ResultVersionId(publicVersionId))
+                .orElseThrow(() -> new IllegalStateException("Current public version not found"));
+        if (!publicVersion.resultId().equals(result.id())) {
+            throw new IllegalStateException("Public version does not belong to ActivityResult");
+        }
+        return publicVersion;
+    }
+
+    private ResultVersion requireResetPublicVersion(ActivityResult result) {
+        if (result.publicStatus() != ResultPublicStatus.PLATFORM_TAKEDOWN) {
+            throw new IllegalStateException("Platform takedown reset requires PLATFORM_TAKEDOWN status");
+        }
+        UUID publicVersionId = result.currentPublicVersionId();
+        if (publicVersionId == null) {
+            throw new IllegalStateException("currentPublicVersionId required");
+        }
+        if (!result.publicVisibilityBlocked()) {
+            throw new IllegalStateException("Platform takedown reset requires blocked public visibility");
+        }
+        if (result.currentCandidateVersionId() != null) {
+            throw new IllegalStateException("Platform takedown reset requires no current candidate");
         }
         ResultVersion publicVersion = resultVersions.findById(new ResultVersionId(publicVersionId))
                 .orElseThrow(() -> new IllegalStateException("Current public version not found"));
