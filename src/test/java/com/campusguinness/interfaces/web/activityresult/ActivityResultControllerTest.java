@@ -2,6 +2,8 @@ package com.campusguinness.interfaces.web.activityresult;
 
 import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.result.ActivityResultEditorResult;
+import com.campusguinness.result.application.query.ActivityResultReadQueryService;
+import com.campusguinness.result.application.query.model.ManagementActivityResultDetail;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
 import com.campusguinness.result.application.service.ActivityResultPublicationApplicationService;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ class ActivityResultControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityResultApplicationService service;
     @MockitoBean ActivityResultPublicationApplicationService publicationService;
+    @MockitoBean ActivityResultReadQueryService readQueryService;
 
     @Test void publishReturns200() throws Exception {
         UUID id = UUID.randomUUID();
@@ -33,8 +36,7 @@ class ActivityResultControllerTest {
     }
     @Test void readEditorReturns200() throws Exception {
         UUID activityId = UUID.randomUUID();
-        when(service.readEditor(activityId)).thenReturn(new ActivityResultEditorResult(
-                activityId, null, "DRAFT", "NOT_SUBMITTED", null, null, null, false, null));
+        when(readQueryService.managementDetail(activityId)).thenReturn(detail(activityId, null));
         mvc.perform(get("/api/v1/activities/" + activityId + "/result"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.activityId").value(activityId.toString()));
     }
@@ -43,6 +45,7 @@ class ActivityResultControllerTest {
         UUID resultId = UUID.randomUUID();
         when(service.saveEditorContent(org.mockito.Mockito.eq(activityId), any())).thenReturn(new ActivityResultEditorResult(
                 activityId, resultId, "DRAFT", "NOT_SUBMITTED", UUID.randomUUID(), null, null, false, null));
+        when(readQueryService.managementDetail(activityId)).thenReturn(detail(activityId, resultId));
         mvc.perform(put("/api/v1/activities/" + activityId + "/result")
                         .contentType("application/json")
                         .content("{\"title\":\"T\",\"summaryText\":\"S\",\"scoreHighlights\":[],\"mediaRefs\":[]}"))
@@ -72,5 +75,11 @@ class ActivityResultControllerTest {
         when(service.publishInternal(any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/activity-results/" + UUID.randomUUID() + "/publish"))
                 .andExpect(status().isNotFound());
+    }
+
+    private ManagementActivityResultDetail detail(UUID activityId, UUID resultId) {
+        return new ManagementActivityResultDetail(
+                activityId, resultId, "DRAFT", "NOT_SUBMITTED",
+                null, null, null, false, null, null, null);
     }
 }

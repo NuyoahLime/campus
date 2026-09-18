@@ -5,6 +5,7 @@ import com.campusguinness.score.application.exception.ScoreWriteException;
 import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.ranking.application.exception.RankingGenerationException;
+import com.campusguinness.result.application.query.ActivityResultReadConsistencyException;
 import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
 import com.campusguinness.school.application.exception.SchoolRegistrationReviewException;
 import com.campusguinness.school.internal.persistence.SchoolRegistrationConcurrentReviewException;
@@ -95,6 +96,17 @@ public class GlobalExceptionHandler {
                         "The resource was updated by another request.",
                         req.getRequestURI()
                 ));
+    }
+
+    @ExceptionHandler(ActivityResultReadConsistencyException.class)
+    public ResponseEntity<ApiErrorResponse> handleActivityResultReadConsistency(
+            ActivityResultReadConsistencyException ex,
+            HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.of(
+                        "ACTIVITY_RESULT_DATA_CONSISTENCY",
+                        ex.getMessage(),
+                        req.getRequestURI()));
     }
 
     @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
