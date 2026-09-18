@@ -219,6 +219,79 @@ class ActivityResultReviewAuthorizationIT extends PostgreSqlIntegrationTestSuppo
                 .andExpect(jsonPath("$.code").value("CONFLICT"));
     }
 
+    @Test
+    void takedownEndpointIsSuperAdminOnlyCsrfProtectedAndReturnsControlledErrors() throws Exception {
+        Fixture fixture = insertVisiblePublicResult();
+        String path = "/api/v1/super-admin/activity-results/{id}/takedown";
+        String body = "{\"reason\":\"  emergency governance  \"}";
+
+        mvc.perform(post(path, fixture.resultId())
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN"))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(studentA, "STUDENT", studentMembership, schoolA, "STUDENT"))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"reason\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"reason\":\"" + "x".repeat(2001) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(post(path, UUID.randomUUID())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicStatus").value("PLATFORM_TAKEDOWN"));
+        assertThat(reviewCount(fixture.resultId(), "TAKEDOWN")).isOne();
+        assertThat(jdbc.queryForObject("""
+                SELECT reason FROM result_review_records
+                WHERE result_id = ? AND action = 'TAKEDOWN'
+                """, String.class, fixture.resultId())).isEqualTo("emergency governance");
+
+        mvc.perform(post(path, fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"));
+        assertThat(reviewCount(fixture.resultId(), "TAKEDOWN")).isOne();
+    }
+
     private void submit(UUID resultId) throws Exception {
         mvc.perform(post("/api/v1/activity-results/{id}/submit-public-review", resultId)
                         .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN"))
@@ -251,6 +324,20 @@ class ActivityResultReviewAuthorizationIT extends PostgreSqlIntegrationTestSuppo
                 WHERE id = ?
                 """, versionId, versionId, resultId);
         return new Fixture(resultId, versionId);
+    }
+
+    private Fixture insertVisiblePublicResult() {
+        Fixture fixture = insertPublishedResult();
+        jdbc.update("""
+                UPDATE result_versions SET published_publicly_at = now() WHERE id = ?
+                """, fixture.versionId());
+        jdbc.update("""
+                UPDATE activity_results
+                SET result_public_status = 'PUBLIC', current_candidate_version_id = NULL,
+                    current_public_version_id = ?, public_visibility_blocked = false
+                WHERE id = ?
+                """, fixture.versionId(), fixture.resultId());
+        return fixture;
     }
 
     private RequestPostProcessor principal(

@@ -199,7 +199,8 @@ public class SecurityConfig {
                         "/api/v1/super-admin/ranking-definitions/*/disable",
                         "/api/v1/super-admin/ranking-definitions/*/versions/*/publish",
                         "/api/v1/super-admin/activity-results/*/approve-public-review",
-                        "/api/v1/super-admin/activity-results/*/reject-public-review"
+                        "/api/v1/super-admin/activity-results/*/reject-public-review",
+                        "/api/v1/super-admin/activity-results/*/takedown"
                 ).hasRole("SUPER_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/challenge-projects/*")
                 .hasRole("SUPER_ADMIN")
