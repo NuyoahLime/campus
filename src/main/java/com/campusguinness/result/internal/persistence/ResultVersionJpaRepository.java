@@ -24,4 +24,15 @@ interface ResultVersionJpaRepository extends JpaRepository<ResultVersionEntity, 
     int markPublishedInternallyIfUnpublished(
             @Param("id") UUID id,
             @Param("publishedAt") Instant publishedAt);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE result_versions
+            SET published_publicly_at = :publishedAt
+            WHERE id = :id
+              AND published_publicly_at IS NULL
+            """, nativeQuery = true)
+    int markPublishedPubliclyIfUnpublished(
+            @Param("id") UUID id,
+            @Param("publishedAt") Instant publishedAt);
 }

@@ -52,4 +52,16 @@ class ResultVersionRepositoryAdapter implements ResultVersionRepository {
                     "ResultVersion does not exist or is already published internally: " + id.value());
         }
     }
+
+    @Override
+    @Transactional
+    public void markPublishedPublicly(ResultVersionId id, Instant publishedAt) {
+        Objects.requireNonNull(id, "id required");
+        Objects.requireNonNull(publishedAt, "publishedAt required");
+        int updated = jpaRepository.markPublishedPubliclyIfUnpublished(id.value(), publishedAt);
+        if (updated != 1) {
+            throw new IllegalStateException(
+                    "ResultVersion does not exist or is already published publicly: " + id.value());
+        }
+    }
 }

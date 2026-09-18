@@ -285,6 +285,51 @@ class ActivityResultPersistenceBaselineIT extends PostgreSqlIntegrationTestSuppo
                 .hasMessageContaining("does not exist");
     }
 
+    @Test
+    void publicPublicationStampTargetsExactVersionAndPreservesCoreSnapshot() {
+        ActivityResult result = createResult(createActivity());
+        ResultVersion v1 = createVersion(result, 1, "V1");
+        ResultVersion v2 = createVersion(result, 2, "V2");
+        Instant publishedAt = Instant.parse("2026-09-17T12:00:00Z");
+
+        resultVersions.markPublishedPublicly(v2.id(), publishedAt);
+
+        ResultVersion after = resultVersions.findById(v2.id()).orElseThrow();
+        assertThat(after.publishedPubliclyAt()).isEqualTo(publishedAt);
+        assertThat(after.resultId()).isEqualTo(v2.resultId());
+        assertThat(after.versionNumber()).isEqualTo(v2.versionNumber());
+        assertThat(after.title()).isEqualTo(v2.title());
+        assertThat(after.summaryText()).isEqualTo(v2.summaryText());
+        assertThat(after.scoreHighlights()).isEqualTo(v2.scoreHighlights());
+        assertThat(after.mediaRefs()).isEqualTo(v2.mediaRefs());
+        assertThat(after.publishedInternallyAt()).isEqualTo(v2.publishedInternallyAt());
+        assertThat(after.createdAt()).isEqualTo(v2.createdAt());
+        assertThat(resultVersions.findById(v1.id()).orElseThrow().publishedPubliclyAt()).isNull();
+    }
+
+    @Test
+    void publicPublicationStampCannotBeOverwritten() {
+        ActivityResult result = createResult(createActivity());
+        ResultVersion version = createVersion(result, 1, "V1");
+        Instant firstStamp = Instant.parse("2026-09-17T12:01:00Z");
+        resultVersions.markPublishedPublicly(version.id(), firstStamp);
+
+        assertThatThrownBy(() -> resultVersions.markPublishedPublicly(
+                version.id(), Instant.parse("2026-09-17T12:02:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already published publicly");
+        assertThat(resultVersions.findById(version.id()).orElseThrow().publishedPubliclyAt())
+                .isEqualTo(firstStamp);
+    }
+
+    @Test
+    void publicPublicationStampRejectsMissingVersion() {
+        assertThatThrownBy(() -> resultVersions.markPublishedPublicly(
+                new ResultVersionId(UUID.randomUUID()), Instant.parse("2026-09-17T12:03:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not exist");
+    }
+
     private ActivityResult createResult(UUID activityId) {
         ActivityResult result = ActivityResult.create(new ActivityResult.Builder()
                 .id(new ActivityResultId(UUID.randomUUID()))
