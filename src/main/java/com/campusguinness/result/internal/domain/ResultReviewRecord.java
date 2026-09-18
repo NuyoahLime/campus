@@ -71,6 +71,17 @@ public final class ResultReviewRecord {
                 null, null, reviewerId, reviewedAt, reason, reviewedAt);
     }
 
+    public static ResultReviewRecord takedown(
+            ResultReviewRecordId id,
+            ActivityResultId resultId,
+            ResultVersionId exactPublicVersionId,
+            UUID reviewerId,
+            Instant reviewedAt,
+            String reason) {
+        return new ResultReviewRecord(id, resultId, exactPublicVersionId, ResultReviewAction.TAKEDOWN,
+                null, null, reviewerId, reviewedAt, reason, reviewedAt);
+    }
+
     public static ResultReviewRecord reconstitute(
             ResultReviewRecordId id,
             ActivityResultId resultId,

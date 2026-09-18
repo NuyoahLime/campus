@@ -2,6 +2,7 @@ package com.campusguinness.result.internal.domain;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.time.Instant;
 import java.util.UUID;
@@ -36,6 +37,14 @@ import java.util.UUID;
  * <p>ResultVersion is an immutable snapshot referenced through candidate, internal, and public pointers.
  */
 public final class ActivityResult {
+
+    private static final EnumSet<ResultPublicStatus> PLATFORM_TAKEDOWN_ALLOWED_STATUSES = EnumSet.of(
+            ResultPublicStatus.PUBLIC,
+            ResultPublicStatus.NOT_SUBMITTED,
+            ResultPublicStatus.PENDING_PUBLIC_REVIEW,
+            ResultPublicStatus.PLATFORM_APPROVED,
+            ResultPublicStatus.PLATFORM_REJECTED,
+            ResultPublicStatus.ANOMALY_PENDING);
 
     private final ActivityResultId id;
     private final UUID schoolId;
@@ -287,15 +296,29 @@ public final class ActivityResult {
         touch();
     }
 
-    /** PUBLIC or ANOMALY_PENDING → PLATFORM_TAKEDOWN */
-    public void platformTakedown() {
-        if (publicStatus != ResultPublicStatus.PUBLIC
-                && publicStatus != ResultPublicStatus.ANOMALY_PENDING) {
+    /** Any visible public base -> PLATFORM_TAKEDOWN for its exact public version. */
+    public void platformTakedown(UUID publicVersionId) {
+        requireVersionId(publicVersionId, "publicVersionId");
+        if (!publicVersionId.equals(currentPublicVersionId)) {
+            throw new IllegalStateException("Platform takedown must use the current public version");
+        }
+        if (publicVisibilityBlocked) {
+            throw new IllegalStateException("Public visibility is already blocked");
+        }
+        if (!PLATFORM_TAKEDOWN_ALLOWED_STATUSES.contains(publicStatus)) {
             throw new InvalidResultStateTransitionException(publicStatus, "platform takedown");
         }
         this.publicStatus = ResultPublicStatus.PLATFORM_TAKEDOWN;
+        this.currentCandidateVersionId = null;
+        this.publicVisibilityBlocked = true;
         touch();
         domainEvents.add(new ResultPlatformTakenDown(id));
+    }
+
+    /** @deprecated use platformTakedown(UUID) so the exact public pointer is explicit. */
+    @Deprecated(forRemoval = false)
+    public void platformTakedown() {
+        platformTakedown(currentPublicVersionId);
     }
 
     private void touch() { updatedAt = Instant.now(); }
