@@ -31,4 +31,14 @@ public class SuperAdminActivityResultGovernanceController {
         return ResponseEntity.ok(new ActivityResultResponse(
                 result.id(), result.internalStatus(), result.publicStatus()));
     }
+
+    @PostMapping("/{id}/reset-takedown")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ActivityResultResponse> resetTakedown(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResetTakedownActivityResultRequest request) {
+        var result = service.resetTakedown(id, request.reason());
+        return ResponseEntity.ok(new ActivityResultResponse(
+                result.id(), result.internalStatus(), result.publicStatus()));
+    }
 }

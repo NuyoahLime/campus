@@ -296,6 +296,25 @@ public final class ActivityResult {
         touch();
     }
 
+    /** PLATFORM_TAKEDOWN -> NOT_SUBMITTED without restoring public visibility. */
+    public void resetPlatformTakedown(UUID historicalPublicVersionId) {
+        if (publicStatus != ResultPublicStatus.PLATFORM_TAKEDOWN) {
+            throw new InvalidResultStateTransitionException(publicStatus, "reset platform takedown");
+        }
+        requireVersionId(historicalPublicVersionId, "historicalPublicVersionId");
+        if (!historicalPublicVersionId.equals(currentPublicVersionId)) {
+            throw new IllegalStateException("Reset must use the current historical public version");
+        }
+        if (!publicVisibilityBlocked) {
+            throw new IllegalStateException("Platform takedown reset requires blocked public visibility");
+        }
+        if (currentCandidateVersionId != null) {
+            throw new IllegalStateException("Platform takedown reset requires no current candidate");
+        }
+        this.publicStatus = ResultPublicStatus.NOT_SUBMITTED;
+        touch();
+    }
+
     /** Any visible public base -> PLATFORM_TAKEDOWN for its exact public version. */
     public void platformTakedown(UUID publicVersionId) {
         requireVersionId(publicVersionId, "publicVersionId");

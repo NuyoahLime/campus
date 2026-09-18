@@ -245,6 +245,42 @@ class ActivityResultTest {
             assertThat(r.publicStatus()).isEqualTo(ResultPublicStatus.PLATFORM_TAKEDOWN);
             assertThat(r.domainEvents()).anyMatch(e -> e instanceof ResultPlatformTakenDown);
         }
+
+        @Test
+        @DisplayName("PLATFORM_TAKEDOWN reset preserves pointers and visibility block")
+        void shouldResetPlatformTakedownWithoutRestoringVisibility() {
+            var r = createInternalPublished();
+            UUID versionId = r.currentCandidateVersionId();
+            r.submitForReview();
+            r.platformApprove();
+            r.makePublic(versionId);
+            r.platformTakedown(versionId);
+
+            r.resetPlatformTakedown(versionId);
+
+            assertThat(r.publicStatus()).isEqualTo(ResultPublicStatus.NOT_SUBMITTED);
+            assertThat(r.currentCandidateVersionId()).isNull();
+            assertThat(r.currentInternalVersionId()).isEqualTo(versionId);
+            assertThat(r.currentPublicVersionId()).isEqualTo(versionId);
+            assertThat(r.publicVisibilityBlocked()).isTrue();
+        }
+
+        @Test
+        @DisplayName("platform takedown reset requires the exact historical public pointer")
+        void shouldRejectResetForWrongHistoricalPublicVersion() {
+            var r = createInternalPublished();
+            UUID versionId = r.currentCandidateVersionId();
+            r.submitForReview();
+            r.platformApprove();
+            r.makePublic(versionId);
+            r.platformTakedown(versionId);
+
+            assertThatThrownBy(() -> r.resetPlatformTakedown(UUID.randomUUID()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("historical public version");
+            assertThat(r.publicStatus()).isEqualTo(ResultPublicStatus.PLATFORM_TAKEDOWN);
+            assertThat(r.publicVisibilityBlocked()).isTrue();
+        }
     }
 
     @Nested

@@ -41,6 +41,37 @@ class ActivityResultGovernanceControllerTest {
     }
 
     @Test
+    void resetTakedownDelegatesResultAndReasonOnly() throws Exception {
+        UUID resultId = UUID.randomUUID();
+        when(service.resetTakedown(resultId, "  reviewed  ")).thenReturn(
+                new ActivityResultResult(resultId, "INTERNAL_PUBLISHED", "NOT_SUBMITTED"));
+
+        mvc.perform(post("/api/v1/super-admin/activity-results/{id}/reset-takedown", resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"  reviewed  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(resultId.toString()))
+                .andExpect(jsonPath("$.publicStatus").value("NOT_SUBMITTED"));
+
+        verify(service).resetTakedown(resultId, "  reviewed  ");
+    }
+
+    @Test
+    void resetTakedownDtoAllowsPaddedReasonForNormalizedApplicationValidation() throws Exception {
+        UUID resultId = UUID.randomUUID();
+        String padded = "  " + "x".repeat(2000) + "  ";
+        when(service.resetTakedown(resultId, padded)).thenReturn(
+                new ActivityResultResult(resultId, "INTERNAL_PUBLISHED", "NOT_SUBMITTED"));
+
+        mvc.perform(post("/api/v1/super-admin/activity-results/{id}/reset-takedown", resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + padded + "\"}"))
+                .andExpect(status().isOk());
+
+        verify(service).resetTakedown(resultId, padded);
+    }
+
+    @Test
     void nullBlankAndOversizedReasonsReturnControlledValidationErrors() throws Exception {
         UUID resultId = UUID.randomUUID();
         String path = "/api/v1/super-admin/activity-results/{id}/takedown";
@@ -58,6 +89,23 @@ class ActivityResultGovernanceControllerTest {
         mvc.perform(post(path, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"" + "x".repeat(2001) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void resetTakedownNullAndBlankReasonsReturnControlledValidationErrors() throws Exception {
+        UUID resultId = UUID.randomUUID();
+        String path = "/api/v1/super-admin/activity-results/{id}/reset-takedown";
+
+        mvc.perform(post(path, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(post(path, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"   \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
