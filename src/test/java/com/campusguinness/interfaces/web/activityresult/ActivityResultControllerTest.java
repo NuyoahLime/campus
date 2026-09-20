@@ -2,6 +2,8 @@ package com.campusguinness.interfaces.web.activityresult;
 
 import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.result.ActivityResultEditorResult;
+import com.campusguinness.result.application.query.ActivityResultReadQueryService;
+import com.campusguinness.result.application.query.model.ManagementActivityResultDetail;
 import com.campusguinness.result.application.service.ActivityResultApplicationService;
 import com.campusguinness.result.application.service.ActivityResultPublicationApplicationService;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,6 +28,7 @@ class ActivityResultControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityResultApplicationService service;
     @MockitoBean ActivityResultPublicationApplicationService publicationService;
+    @MockitoBean ActivityResultReadQueryService readQueryService;
 
     @Test void publishReturns200() throws Exception {
         UUID id = UUID.randomUUID();
@@ -33,8 +38,7 @@ class ActivityResultControllerTest {
     }
     @Test void readEditorReturns200() throws Exception {
         UUID activityId = UUID.randomUUID();
-        when(service.readEditor(activityId)).thenReturn(new ActivityResultEditorResult(
-                activityId, null, "DRAFT", "NOT_SUBMITTED", null, null, null, false, null));
+        when(readQueryService.managementDetail(activityId)).thenReturn(detail(activityId, null));
         mvc.perform(get("/api/v1/activities/" + activityId + "/result"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.activityId").value(activityId.toString()));
     }
@@ -46,7 +50,12 @@ class ActivityResultControllerTest {
         mvc.perform(put("/api/v1/activities/" + activityId + "/result")
                         .contentType("application/json")
                         .content("{\"title\":\"T\",\"summaryText\":\"S\",\"scoreHighlights\":[],\"mediaRefs\":[]}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.resultId").value(resultId.toString()));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultId").value(resultId.toString()))
+                .andExpect(jsonPath("$.internalStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.publicStatus").value("NOT_SUBMITTED"))
+                .andExpect(jsonPath("$.currentCandidateVersionId").isNotEmpty());
+        verify(readQueryService, never()).managementDetail(activityId);
     }
     @Test void withdrawReturns200() throws Exception {
         UUID id = UUID.randomUUID();
@@ -72,5 +81,11 @@ class ActivityResultControllerTest {
         when(service.publishInternal(any())).thenThrow(new IllegalArgumentException("not found"));
         mvc.perform(post("/api/v1/activity-results/" + UUID.randomUUID() + "/publish"))
                 .andExpect(status().isNotFound());
+    }
+
+    private ManagementActivityResultDetail detail(UUID activityId, UUID resultId) {
+        return new ManagementActivityResultDetail(
+                activityId, resultId, "DRAFT", "NOT_SUBMITTED",
+                null, null, null, false, null, null, null);
     }
 }

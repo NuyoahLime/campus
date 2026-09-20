@@ -98,7 +98,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/school-registrations").permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/api/v1/public/rankings",
-                        "/api/v1/public/rankings/*"
+                        "/api/v1/public/rankings/*",
+                        "/api/v1/public/activities/*/result"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/api/v1/challenge-projects/governance",
@@ -130,7 +131,10 @@ public class SecurityConfig {
                         "/api/v1/school-admin/rankings",
                         "/api/v1/school-admin/rankings/*",
                         "/api/v1/school-admin/ranking-definitions",
-                        "/api/v1/school-admin/ranking-definitions/*"
+                        "/api/v1/school-admin/ranking-definitions/*",
+                        "/api/v1/school-admin/activity-results",
+                        "/api/v1/school-admin/activities/*/result/history",
+                        "/api/v1/activities/*/result"
                 ).hasRole("SCHOOL_ADMIN")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-admin/score-attempts/*/submit",
@@ -236,7 +240,8 @@ public class SecurityConfig {
                         "/api/v1/student/feedback",
                         "/api/v1/student/feedback/*",
                         "/api/v1/student/rankings",
-                        "/api/v1/student/rankings/*"
+                        "/api/v1/student/rankings/*",
+                        "/api/v1/student/activities/*/result"
                 ).hasRole("STUDENT")
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/school-registrations/*/withdraw",
