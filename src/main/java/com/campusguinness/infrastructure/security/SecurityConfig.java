@@ -133,6 +133,7 @@ public class SecurityConfig {
                         "/api/v1/school-admin/ranking-definitions",
                         "/api/v1/school-admin/ranking-definitions/*",
                         "/api/v1/school-admin/activity-results",
+                        "/api/v1/school-admin/activity-results/*/versions/*/format-history",
                         "/api/v1/school-admin/activities/*/result/history",
                         "/api/v1/activities/*/result"
                 ).hasRole("SCHOOL_ADMIN")
@@ -158,6 +159,7 @@ public class SecurityConfig {
                         "/api/v1/activity-applications/*/reject",
                         "/api/v1/activity-results/*/publish",
                         "/api/v1/activity-results/*/submit-public-review",
+                        "/api/v1/activity-results/*/versions/*/format-edits",
                         "/api/v1/score-appeals/*/begin-processing",
                         "/api/v1/score-appeals/*/reject",
                         "/api/v1/school-admin/appeals/*/begin-processing",

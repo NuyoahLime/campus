@@ -68,6 +68,14 @@ package com.campusguinness.result.application.format;
  * FMT-63  historyIsVersionIsolatedAndOrderedByRevisionAscending - exact-version history isolation.
  * FMT-64  historyIsVersionIsolatedAndOrderedByRevisionAscending - revision ASC authority.
  * FMT-65  ResultFormatEditControllerTest - HTTP role, anti-enumeration and unknown-key contract.
+ * FMT-66  malformedUnselectedPublicOverlayDoesNotPoisonSelectedInternal - select before overlay.
+ * FMT-67  malformedPreferredInternalOverlayFailsClosedWithoutPublicFallback - selected corruption fails.
+ * FMT-68  semanticInvalidStoredStyleMakesPublicReadNotFound - stored style revalidation.
+ * FMT-69  semanticInvalidStoredParagraphCoverageMakesSelectedStudentReadNotFound - stored coverage revalidation.
+ * FMT-70  semanticInvalidStoredEmphasisMakesManagementReadConflict - stored emphasis revalidation.
+ * FMT-71  unknownStoredPresentationKeyFailsClosed - stored unknown-key revalidation.
+ * FMT-72  appendIsImmutableAndAdvancesExplicitHead - response/history persisted editedAt equality.
+ * FMT-73  ResultFormatEditControllerTest and SecurityConfig matchers - filter and method security.
  */
 final class FmtCoverageLedger {
     private FmtCoverageLedger() {

@@ -50,11 +50,27 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
     void malformedPreferredInternalOverlayFailsClosedWithoutPublicFallback() throws Exception {
         Fixture fixture = insertResult(
                 schoolA, "broken-student", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 2, 2, 1);
-        insertFormat(fixture.resultId(), fixture.v1(), 1, payload(0, 4, "NORMAL"));
+        insertFormat(fixture.resultId(), fixture.v1(), 1,
+                payloadFor("Summary V1 broken-student"));
         insertFormat(fixture.resultId(), fixture.v2(), 1, malformedPayload());
 
         mvc.perform(get(STUDENT, fixture.activityId()).with(studentA()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void malformedUnselectedPublicOverlayDoesNotPoisonSelectedInternal() throws Exception {
+        Fixture fixture = insertResult(
+                schoolA, "unselected-public", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 2, 2, 1);
+        insertFormat(fixture.resultId(), fixture.v1(), 1, malformedPayload());
+        insertFormat(fixture.resultId(), fixture.v2(), 1,
+                payloadFor("Summary V2 unselected-public"));
+
+        mvc.perform(get(STUDENT, fixture.activityId()).with(studentA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versionId").value(fixture.v2().toString()))
+                .andExpect(jsonPath("$.presentation.paragraphs[0].end")
+                        .value("Summary V2 unselected-public".length()));
     }
 
     @Test
@@ -73,13 +89,17 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
     void exactVersionOverlaysRemainIsolatedAndPublicStudentDtosHideAuditMetadata() throws Exception {
         Fixture fixture = insertResult(
                 schoolA, "overlay-isolation", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 2, 2, 1);
-        UUID v1Edit = insertFormat(fixture.resultId(), fixture.v1(), 1, payload(0, 4, "NORMAL"));
-        UUID v2Edit = insertFormat(fixture.resultId(), fixture.v2(), 1, payload(0, 5, "HEADING"));
+        int v1End = "Summary V1 overlay-isolation".length();
+        int v2End = "Summary V2 overlay-isolation".length();
+        UUID v1Edit = insertFormat(fixture.resultId(), fixture.v1(), 1,
+                payloadFor("Summary V1 overlay-isolation"));
+        UUID v2Edit = insertFormat(fixture.resultId(), fixture.v2(), 1,
+                payloadFor("Summary V2 overlay-isolation"));
 
         mvc.perform(get(PUBLIC, fixture.activityId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.versionId").value(fixture.v1().toString()))
-                .andExpect(jsonPath("$.presentation.paragraphs[0].end").value(4))
+                .andExpect(jsonPath("$.presentation.paragraphs[0].end").value(v1End))
                 .andExpect(jsonPath("$.formatEditId").doesNotExist())
                 .andExpect(jsonPath("$.revision").doesNotExist())
                 .andExpect(jsonPath("$.reason").doesNotExist())
@@ -88,7 +108,7 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
         mvc.perform(get(STUDENT, fixture.activityId()).with(studentA()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.versionId").value(fixture.v2().toString()))
-                .andExpect(jsonPath("$.presentation.paragraphs[0].end").value(5))
+                .andExpect(jsonPath("$.presentation.paragraphs[0].end").value(v2End))
                 .andExpect(jsonPath("$.formatEditId").doesNotExist())
                 .andExpect(jsonPath("$.revision").doesNotExist())
                 .andExpect(jsonPath("$.reason").doesNotExist())
@@ -96,10 +116,10 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
                 .andExpect(jsonPath("$.formatHistory").doesNotExist());
         mvc.perform(get(MANAGEMENT, fixture.activityId()).with(adminA()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.publicProjection.presentation.paragraphs[0].end").value(4))
+                .andExpect(jsonPath("$.publicProjection.presentation.paragraphs[0].end").value(v1End))
                 .andExpect(jsonPath("$.publicProjection.currentFormatEditRecordId").value(v1Edit.toString()))
                 .andExpect(jsonPath("$.publicProjection.currentFormatRevision").value(1))
-                .andExpect(jsonPath("$.internalProjection.presentation.paragraphs[0].end").value(5))
+                .andExpect(jsonPath("$.internalProjection.presentation.paragraphs[0].end").value(v2End))
                 .andExpect(jsonPath("$.internalProjection.currentFormatEditRecordId").value(v2Edit.toString()))
                 .andExpect(jsonPath("$.internalProjection.currentFormatRevision").value(1));
     }
@@ -108,12 +128,12 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
     void makePublicStateRetainsOverlayBoundToExactVersion() throws Exception {
         Fixture fixture = insertResult(
                 schoolA, "made-public", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, null, 2, 2);
-        insertFormat(fixture.resultId(), fixture.v2(), 1, payload(0, 5, "HEADING"));
+        insertFormat(fixture.resultId(), fixture.v2(), 1, payloadFor("Summary V2 made-public"));
 
         mvc.perform(get(PUBLIC, fixture.activityId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.versionId").value(fixture.v2().toString()))
-                .andExpect(jsonPath("$.presentation.paragraphs[0].style").value("HEADING"));
+                .andExpect(jsonPath("$.presentation.paragraphs[0].style").value("NORMAL"));
     }
 
     @Test
@@ -122,7 +142,8 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
             Fixture fixture = insertResult(
                     schoolA, "blocked-" + status, "PUBLISHED", "INTERNAL_PUBLISHED", status, true,
                     null, 1, 1);
-            insertFormat(fixture.resultId(), fixture.v1(), 1, payload(0, 4, "NORMAL"));
+            insertFormat(fixture.resultId(), fixture.v1(), 1,
+                    payloadFor("Summary V1 blocked-" + status));
 
             mvc.perform(get(PUBLIC, fixture.activityId())).andExpect(status().isNotFound());
             mvc.perform(get(HISTORY, fixture.resultId(), fixture.v1()).with(adminA()))
@@ -135,9 +156,9 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
     void historyIsVersionIsolatedAndOrderedByRevisionAscending() throws Exception {
         Fixture fixture = insertResult(
                 schoolA, "history-isolation", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 2, 2, 1);
-        insertRecord(fixture.resultId(), fixture.v1(), 2, payload(0, 4, "HEADING"));
-        insertRecord(fixture.resultId(), fixture.v1(), 1, payload(0, 4, "NORMAL"));
-        insertRecord(fixture.resultId(), fixture.v2(), 1, payload(0, 5, "NORMAL"));
+        insertRecord(fixture.resultId(), fixture.v1(), 2, payloadFor("Summary V1 history-isolation"));
+        insertRecord(fixture.resultId(), fixture.v1(), 1, payloadFor("Summary V1 history-isolation"));
+        insertRecord(fixture.resultId(), fixture.v2(), 1, payloadFor("Summary V2 history-isolation"));
 
         mvc.perform(get(HISTORY, fixture.resultId(), fixture.v1()).with(adminA()))
                 .andExpect(status().isOk())
@@ -148,6 +169,61 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].revision").value(1));
+    }
+
+    @Test
+    void semanticInvalidStoredStyleMakesPublicReadNotFound() throws Exception {
+        Fixture fixture = insertResult(
+                schoolA, "semantic-style", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 1, 1, 1);
+        int end = "Summary V1 semantic-style".length();
+        insertFormat(fixture.resultId(), fixture.v1(), 1, payload(0, end, "HEADING"));
+
+        mvc.perform(get(PUBLIC, fixture.activityId())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void semanticInvalidStoredParagraphCoverageMakesSelectedStudentReadNotFound() throws Exception {
+        Fixture fixture = insertResult(
+                schoolA, "semantic-gap", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 2, 2, 1);
+        insertFormat(fixture.resultId(), fixture.v1(), 1,
+                payloadFor("Summary V1 semantic-gap"));
+        int end = "Summary V2 semantic-gap".length();
+        insertFormat(fixture.resultId(), fixture.v2(), 1, payload(1, end, "NORMAL"));
+
+        mvc.perform(get(STUDENT, fixture.activityId()).with(studentA()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void semanticInvalidStoredEmphasisMakesManagementReadConflict() throws Exception {
+        Fixture fixture = insertResult(
+                schoolA, "semantic-emphasis", "PUBLISHED", "INTERNAL_PUBLISHED",
+                "NOT_SUBMITTED", false, 1, 1, null);
+        int end = "Summary V1 semantic-emphasis".length();
+        String crossing = """
+                {"paragraphs":[{"start":0,"end":7,"style":"NORMAL"},
+                {"start":7,"end":%d,"style":"NORMAL"}],
+                "emphasisRanges":[{"start":6,"end":8,"style":"BOLD"}]}
+                """.formatted(end);
+        insertFormat(fixture.resultId(), fixture.v1(), 1, crossing);
+
+        mvc.perform(get(MANAGEMENT, fixture.activityId()).with(adminA()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACTIVITY_RESULT_DATA_CONSISTENCY"));
+    }
+
+    @Test
+    void unknownStoredPresentationKeyFailsClosed() throws Exception {
+        Fixture fixture = insertResult(
+                schoolA, "semantic-unknown", "PUBLISHED", "INTERNAL_PUBLISHED", "PUBLIC", false, 1, 1, 1);
+        int end = "Summary V1 semantic-unknown".length();
+        String payload = """
+                {"paragraphs":[{"start":0,"end":%d,"style":"NORMAL"}],
+                "emphasisRanges":[],"unknown":true}
+                """.formatted(end);
+        insertFormat(fixture.resultId(), fixture.v1(), 1, payload);
+
+        mvc.perform(get(PUBLIC, fixture.activityId())).andExpect(status().isNotFound());
     }
 
     private UUID insertFormat(UUID resultId, UUID versionId, int revision, String payload) {
@@ -174,6 +250,10 @@ class ResultFormatEditReadIntegrationIT extends ActivityResultReadTestSupport {
         return """
                 {"paragraphs":[{"start":%d,"end":%d,"style":"%s"}],"emphasisRanges":[]}
                 """.formatted(start, end, style);
+    }
+
+    private String payloadFor(String summary) {
+        return payload(0, summary.codePointCount(0, summary.length()), "NORMAL");
     }
 
     private String malformedPayload() {

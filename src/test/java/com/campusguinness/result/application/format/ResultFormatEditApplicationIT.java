@@ -105,6 +105,10 @@ class ResultFormatEditApplicationIT extends PostgreSqlIntegrationTestSupport {
         assertThat(jdbc.queryForMap("SELECT * FROM result_versions WHERE id=?", versionId)).isEqualTo(versionBefore);
         assertThat(jdbc.queryForMap("SELECT * FROM activity_results WHERE id=?", resultId)).isEqualTo(resultBefore);
         assertThat(service.history(resultId, versionId)).extracting(ResultFormatHistoryEntry::revision).containsExactly(1, 2);
+        assertThat(jdbc.queryForObject(
+                "SELECT edited_at FROM result_format_edit_records WHERE id=?",
+                java.sql.Timestamp.class, second.formatEditId()).toInstant()).isEqualTo(second.editedAt());
+        assertThat(service.history(resultId, versionId).getLast().editedAt()).isEqualTo(second.editedAt());
     }
 
     @Test
