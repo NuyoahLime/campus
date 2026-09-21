@@ -10,6 +10,7 @@ import com.campusguinness.result.application.query.model.ManagementActivityResul
 import com.campusguinness.result.application.query.model.ManagementActivityResultSummary;
 import com.campusguinness.result.application.query.model.PublicActivityResultView;
 import com.campusguinness.result.application.query.model.StudentActivityResultView;
+import com.campusguinness.result.application.query.model.ResultFormatOverlayProjection;
 import com.campusguinness.result.application.query.port.ActivityResultReadQueryPort;
 import com.campusguinness.result.internal.domain.ResultInternalStatus;
 import com.campusguinness.result.internal.domain.ResultPublicStatus;
@@ -40,15 +41,24 @@ public class ActivityResultReadQueryService {
 
     public PublicActivityResultView publicDetail(UUID activityId) {
         requireActivityId(activityId);
-        return query.findPublicByActivityId(activityId)
-                .orElseThrow(() -> notFound(activityId));
+        try {
+            return query.findPublicByActivityId(activityId)
+                    .orElseThrow(() -> notFound(activityId));
+        } catch (ActivityResultReadConsistencyException ex) {
+            throw notFound(activityId);
+        }
     }
 
     public StudentActivityResultView studentDetail(UUID activityId) {
         requireActivityId(activityId);
         UUID schoolId = studentAuthorization.requireUniqueActiveStudent().schoolId();
-        ActivityResultStudentReadState state = query.findStudentState(activityId, schoolId)
-                .orElseThrow(() -> notFound(activityId));
+        ActivityResultStudentReadState state;
+        try {
+            state = query.findStudentState(activityId, schoolId)
+                    .orElseThrow(() -> notFound(activityId));
+        } catch (ActivityResultReadConsistencyException ex) {
+            throw notFound(activityId);
+        }
 
         if (internalAllowed(state)) {
             if (state.internalProjection() == null) {
@@ -119,10 +129,17 @@ public class ActivityResultReadQueryService {
             ActivityResultStudentReadState state,
             ActivityResultVersionProjection version,
             String source) {
+        ResultFormatOverlayProjection overlay;
+        try {
+            overlay = query.findFormatOverlay(state.resultId(), version.versionId()).orElse(null);
+        } catch (ActivityResultReadConsistencyException ex) {
+            throw notFound(state.activityId());
+        }
         return new StudentActivityResultView(
                 state.activityId(), state.resultId(), version.versionId(), version.versionNumber(),
                 version.title(), version.summaryText(), version.scoreHighlights(), source,
-                version.publishedInternallyAt(), version.publishedPubliclyAt());
+                version.publishedInternallyAt(), version.publishedPubliclyAt(),
+                overlay == null ? null : overlay.presentation());
     }
 
     private void requireConsistentPointers(ManagementActivityResultDetail detail) {

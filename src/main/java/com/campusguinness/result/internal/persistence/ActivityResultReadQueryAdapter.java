@@ -8,6 +8,8 @@ import com.campusguinness.result.application.query.model.ActivityResultVersionPr
 import com.campusguinness.result.application.query.model.ManagementActivityResultDetail;
 import com.campusguinness.result.application.query.model.ManagementActivityResultSummary;
 import com.campusguinness.result.application.query.model.PublicActivityResultView;
+import com.campusguinness.result.application.format.ResultFormatPresentationValidator;
+import com.campusguinness.result.application.query.model.ResultFormatOverlayProjection;
 import com.campusguinness.result.application.query.port.ActivityResultReadQueryPort;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -32,10 +34,13 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final ResultFormatPresentationValidator presentationValidator;
 
-    ActivityResultReadQueryAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+    ActivityResultReadQueryAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper,
+            ResultFormatPresentationValidator presentationValidator) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.presentationValidator = presentationValidator;
     }
 
     @Override
@@ -44,12 +49,15 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
                 SELECT a.id AS activity_id, ar.id AS result_id,
                        pv.id AS version_id, pv.version_number, pv.title, pv.summary_text,
                        pv.score_highlights::text AS score_highlights,
-                       pv.published_publicly_at
+                       pv.published_publicly_at, fe.payload::text AS format_payload
                 FROM activities a
                 JOIN activity_results ar ON ar.activity_id = a.id
                 JOIN result_versions pv
                   ON pv.id = ar.current_public_version_id
                  AND pv.result_id = ar.id
+                LEFT JOIN result_format_heads fh ON fh.result_version_id = pv.id AND fh.result_id = ar.id
+                LEFT JOIN result_format_edit_records fe ON fe.id = fh.current_format_edit_record_id
+                 AND fe.result_id = ar.id AND fe.result_version_id = pv.id
                 WHERE a.id = ?
                   AND a.execution_status IN ('PUBLISHED', 'IN_PROGRESS', 'ENDED', 'CANCELLED')
                   AND ar.current_public_version_id IS NOT NULL
@@ -92,6 +100,26 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
     }
 
     @Override
+    public Optional<ResultFormatOverlayProjection> findFormatOverlay(UUID resultId, UUID resultVersionId) {
+        return jdbc.query("""
+                SELECT fe.id, fe.revision, fe.payload::text, v.summary_text
+                FROM result_format_heads fh
+                JOIN result_format_edit_records fe
+                  ON fe.id = fh.current_format_edit_record_id
+                 AND fe.result_id = fh.result_id
+                 AND fe.result_version_id = fh.result_version_id
+                JOIN result_versions v
+                  ON v.id = fh.result_version_id
+                 AND v.result_id = fh.result_id
+                WHERE fh.result_id = ? AND fh.result_version_id = ?
+                """, rs -> rs.next() ? Optional.of(new ResultFormatOverlayProjection(
+                        presentationValidator.restoreAndValidate(
+                                rs.getString("payload"), rs.getString("summary_text")),
+                        uuid(rs, "id"), rs.getInt("revision"))) : Optional.empty(),
+                resultId, resultVersionId);
+    }
+
+    @Override
     public Optional<ManagementActivityResultDetail> findManagementDetail(UUID activityId, UUID schoolId) {
         return jdbc.query("""
                 SELECT a.id AS activity_id, ar.id AS result_id,
@@ -104,18 +132,27 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
                        cv.media_refs::text AS candidate_media_refs,
                        cv.published_internally_at AS candidate_published_internally_at,
                        cv.published_publicly_at AS candidate_published_publicly_at,
+                       cvf.payload::text AS candidate_format_payload,
+                       cvf.id AS candidate_format_record_id,
+                       cvf.revision AS candidate_format_revision,
                        iv.id AS internal_version_id, iv.version_number AS internal_version_number,
                        iv.title AS internal_title, iv.summary_text AS internal_summary_text,
                        iv.score_highlights::text AS internal_score_highlights,
                        iv.media_refs::text AS internal_media_refs,
                        iv.published_internally_at AS internal_published_internally_at,
                        iv.published_publicly_at AS internal_published_publicly_at,
+                       ivf.payload::text AS internal_format_payload,
+                       ivf.id AS internal_format_record_id,
+                       ivf.revision AS internal_format_revision,
                        pv.id AS public_version_id, pv.version_number AS public_version_number,
                        pv.title AS public_title, pv.summary_text AS public_summary_text,
                        pv.score_highlights::text AS public_score_highlights,
                        pv.media_refs::text AS public_media_refs,
                        pv.published_internally_at AS public_published_internally_at,
-                       pv.published_publicly_at AS public_published_publicly_at
+                       pv.published_publicly_at AS public_published_publicly_at,
+                       pvf.payload::text AS public_format_payload,
+                       pvf.id AS public_format_record_id,
+                       pvf.revision AS public_format_revision
                 FROM activities a
                 LEFT JOIN activity_results ar
                   ON ar.activity_id = a.id
@@ -123,12 +160,21 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
                 LEFT JOIN result_versions cv
                   ON cv.id = ar.current_candidate_version_id
                  AND cv.result_id = ar.id
+                LEFT JOIN result_format_heads cvh ON cvh.result_version_id = cv.id AND cvh.result_id = ar.id
+                LEFT JOIN result_format_edit_records cvf ON cvf.id = cvh.current_format_edit_record_id
+                 AND cvf.result_id = ar.id AND cvf.result_version_id = cv.id
                 LEFT JOIN result_versions iv
                   ON iv.id = ar.current_internal_version_id
                  AND iv.result_id = ar.id
+                LEFT JOIN result_format_heads ivh ON ivh.result_version_id = iv.id AND ivh.result_id = ar.id
+                LEFT JOIN result_format_edit_records ivf ON ivf.id = ivh.current_format_edit_record_id
+                 AND ivf.result_id = ar.id AND ivf.result_version_id = iv.id
                 LEFT JOIN result_versions pv
                   ON pv.id = ar.current_public_version_id
                  AND pv.result_id = ar.id
+                LEFT JOIN result_format_heads pvh ON pvh.result_version_id = pv.id AND pvh.result_id = ar.id
+                LEFT JOIN result_format_edit_records pvf ON pvf.id = pvh.current_format_edit_record_id
+                 AND pvf.result_id = ar.id AND pvf.result_version_id = pv.id
                 WHERE a.id = ? AND a.school_id = ?
                 """, rs -> rs.next() ? Optional.of(mapManagementDetail(rs)) : Optional.empty(), activityId, schoolId);
     }
@@ -208,7 +254,8 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
                 uuid(rs, "activity_id"), uuid(rs, "result_id"), uuid(rs, "version_id"),
                 rs.getInt("version_number"), rs.getString("title"), rs.getString("summary_text"),
                 readList(rs.getString("score_highlights"), STRING_LIST, "scoreHighlights"),
-                instant(rs, "published_publicly_at"));
+                instant(rs, "published_publicly_at"), restorePresentation(
+                        rs.getString("format_payload"), rs.getString("summary_text")));
     }
 
     private ActivityResultStudentReadState mapStudentState(ResultSet rs) throws SQLException {
@@ -217,7 +264,7 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
                 rs.getString("result_internal_status"), rs.getString("result_public_status"),
                 uuid(rs, "current_candidate_version_id"), uuid(rs, "current_internal_version_id"),
                 uuid(rs, "current_public_version_id"), rs.getBoolean("public_visibility_blocked"),
-                mapVersion(rs, "internal", false), mapVersion(rs, "public", false));
+                mapBaseVersion(rs, "internal", false), mapBaseVersion(rs, "public", false));
     }
 
     private ManagementActivityResultDetail mapManagementDetail(ResultSet rs) throws SQLException {
@@ -259,7 +306,11 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
                         ? readList(rs.getString(prefix + "_media_refs"), UUID_LIST, "mediaRefs")
                         : List.of(),
                 instant(rs, prefix + "_published_internally_at"),
-                instant(rs, prefix + "_published_publicly_at"));
+                instant(rs, prefix + "_published_publicly_at"),
+                restorePresentation(rs.getString(prefix + "_format_payload"),
+                        rs.getString(prefix + "_summary_text")),
+                uuid(rs, prefix + "_format_record_id"),
+                integer(rs, prefix + "_format_revision"));
     }
 
     private <T> List<T> readList(String json, TypeReference<List<T>> type, String field) {
@@ -271,6 +322,25 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
         }
     }
 
+    private ActivityResultVersionProjection mapBaseVersion(ResultSet rs, String prefix, boolean includeMedia)
+            throws SQLException {
+        UUID id = uuid(rs, prefix + "_version_id");
+        if (id == null) return null;
+        return new ActivityResultVersionProjection(
+                id, rs.getInt(prefix + "_version_number"), rs.getString(prefix + "_title"),
+                rs.getString(prefix + "_summary_text"),
+                readList(rs.getString(prefix + "_score_highlights"), STRING_LIST, "scoreHighlights"),
+                includeMedia ? readList(rs.getString(prefix + "_media_refs"), UUID_LIST, "mediaRefs") : List.of(),
+                instant(rs, prefix + "_published_internally_at"),
+                instant(rs, prefix + "_published_publicly_at"));
+    }
+
+    private com.campusguinness.result.application.format.ResultFormatPresentation restorePresentation(
+            String json, String summary) {
+        if (json == null || json.isBlank()) return null;
+        return presentationValidator.restoreAndValidate(json, summary);
+    }
+
     private static UUID uuid(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, UUID.class);
     }
@@ -278,5 +348,10 @@ class ActivityResultReadQueryAdapter implements ActivityResultReadQueryPort {
     private static Instant instant(ResultSet rs, String column) throws SQLException {
         var value = rs.getTimestamp(column);
         return value == null ? null : value.toInstant();
+    }
+
+    private static Integer integer(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
     }
 }

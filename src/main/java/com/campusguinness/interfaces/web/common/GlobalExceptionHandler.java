@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import com.campusguinness.identity.application.exception.IdentityApplicationException;
 import com.campusguinness.ranking.application.exception.RankingGenerationException;
 import com.campusguinness.result.application.query.ActivityResultReadConsistencyException;
+import com.campusguinness.result.application.format.ResultFormatEditException;
 import com.campusguinness.school.application.query.exception.SchoolRegistrationNotFoundException;
 import com.campusguinness.school.application.exception.SchoolRegistrationReviewException;
 import com.campusguinness.school.internal.persistence.SchoolRegistrationConcurrentReviewException;
@@ -109,6 +110,16 @@ public class GlobalExceptionHandler {
                         req.getRequestURI()));
     }
 
+    @ExceptionHandler(ResultFormatEditException.class)
+    public ResponseEntity<ApiErrorResponse> handleResultFormatEdit(ResultFormatEditException ex, HttpServletRequest req) {
+        HttpStatus status = switch (ex.code()) {
+            case "ACTIVITY_RESULT_FORMAT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "ACTIVITY_RESULT_FORMAT_INVALID" -> HttpStatus.BAD_REQUEST;
+            default -> HttpStatus.CONFLICT;
+        };
+        return ResponseEntity.status(status).body(ApiErrorResponse.of(ex.code(), ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(RuntimeException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -197,6 +208,12 @@ public class GlobalExceptionHandler {
                             "The ActivityResult was changed by another request.",
                             req.getRequestURI()
                     ));
+        }
+        if (containsInCauseChain(ex, "uq_result_format_record_revision")
+                || containsInCauseChain(ex, "result_format_heads")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrorResponse.of("ACTIVITY_RESULT_FORMAT_CONFLICT",
+                            "The format overlay was changed by another request.", req.getRequestURI()));
         }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.of("INTERNAL_ERROR", "An unexpected error occurred", req.getRequestURI()));

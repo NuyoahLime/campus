@@ -19,7 +19,7 @@ class DatabaseMigrationTest {
     void flywayMigrationsExecuted() {
         Integer count = jdbc.queryForObject(
             "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(23);
+        assertThat(count).isEqualTo(24);
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.campusguinness.result.application.query.model.ActivityResultStudentRe
 import com.campusguinness.result.application.query.model.ManagementActivityResultDetail;
 import com.campusguinness.result.application.query.model.ManagementActivityResultSummary;
 import com.campusguinness.result.application.query.model.PublicActivityResultView;
+import com.campusguinness.result.application.query.model.ResultFormatOverlayProjection;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,8 @@ public interface ActivityResultReadQueryPort {
     Optional<PublicActivityResultView> findPublicByActivityId(UUID activityId);
 
     Optional<ActivityResultStudentReadState> findStudentState(UUID activityId, UUID schoolId);
+
+    Optional<ResultFormatOverlayProjection> findFormatOverlay(UUID resultId, UUID resultVersionId);
 
     Optional<ManagementActivityResultDetail> findManagementDetail(UUID activityId, UUID schoolId);
 
