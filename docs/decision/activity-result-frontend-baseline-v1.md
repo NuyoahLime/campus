@@ -100,13 +100,64 @@ The matrix is a frontend affordance contract, not authorization. Activity execut
 | Publish internal | Result exists; internal `DRAFT`; candidate pointer exists | No result/candidate, or internal is not `DRAFT` |
 | Withdraw internal | Internal `INTERNAL_PUBLISHED` | Any other internal status |
 | Return to draft | Internal `INTERNAL_WITHDRAWN` | Any other internal status; action never clears a public block or restores public visibility |
-| Submit public review | Internal `INTERNAL_PUBLISHED`; public `NOT_SUBMITTED`; candidate and internal pointers identify the same exact version | Missing/mismatched pointers, blocked/other public status, or other internal status |
-| Make public | Public `PLATFORM_APPROVED`; candidate exists and is the exact current internal approved version | Any other status/pointer relation or blocked state |
-| Format-only edit | Result/version exists, exact immutable summary is available, and target version is not the review-bound candidate | Target candidate is bound while public status is `PENDING_PUBLIC_REVIEW`, `PLATFORM_APPROVED`, or `PLATFORM_REJECTED`; missing exact version |
+| Submit public review | Internal `INTERNAL_PUBLISHED`; public `NOT_SUBMITTED`; non-null candidate and internal pointers identify the same exact version | Missing/mismatched pointers, another public status, or another internal status. `publicVisibilityBlocked` is not a blocker |
+| Make public | Public `PLATFORM_APPROVED`; non-null candidate and internal pointers identify the same exact approved version; server approval binding remains authoritative | Any other status/pointer relation. `publicVisibilityBlocked` is not a blocker |
+| Format-only edit | Activity is `PUBLISHED`, `IN_PROGRESS`, or `ENDED`; public status is neither `ANOMALY_PENDING` nor `PLATFORM_TAKEDOWN`; target is either the exact current internal version while internal is `INTERNAL_PUBLISHED`, or the exact current public version while visibility is not blocked; target is not candidate-only or a review-bound candidate | Activity `DRAFT`/`CANCELLED`; governance-blocked status; candidate-only, review-bound candidate, historical non-current, blocked public, or withdrawn-internal-only target |
 | View result history | Existing result and history read is authorized | No result; controlled `403`/scoped `404` |
 | View format history | Existing exact result/version | Missing result/version; controlled `403`/scoped `404` |
 
-For a review-bound candidate, format editing is disabled before submission and explains that the current version is bound to public review. A backend `409` is fallback protection, not the primary interaction.
+Once a candidate becomes bound to public review, format-only editing is disabled for that candidate. The old visible public version remains independently eligible when it is still the exact current public version and is not blocked. A backend `409` is final concurrency and state protection, not the primary interaction.
+
+### 5.4 Post-takedown recovery
+
+`publicVisibilityBlocked` guards visibility of the old public pointer. It is not a global ActivityResult workflow lock and does not block a replacement candidate from normal review and publication.
+
+The frozen recovery path is:
+
+1. `PLATFORM_TAKEDOWN` is reset by SuperAdmin to `NOT_SUBMITTED`; `publicVisibilityBlocked = true`, the historical `currentPublicVersionId` remains V1, and `currentCandidateVersionId = null`.
+2. SchoolAdmin saves replacement V2; internal becomes `DRAFT`, public remains `NOT_SUBMITTED`, and the old-public block remains true.
+3. SchoolAdmin publishes V2 internally and submits V2 for review while the old-public block remains true.
+4. SuperAdmin approves V2 while the block remains true.
+5. SchoolAdmin makes V2 public while the block remains true. The server atomically sets `currentPublicVersionId = V2`, clears `currentCandidateVersionId`, sets public status to `PUBLIC`, and sets `publicVisibilityBlocked = false`.
+
+| Recovery state | Submit review | Make public |
+| --- | --- | --- |
+| Internal `INTERNAL_PUBLISHED`; public `NOT_SUBMITTED`; candidate/internal V2; historical public V1; blocked `true` | Enabled | Not yet; approval is required |
+| Public `PLATFORM_APPROVED`; candidate/internal V2; historical public V1; blocked `true` | Not applicable | Enabled |
+
+An implementation equivalent to `if (publicVisibilityBlocked) { disable submit; disable makePublic; }` is prohibited. The block affects old public visibility, public-version format eligibility, public reads, and Student visibility according to server authority; it does not lock the whole workflow.
+
+### 5.5 Exact format-target eligibility
+
+`FORMAT_EDIT_ACTIVITY_STATE_GATE = PUBLISHED | IN_PROGRESS | ENDED`. Activity `DRAFT` and `CANCELLED` deny formatting. Public status `ANOMALY_PENDING` or `PLATFORM_TAKEDOWN` also denies formatting regardless of retained pointers.
+
+After those gates, an exact target is eligible only when either:
+
+- it equals `currentInternalVersionId` and `internalStatus == INTERNAL_PUBLISHED`; or
+- it equals `currentPublicVersionId` and `publicVisibilityBlocked == false`.
+
+A target is nevertheless denied when it is candidate-only, meaning it equals `currentCandidateVersionId` but neither current internal nor current public; or when it is the current candidate bound to `PENDING_PUBLIC_REVIEW`, `PLATFORM_APPROVED`, or `PLATFORM_REJECTED`. A target that is neither current internal nor current public is historical non-current and denied. `INTERNAL_WITHDRAWN` does not grant authority through a retained internal pointer, unless that same exact target independently qualifies as the visible current public version.
+
+| Scenario | Exact target | Frontend eligibility |
+| --- | --- | --- |
+| Candidate-only V2 | V2 | Deny |
+| First-public pending V1 | V1 | Deny: review-bound candidate |
+| First-public approved V1 | V1 | Deny: review-bound candidate |
+| Public V1 | V1 | Allow when it is the unblocked exact current public version |
+| Replacement draft | V2 | Deny: candidate-only |
+| Replacement draft | Old V1 | Allow when it remains the unblocked exact current public version |
+| Replacement internal | V2 | Allow as exact current internal while `INTERNAL_PUBLISHED` |
+| Replacement internal | Old V1 | Allow when it remains the unblocked exact current public version |
+| Replacement pending | V2 | Deny: review-bound candidate |
+| Replacement pending | Old V1 | Allow when it remains the unblocked exact current public version |
+| Replacement approved | V2 | Deny: review-bound candidate |
+| Replacement approved | Old V1 | Allow when it remains the unblocked exact current public version |
+| Replacement rejected | V2 | Deny: review-bound candidate |
+| Replacement rejected | Old V1 | Allow when it remains the unblocked exact current public version |
+| Takedown historical public | Old V1 | Deny: `PLATFORM_TAKEDOWN` and blocked |
+| Reset blocked old public | Old V1 | Deny: blocked historical public |
+| Historical non-current | Historical version | Deny |
+| Internal withdrawn only | Retained internal version | Deny unless the same target independently qualifies as visible current public |
 
 ## 6. Format-only editor and renderer
 
@@ -200,6 +251,8 @@ The following cases use real API behavior and verify both visible UI and relevan
 | FE-E2E-29 | Conditional: a future approved publication restores visibility through the normal publication flow. |
 
 FE-E2E-01 through FE-E2E-24 are approved baseline cases. `FE-E2E-25..29 = BLOCKED_BY_FRONTEND_SUPPORT_QUERY`; they become executable only after a stable governance discovery/detail contract closes the documented gap.
+
+`POST_TAKEDOWN_RECOVERY_CONTRACT = APPROVED`. Once governance queries make the conditional cases executable, the browser flow must verify: reset preserves `publicVisibilityBlocked = true`; a new SchoolAdmin candidate can be saved, published internally, and submitted while blocked; SuperAdmin approval preserves the block; and SchoolAdmin Make Public succeeds while blocked, atomically clears the block, and exposes the exact newly approved version. The blocked flag must never be used as a Submit or Make Public UI blocker.
 
 ## 12. Implementation slices
 
