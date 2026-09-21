@@ -57,6 +57,10 @@ abstract class ActivityResultReadTestSupport extends PostgreSqlIntegrationTestSu
 
     @AfterEach
     void tearDownReadFixture() {
+        jdbc.update("DELETE FROM result_format_heads WHERE result_id IN "
+                + "(SELECT id FROM activity_results WHERE school_id IN (?, ?))", schoolA, schoolB);
+        jdbc.update("DELETE FROM result_format_edit_records WHERE result_id IN "
+                + "(SELECT id FROM activity_results WHERE school_id IN (?, ?))", schoolA, schoolB);
         jdbc.update("DELETE FROM result_review_records WHERE result_id IN "
                 + "(SELECT id FROM activity_results WHERE school_id IN (?, ?))", schoolA, schoolB);
         jdbc.update("UPDATE activity_results SET current_candidate_version_id = NULL, "

@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - EntityManagerFactory starts with PostgreSQL 18.4 Testcontainer.
  * - All 23 entities are scanned and mapped.
  * - Hibernate ddl-auto is 'none' (verified via configuration).
- * - Flyway executed all 23 migrations.
+ * - Flyway executed all 24 migrations.
  */
 class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
 
@@ -51,22 +51,22 @@ class JpaMappingContextTest extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway executed exactly 23 successful migrations")
-    void flywayExecutedAll23Migrations() {
+    @DisplayName("Flyway executed exactly 24 successful migrations")
+    void flywayExecutedAll24Migrations() {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE success = true", Integer.class);
-        assertThat(count).isEqualTo(23);
+        assertThat(count).isEqualTo(24);
     }
 
     @Test
     @DisplayName("Hibernate did not create or alter any tables")
     void hibernateDidNotCreateTables() {
-        // 36 business tables + 2 spring_session tables + 1 flyway_schema_history = 39
+        // 38 business tables + 2 spring_session tables + 1 flyway_schema_history = 41
         Integer totalTables = jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables " +
                         "WHERE table_schema='public' AND table_type='BASE TABLE'", Integer.class);
         // flyway_schema_history is in public schema
-        assertThat(totalTables).isEqualTo(39);
+        assertThat(totalTables).isEqualTo(41);
     }
 
     @Test

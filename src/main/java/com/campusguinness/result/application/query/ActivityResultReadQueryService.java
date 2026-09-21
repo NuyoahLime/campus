@@ -40,15 +40,24 @@ public class ActivityResultReadQueryService {
 
     public PublicActivityResultView publicDetail(UUID activityId) {
         requireActivityId(activityId);
-        return query.findPublicByActivityId(activityId)
-                .orElseThrow(() -> notFound(activityId));
+        try {
+            return query.findPublicByActivityId(activityId)
+                    .orElseThrow(() -> notFound(activityId));
+        } catch (ActivityResultReadConsistencyException ex) {
+            throw notFound(activityId);
+        }
     }
 
     public StudentActivityResultView studentDetail(UUID activityId) {
         requireActivityId(activityId);
         UUID schoolId = studentAuthorization.requireUniqueActiveStudent().schoolId();
-        ActivityResultStudentReadState state = query.findStudentState(activityId, schoolId)
-                .orElseThrow(() -> notFound(activityId));
+        ActivityResultStudentReadState state;
+        try {
+            state = query.findStudentState(activityId, schoolId)
+                    .orElseThrow(() -> notFound(activityId));
+        } catch (ActivityResultReadConsistencyException ex) {
+            throw notFound(activityId);
+        }
 
         if (internalAllowed(state)) {
             if (state.internalProjection() == null) {
@@ -122,7 +131,7 @@ public class ActivityResultReadQueryService {
         return new StudentActivityResultView(
                 state.activityId(), state.resultId(), version.versionId(), version.versionNumber(),
                 version.title(), version.summaryText(), version.scoreHighlights(), source,
-                version.publishedInternallyAt(), version.publishedPubliclyAt());
+                version.publishedInternallyAt(), version.publishedPubliclyAt(), version.presentation());
     }
 
     private void requireConsistentPointers(ManagementActivityResultDetail detail) {
