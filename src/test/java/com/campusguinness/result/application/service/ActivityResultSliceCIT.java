@@ -8,6 +8,7 @@ import com.campusguinness.result.application.command.SaveActivityResultContentCo
 import com.campusguinness.result.application.port.ActivityResultRepository;
 import com.campusguinness.result.application.port.ResultReviewRecordRepository;
 import com.campusguinness.result.application.query.ActivityResultReviewQueryService;
+import com.campusguinness.result.application.query.ActivityResultGovernanceQueryService;
 import com.campusguinness.result.internal.domain.ActivityResultId;
 import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.AfterEach;
@@ -44,6 +45,7 @@ class ActivityResultSliceCIT extends PostgreSqlIntegrationTestSupport {
     @Autowired private ActivityResultApplicationService editorService;
     @Autowired private ActivityResultReviewApplicationService reviewService;
     @Autowired private ActivityResultReviewQueryService reviewQueryService;
+    @Autowired private ActivityResultGovernanceQueryService governanceQueryService;
     @Autowired private JdbcTemplate jdbc;
     @MockitoSpyBean private ResultReviewRecordRepository reviewRecords;
     @MockitoSpyBean private ActivityResultRepository activityResults;
@@ -261,6 +263,82 @@ class ActivityResultSliceCIT extends PostgreSqlIntegrationTestSupport {
         assertThat(detail.candidateVersionNumber()).isOne();
         assertThat(detail.candidateTitle()).isEqualTo("Candidate V1");
         assertThat(detail.history()).extracting(entry -> entry.action()).containsExactly("SUBMITTED");
+    }
+
+    @Test
+    void pendingSupportReadIncludesActivityContextAndKeepsDraftAndCancelledMembership() {
+        ReviewFixture cancelled = submittedFixture("Cancelled support");
+        jdbc.update("UPDATE activities SET execution_status = 'CANCELLED' WHERE id = ?",
+                cancelled.activityId());
+        ReviewFixture draft = submittedFixture("Draft support");
+        jdbc.update("UPDATE activities SET execution_status = 'DRAFT' WHERE id = ?",
+                draft.activityId());
+        authenticate(superAdminA, "SUPER_ADMIN", null, null);
+
+        var page = reviewQueryService.listPending(0, 20);
+
+        var cancelledSummary = page.items().stream()
+                .filter(item -> item.resultId().equals(cancelled.resultId()))
+                .findFirst().orElseThrow();
+        assertThat(cancelledSummary.schoolName()).startsWith(prefix + "-a");
+        assertThat(cancelledSummary.activityTitle()).isEqualTo(
+                jdbc.queryForObject("SELECT title FROM activities WHERE id = ?", String.class,
+                        cancelled.activityId()));
+        assertThat(cancelledSummary.activityExecutionStatus()).isEqualTo("CANCELLED");
+
+        var draftDetail = reviewQueryService.pendingDetail(draft.resultId());
+        assertThat(draftDetail.schoolName()).startsWith(prefix + "-a");
+        assertThat(draftDetail.activityTitle()).isEqualTo(
+                jdbc.queryForObject("SELECT title FROM activities WHERE id = ?", String.class,
+                        draft.activityId()));
+        assertThat(draftDetail.activityExecutionStatus()).isEqualTo("DRAFT");
+        assertThat(draftDetail.candidateVersionId()).isEqualTo(draft.versionId());
+        assertThat(draftDetail.history()).extracting(entry -> entry.action())
+                .containsExactly("SUBMITTED");
+    }
+
+    @Test
+    void governanceReadUsesExactPublicPointerAndDoesNotCreateRows() {
+        ReviewFixture fixture = publishedFixture("Public pointer V1");
+        UUID v2 = insertVersion(fixture.resultId(), 2, "Newer candidate V2");
+        jdbc.update("UPDATE result_versions SET published_publicly_at = now() WHERE id = ?",
+                fixture.versionId());
+        jdbc.update("""
+                UPDATE activity_results
+                SET result_public_status = 'PUBLIC',
+                    current_candidate_version_id = ?,
+                    current_public_version_id = ?,
+                    public_visibility_blocked = false
+                WHERE id = ?
+                """, v2, fixture.versionId(), fixture.resultId());
+        authenticate(superAdminA, "SUPER_ADMIN", null, null);
+
+        int resultCountBefore = jdbc.queryForObject(
+                "SELECT count(*) FROM activity_results WHERE school_id = ?", Integer.class, schoolA);
+        int versionCountBefore = jdbc.queryForObject(
+                "SELECT count(*) FROM result_versions WHERE result_id = ?", Integer.class, fixture.resultId());
+        int historyCountBefore = historyCount(fixture.resultId());
+
+        var page = governanceQueryService.list(0, 20, " public ", false, "  SLICE-C  ");
+        var summary = page.items().stream()
+                .filter(item -> item.resultId().equals(fixture.resultId()))
+                .findFirst().orElseThrow();
+        var detail = governanceQueryService.detail(fixture.resultId());
+
+        assertThat(summary.currentPublicVersionId()).isEqualTo(fixture.versionId());
+        assertThat(summary.publicStatus()).isEqualTo("PUBLIC");
+        assertThat(detail.currentCandidateVersionId()).isEqualTo(v2);
+        assertThat(detail.currentPublicVersionId()).isEqualTo(fixture.versionId());
+        assertThat(detail.currentPublicVersion()).isNotNull();
+        assertThat(detail.currentPublicVersion().versionId()).isEqualTo(fixture.versionId());
+        assertThat(detail.currentPublicVersion().title()).isEqualTo("Public pointer V1");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM activity_results WHERE school_id = ?", Integer.class, schoolA))
+                .isEqualTo(resultCountBefore);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM result_versions WHERE result_id = ?", Integer.class, fixture.resultId()))
+                .isEqualTo(versionCountBefore);
+        assertThat(historyCount(fixture.resultId())).isEqualTo(historyCountBefore);
     }
 
     @Test

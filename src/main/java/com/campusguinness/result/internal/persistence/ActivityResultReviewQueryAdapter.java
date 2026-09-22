@@ -37,10 +37,16 @@ class ActivityResultReviewQueryAdapter implements ActivityResultReviewQueryPort 
     public QueryPage<PendingResultReviewSummary> findPending(int page, int size) {
         List<PendingResultReviewSummary> items = jdbc.query("""
                 SELECT ar.id AS result_id, ar.school_id, ar.activity_id,
+                       s.name AS school_name, a.title AS activity_title,
+                       a.execution_status AS activity_execution_status,
                        rv.id AS candidate_version_id, rv.version_number,
                        rv.title, submitted.submitted_at, submitted.submitted_by,
                        ar.result_public_status
                 FROM activity_results ar
+                JOIN activities a
+                  ON a.id = ar.activity_id
+                 AND a.school_id = ar.school_id
+                JOIN schools s ON s.id = ar.school_id
                 JOIN result_versions rv
                   ON rv.id = ar.current_candidate_version_id
                  AND rv.result_id = ar.id
@@ -61,6 +67,9 @@ class ActivityResultReviewQueryAdapter implements ActivityResultReviewQueryPort 
                         uuid(rs, "result_id"),
                         uuid(rs, "school_id"),
                         uuid(rs, "activity_id"),
+                        rs.getString("school_name"),
+                        rs.getString("activity_title"),
+                        rs.getString("activity_execution_status"),
                         uuid(rs, "candidate_version_id"),
                         rs.getInt("version_number"),
                         rs.getString("title"),
@@ -72,6 +81,10 @@ class ActivityResultReviewQueryAdapter implements ActivityResultReviewQueryPort 
         Long total = jdbc.queryForObject("""
                 SELECT COUNT(*)
                 FROM activity_results ar
+                JOIN activities a
+                  ON a.id = ar.activity_id
+                 AND a.school_id = ar.school_id
+                JOIN schools s ON s.id = ar.school_id
                 JOIN result_versions rv
                   ON rv.id = ar.current_candidate_version_id
                  AND rv.result_id = ar.id
@@ -92,12 +105,18 @@ class ActivityResultReviewQueryAdapter implements ActivityResultReviewQueryPort 
     public Optional<PendingResultReviewDetail> findPendingDetail(UUID resultId) {
         return jdbc.query("""
                 SELECT ar.id AS result_id, ar.school_id, ar.activity_id,
+                       s.name AS school_name, a.title AS activity_title,
+                       a.execution_status AS activity_execution_status,
                        rv.id AS candidate_version_id, rv.version_number,
                        rv.title, rv.summary_text, rv.score_highlights::text AS score_highlights,
                        rv.media_refs::text AS media_refs,
                        submitted.submitted_at, submitted.submitted_by,
                        ar.result_public_status
                 FROM activity_results ar
+                JOIN activities a
+                  ON a.id = ar.activity_id
+                 AND a.school_id = ar.school_id
+                JOIN schools s ON s.id = ar.school_id
                 JOIN result_versions rv
                   ON rv.id = ar.current_candidate_version_id
                  AND rv.result_id = ar.id
@@ -124,6 +143,9 @@ class ActivityResultReviewQueryAdapter implements ActivityResultReviewQueryPort 
                 resultId,
                 uuid(rs, "school_id"),
                 uuid(rs, "activity_id"),
+                rs.getString("school_name"),
+                rs.getString("activity_title"),
+                rs.getString("activity_execution_status"),
                 candidateVersionId,
                 rs.getInt("version_number"),
                 rs.getString("title"),
