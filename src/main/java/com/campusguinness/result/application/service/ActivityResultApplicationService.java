@@ -3,7 +3,6 @@ package com.campusguinness.result.application.service;
 import com.campusguinness.activity.application.port.ActivityRepository;
 import com.campusguinness.activity.internal.domain.Activity;
 import com.campusguinness.activity.internal.domain.ActivityId;
-import com.campusguinness.activity.internal.domain.ExecutionStatus;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.media.application.service.MediaEligibilityValidator;
 import com.campusguinness.result.application.command.SaveActivityResultContentCommand;
@@ -88,6 +87,7 @@ public class ActivityResultApplicationService {
     public ActivityResultResult publishInternal(UUID id) {
         ActivityResult result = findResult(id);
         authorization.requireSchoolAdmin(result.schoolId());
+        ActivityResultActivityStateGuard.requireOrdinaryMutationAllowed(findActivity(result.activityId()));
         UUID candidateId = result.currentCandidateVersionId();
         if (candidateId == null) {
             throw new IllegalStateException("currentCandidateVersionId required");
@@ -105,6 +105,7 @@ public class ActivityResultApplicationService {
     public ActivityResultResult withdrawInternal(UUID id) {
         ActivityResult result = findResult(id);
         authorization.requireSchoolAdmin(result.schoolId());
+        ActivityResultActivityStateGuard.requireOrdinaryMutationAllowed(findActivity(result.activityId()));
         result.withdrawInternal();
         activityResults.save(result);
         return toLifecycleResult(result);
@@ -113,6 +114,7 @@ public class ActivityResultApplicationService {
     public ActivityResultResult returnToDraft(UUID id) {
         ActivityResult result = findResult(id);
         authorization.requireSchoolAdmin(result.schoolId());
+        ActivityResultActivityStateGuard.requireOrdinaryMutationAllowed(findActivity(result.activityId()));
         result.returnToDraft();
         activityResults.save(result);
         return toLifecycleResult(result);
@@ -182,12 +184,7 @@ public class ActivityResultApplicationService {
     }
 
     private void requireEditableActivity(Activity activity) {
-        ExecutionStatus status = activity.executionStatus();
-        if (status != ExecutionStatus.PUBLISHED
-                && status != ExecutionStatus.IN_PROGRESS
-                && status != ExecutionStatus.ENDED) {
-            throw new IllegalStateException("Cannot edit ActivityResult for activity execution status " + status);
-        }
+        ActivityResultActivityStateGuard.requireOrdinaryMutationAllowed(activity);
     }
 
     private void requireCoreEditAllowed(ActivityResult result) {
@@ -198,6 +195,9 @@ public class ActivityResultApplicationService {
                 || result.publicStatus() == ResultPublicStatus.PLATFORM_APPROVED) {
             throw new IllegalStateException(
                     "Cannot edit core content from public status " + result.publicStatus());
+        }
+        if (result.publicStatus() == ResultPublicStatus.PLATFORM_TAKEDOWN) {
+            throw new IllegalStateException("Cannot edit core content from public status PLATFORM_TAKEDOWN");
         }
     }
 

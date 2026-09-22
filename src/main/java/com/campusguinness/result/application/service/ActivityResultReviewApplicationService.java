@@ -1,5 +1,7 @@
 package com.campusguinness.result.application.service;
 
+import com.campusguinness.activity.application.port.ActivityRepository;
+import com.campusguinness.activity.internal.domain.ActivityId;
 import com.campusguinness.identity.application.service.PlatformGovernanceAuthorization;
 import com.campusguinness.identity.application.service.SchoolResourceAuthorization;
 import com.campusguinness.result.application.port.ActivityResultRepository;
@@ -26,6 +28,7 @@ public class ActivityResultReviewApplicationService {
     private static final int REJECTION_REASON_MAX = 2_000;
 
     private final ActivityResultRepository activityResults;
+    private final ActivityRepository activities;
     private final ResultVersionRepository resultVersions;
     private final ResultReviewRecordRepository reviewRecords;
     private final SchoolResourceAuthorization schoolAuthorization;
@@ -34,12 +37,14 @@ public class ActivityResultReviewApplicationService {
 
     public ActivityResultReviewApplicationService(
             ActivityResultRepository activityResults,
+            ActivityRepository activities,
             ResultVersionRepository resultVersions,
             ResultReviewRecordRepository reviewRecords,
             SchoolResourceAuthorization schoolAuthorization,
             PlatformGovernanceAuthorization platformAuthorization,
             Clock clock) {
         this.activityResults = activityResults;
+        this.activities = activities;
         this.resultVersions = resultVersions;
         this.reviewRecords = reviewRecords;
         this.schoolAuthorization = schoolAuthorization;
@@ -50,6 +55,7 @@ public class ActivityResultReviewApplicationService {
     public ActivityResultResult submit(UUID resultId) {
         ActivityResult result = findResult(resultId);
         UUID actorId = schoolAuthorization.requireSchoolAdmin(result.schoolId());
+        requireOrdinaryActivityState(result);
         ResultVersion candidate = requireCurrentCandidate(result);
 
         result.submitForReview(candidate.id().value());
@@ -67,6 +73,7 @@ public class ActivityResultReviewApplicationService {
     public ActivityResultResult approve(UUID resultId) {
         ActivityResult result = findResult(resultId);
         UUID reviewerId = platformAuthorization.requireSuperAdmin();
+        requireOrdinaryActivityState(result);
         ResultVersion candidate = requireCurrentCandidate(result);
         requireOpenSubmission(result, candidate);
 
@@ -86,6 +93,7 @@ public class ActivityResultReviewApplicationService {
         String normalizedReason = normalizeReason(reason);
         ActivityResult result = findResult(resultId);
         UUID reviewerId = platformAuthorization.requireSuperAdmin();
+        requireOrdinaryActivityState(result);
         ResultVersion candidate = requireCurrentCandidate(result);
         requireOpenSubmission(result, candidate);
 
@@ -106,6 +114,11 @@ public class ActivityResultReviewApplicationService {
         if (resultId == null) throw new IllegalArgumentException("ActivityResult id required");
         return activityResults.findById(new ActivityResultId(resultId))
                 .orElseThrow(() -> new IllegalArgumentException("ActivityResult not found: " + resultId));
+    }
+
+    private void requireOrdinaryActivityState(ActivityResult result) {
+        ActivityResultActivityStateGuard.requireOrdinaryMutationAllowed(activities.findById(new ActivityId(result.activityId()))
+                .orElseThrow(() -> new IllegalStateException("ActivityResult activity not found")));
     }
 
     private ResultVersion requireCurrentCandidate(ActivityResult result) {
