@@ -2,7 +2,9 @@
 
 Status: proposed, ready for independent review
 
-Authoritative backend baseline: `4b1af935a14063d6900a091ca5ad566d3ef92ef8`
+Authoritative backend baseline: `578aef87bc2c443dcb1037e4bded18724dbbe502`
+
+The backend correctness patch has merged and been resealed at this baseline. Ordinary ActivityResult mutations are allowed only when the Activity execution state is `PUBLISHED`, `IN_PROGRESS`, or `ENDED`; `DRAFT` and `CANCELLED` deny ordinary mutations. Platform takedown and reset remain the separate safety-governance exception for cancelled Activities.
 
 Scope: product and frontend contract only; no implementation is authorized by this document.
 
@@ -94,14 +96,16 @@ All labels for `internalStatus`, `publicStatus`, `publicVisibilityBlocked`, and 
 
 The matrix is a frontend affordance contract, not authorization. Activity execution state, pointers, review binding, and block state refine it; the server remains final authority. Unsupported actions are hidden when impossible and disabled with a concise reason when the surrounding workflow context is useful.
 
+`ACTIVITY_RESULT_ORDINARY_ACTION_STATE_GATE = PUBLISHED | IN_PROGRESS | ENDED` applies to save core content, publish internal, withdraw internal, return to draft, submit public review, approve public review, reject public review, make public, and format-only edit. `DRAFT` and `CANCELLED` deny these ordinary actions. Takedown and reset are platform safety-governance actions, not ordinary mutations, and remain allowed on cancelled Activities.
+
 | Action | Show/enable when | Disable or hide when |
 | --- | --- | --- |
-| Save core content | Activity is `PUBLISHED`, `IN_PROGRESS`, or `ENDED`; result absent or not internally withdrawn; public status is not review-bound | Activity `DRAFT` or `CANCELLED`; internal `INTERNAL_WITHDRAWN`; public `PENDING_PUBLIC_REVIEW` or `PLATFORM_APPROVED` |
-| Publish internal | Result exists; internal `DRAFT`; candidate pointer exists | No result/candidate, or internal is not `DRAFT` |
-| Withdraw internal | Internal `INTERNAL_PUBLISHED` | Any other internal status |
-| Return to draft | Internal `INTERNAL_WITHDRAWN` | Any other internal status; action never clears a public block or restores public visibility |
-| Submit public review | Internal `INTERNAL_PUBLISHED`; public `NOT_SUBMITTED`; non-null candidate and internal pointers identify the same exact version | Missing/mismatched pointers, another public status, or another internal status. `publicVisibilityBlocked` is not a blocker |
-| Make public | Public `PLATFORM_APPROVED`; non-null candidate and internal pointers identify the same exact approved version; server approval binding remains authoritative | Any other status/pointer relation. `publicVisibilityBlocked` is not a blocker |
+| Save core content | Allowed Activity state; result absent or not internally withdrawn; public status is not `PENDING_PUBLIC_REVIEW`, `PLATFORM_APPROVED`, or `PLATFORM_TAKEDOWN` | Activity `DRAFT` or `CANCELLED`; internal `INTERNAL_WITHDRAWN`; review-bound/takedown public status |
+| Publish internal | Allowed Activity state; result exists; internal `DRAFT`; candidate pointer exists | Activity `DRAFT`/`CANCELLED`, no result/candidate, or internal is not `DRAFT` |
+| Withdraw internal | Allowed Activity state; internal `INTERNAL_PUBLISHED` | Activity `DRAFT`/`CANCELLED`, or any other internal status |
+| Return to draft | Allowed Activity state; internal `INTERNAL_WITHDRAWN` | Activity `DRAFT`/`CANCELLED`, or any other internal status; action never clears a public block or restores public visibility |
+| Submit public review | Allowed Activity state; internal `INTERNAL_PUBLISHED`; public `NOT_SUBMITTED`; non-null candidate and internal pointers identify the same exact version | Activity `DRAFT`/`CANCELLED`, missing/mismatched pointers, another public status, or another internal status. `publicVisibilityBlocked` is not a blocker |
+| Make public | Allowed Activity state; public `PLATFORM_APPROVED`; non-null candidate and internal pointers identify the same exact approved version; server approval binding remains authoritative | Activity `DRAFT`/`CANCELLED`, or any other status/pointer relation. `publicVisibilityBlocked` is not a blocker |
 | Format-only edit | Activity is `PUBLISHED`, `IN_PROGRESS`, or `ENDED`; public status is neither `ANOMALY_PENDING` nor `PLATFORM_TAKEDOWN`; target is either the exact current internal version while internal is `INTERNAL_PUBLISHED`, or the exact current public version while visibility is not blocked; target is not candidate-only or a review-bound candidate | Activity `DRAFT`/`CANCELLED`; governance-blocked status; candidate-only, review-bound candidate, historical non-current, blocked public, or withdrawn-internal-only target |
 | View result history | Existing result and history read is authorized | No result; controlled `403`/scoped `404` |
 | View format history | Existing exact result/version | Missing result/version; controlled `403`/scoped `404` |
@@ -111,6 +115,8 @@ Once a candidate becomes bound to public review, format-only editing is disabled
 ### 5.4 Post-takedown recovery
 
 `publicVisibilityBlocked` guards visibility of the old public pointer. It is not a global ActivityResult workflow lock and does not block a replacement candidate from normal review and publication.
+
+For core save specifically, `publicStatus == PLATFORM_TAKEDOWN` is a deny condition because reset is required first and reset leaves `currentCandidateVersionId == null`. Do not use `publicVisibilityBlocked == true` as a core-save blocker. The reset-first path is the only recovery path for a takedown result.
 
 The frozen recovery path is:
 
@@ -126,6 +132,8 @@ The frozen recovery path is:
 | Public `PLATFORM_APPROVED`; candidate/internal V2; historical public V1; blocked `true` | Not applicable | Enabled |
 
 An implementation equivalent to `if (publicVisibilityBlocked) { disable submit; disable makePublic; }` is prohibited. The block affects old public visibility, public-version format eligibility, public reads, and Student visibility according to server authority; it does not lock the whole workflow.
+
+The same prohibition applies globally: `if (publicVisibilityBlocked) disable save/submit/approve/makePublic` is invalid. After reset, save V2, internal publish V2, submit V2, approve V2, and make public V2 remain available while blocked; successful Make Public changes the public pointer to V2 and clears the block.
 
 ### 5.5 Exact format-target eligibility
 
@@ -183,6 +191,10 @@ Add "Result Review" to `superAdminNavigation`.
 
 Approve and Reject act on the loaded exact candidate. Reject requires a bounded modal and reason. Approval is not publication: after approval the UI states that SchoolAdmin must still perform Make Public, and anonymous visibility must not be implied.
 
+Approve and Reject are allowed only for public status `PENDING_PUBLIC_REVIEW` and Activity execution state `PUBLISHED`, `IN_PROGRESS`, or `ENDED`. If an Activity becomes `CANCELLED` while pending, the candidate and review history remain readable, but Approve and Reject are unavailable; platform safety governance is separate and does not delete history.
+
+`SUPERADMIN_REVIEW_ACTIVITY_STATE_READ = GAP` and `SUPERADMIN_REVIEW_ACTIVITY_STATE_AFFORDANCE = BLOCKED_BY_SUPPORT_QUERY`: the current `PendingResultReviewSummary` and `PendingResultReviewDetail` do not expose `activityExecutionStatus`, while backend decisions enforce it. Do not infer Activity state from `publicStatus` or use the SchoolAdmin management endpoint for SuperAdmin. Candidate future fields are `PendingResultReviewSummary.activityExecutionStatus` and `PendingResultReviewDetail.activityExecutionStatus`; the final shape is deferred to the Support Query Baseline.
+
 ## 8. SuperAdmin governance read-gap audit
 
 `SUPERADMIN_GOVERNANCE_DISCOVERY_READ = GAP`.
@@ -195,6 +207,19 @@ Code evidence at the authoritative baseline:
 - A taken-down result is therefore not guaranteed to remain discoverable or readable after reload, so the required `discover -> read -> takedown -> reload -> read takedown state -> reset -> reload` chain does not exist.
 
 Consequently `SUPERADMIN_GOVERNANCE_UI = BLOCKED_BY_READ_CONTRACT`. Implementation must not bridge this gap using localStorage, transient page state, manual UUID entry, scanning public activities, N+1 public-result probes, or hiding reload behavior. The minimum next stage is `ACTIVITY_RESULT_FRONTEND_SUPPORT_QUERY_BASELINE`, defining additive governance discovery/detail reads before governance UI work.
+
+### 8.1 Support-query gaps
+
+| Gap | Evidence | Required support |
+| --- | --- | --- |
+| Governance discovery/read | Governance exposes takedown/reset mutations but no durable general list/detail reload path | Additive governance discovery/detail query contract |
+| SuperAdmin review Activity execution status | Pending review summary/detail omit `activityExecutionStatus` although approve/reject enforce it | Additive review support query field contract |
+
+`SUPPORT_QUERY_GAP_COUNT = 2`. `NO MUTATION CONTRACT CHANGE REQUIRED`. Both gaps are addressed together in `ACTIVITY_RESULT_FRONTEND_SUPPORT_QUERY_BASELINE`.
+
+### 8.2 SchoolAdmin Activity status source
+
+Do not add `executionStatus` to the ActivityResult DTO. SchoolAdmin loads Activity context and execution status independently from `GET /api/v1/activities/management/{activityId}` and loads result state, pointers, and content from `GET /api/v1/activities/{activityId}/result`. Separate loading and error handling is required. `SCHOOL_ADMIN_ACTIVITY_STATE_SUPPORT_QUERY = NOT_REQUIRED`.
 
 ## 9. Page state and mutation contracts
 
@@ -249,8 +274,10 @@ The following cases use real API behavior and verify both visible UI and relevan
 | FE-E2E-27 | Conditional: reset takedown leaves public visibility blocked. |
 | FE-E2E-28 | Conditional: reload can still read reset state. |
 | FE-E2E-29 | Conditional: a future approved publication restores visibility through the normal publication flow. |
+| FE-E2E-30 | Pending review -> Activity is cancelled -> reload detail; candidate/history remain readable and Approve/Reject are disabled or unavailable. |
+| FE-E2E-31 | Stale Approve/Reject after cancellation is denied by the server; the UI shows a controlled conflict, refreshes authoritative state, and records no APPROVED/REJECTED history. |
 
-FE-E2E-01 through FE-E2E-24 are approved baseline cases. `FE-E2E-25..29 = BLOCKED_BY_FRONTEND_SUPPORT_QUERY`; they become executable only after a stable governance discovery/detail contract closes the documented gap.
+FE-E2E-01 through FE-E2E-24 are approved baseline cases. `FE-E2E-25..31 = BLOCKED_BY_FRONTEND_SUPPORT_QUERY`; they become executable only after stable governance discovery/detail and review Activity-state contracts close the documented gaps. `FE-E2E_TOTAL = 31`.
 
 `POST_TAKEDOWN_RECOVERY_CONTRACT = APPROVED`. Once governance queries make the conditional cases executable, the browser flow must verify: reset preserves `publicVisibilityBlocked = true`; a new SchoolAdmin candidate can be saved, published internally, and submitted while blocked; SuperAdmin approval preserves the block; and SchoolAdmin Make Public succeeds while blocked, atomically clears the block, and exposes the exact newly approved version. The blocked flag must never be used as a Submit or Make Public UI blocker.
 
@@ -261,10 +288,10 @@ Implementation must remain split into reviewable slices:
 - **FE-A:** audience-specific types, ActivityResult API client, centralized labels, and safe shared presentation renderer.
 - **FE-B:** Public and Student projections integrated into their existing activity detail pages.
 - **FE-C:** SchoolAdmin list, dedicated editor, projection views, lifecycle actions, lifecycle/review history, and format editor/history.
-- **FE-D:** SuperAdmin pending review queue, detail, approve, and reject.
-- **FE-E:** SuperAdmin takedown/reset governance; blocked until the governance support-query contract is defined and implemented.
+- **FE-D:** SuperAdmin pending review queue, detail, approve, and reject; partially blocked by the review Activity-state support query.
+- **FE-E:** SuperAdmin takedown/reset governance; blocked by the governance read contract and review support-query contract.
 
-No slice should combine all audiences into one large pull request. Because the governance read chain is currently incomplete, the next stage is `ACTIVITY_RESULT_FRONTEND_SUPPORT_QUERY_BASELINE`, not FE-A implementation.
+`FE-D = PARTIALLY_BLOCKED_BY_SUPPORT_QUERY`. `FE-E = BLOCKED_BY_SUPPORT_QUERY`. No slice should combine all audiences into one large pull request. After Review V3, the next stage is `ACTIVITY_RESULT_FRONTEND_SUPPORT_QUERY_BASELINE`, which addresses both gaps together.
 
 ## 13. Frozen decisions
 
