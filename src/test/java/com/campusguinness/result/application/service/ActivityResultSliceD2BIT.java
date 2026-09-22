@@ -236,6 +236,68 @@ class ActivityResultSliceD2BIT extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test
+    void takedownBlocksCoreSaveUntilResetThenAllowsBlockedRecovery() {
+        Fixture fixture = takedownFixture("PUBLISHED");
+        int versionsBefore = jdbc.queryForObject(
+                "SELECT count(*) FROM result_versions WHERE result_id = ?", Integer.class, fixture.resultId());
+
+        authenticate(schoolAdmin, "SCHOOL_ADMIN", schoolId, "SCHOOL_ADMIN");
+        assertThatThrownBy(() -> resultService.saveEditorContent(fixture.activityId(),
+                new SaveActivityResultContentCommand("Blocked", "Must wait for reset", List.of(), List.of())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PLATFORM_TAKEDOWN");
+        assertThat(resultColumn(fixture.resultId(), "current_candidate_version_id")).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM result_versions WHERE result_id = ?",
+                Integer.class, fixture.resultId())).isEqualTo(versionsBefore);
+
+        authenticate(superAdmin, "SUPER_ADMIN", null, null);
+        governanceService.resetTakedown(fixture.resultId(), "reset before replacement");
+        authenticate(schoolAdmin, "SCHOOL_ADMIN", schoolId, "SCHOOL_ADMIN");
+        var saved = resultService.saveEditorContent(fixture.activityId(),
+                new SaveActivityResultContentCommand("Replacement", "Allowed after reset", List.of(), List.of()));
+
+        assertThat(saved.currentCandidateVersionId()).isNotNull();
+        assertThat(resultColumn(fixture.resultId(), "public_visibility_blocked")).isEqualTo(true);
+        assertThat(resultColumn(fixture.resultId(), "current_public_version_id"))
+                .isEqualTo(fixture.publicVersionId());
+    }
+
+    @Test
+    void publishInternalRejectsCancelledActivityWithOtherwiseValidResultState() {
+        Fixture fixture = fixture("NOT_SUBMITTED", "PUBLISHED", false);
+        UUID candidate = insertVersion(fixture.resultId(), 2, "Candidate", null);
+        jdbc.update("UPDATE activity_results SET result_internal_status = 'DRAFT', current_candidate_version_id = ?, "
+                + "current_internal_version_id = NULL WHERE id = ?", candidate, fixture.resultId());
+        jdbc.update("UPDATE activities SET execution_status = 'CANCELLED' WHERE id = ?", fixture.activityId());
+
+        authenticate(schoolAdmin, "SCHOOL_ADMIN", schoolId, "SCHOOL_ADMIN");
+        assertThatThrownBy(() -> resultService.publishInternal(fixture.resultId()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("CANCELLED");
+        assertThat(resultColumn(fixture.resultId(), "current_candidate_version_id")).isEqualTo(candidate);
+        assertThat(resultColumn(fixture.resultId(), "current_internal_version_id")).isNull();
+    }
+
+    @Test
+    void withdrawAndReturnToDraftRejectCancelledActivityBeforeDomainMutation() {
+        Fixture withdrawn = fixture("NOT_SUBMITTED", "CANCELLED", false);
+        jdbc.update("UPDATE activity_results SET result_internal_status = 'INTERNAL_PUBLISHED' WHERE id = ?",
+                withdrawn.resultId());
+        authenticate(schoolAdmin, "SCHOOL_ADMIN", schoolId, "SCHOOL_ADMIN");
+        assertThatThrownBy(() -> resultService.withdrawInternal(withdrawn.resultId()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("CANCELLED");
+        assertThat(resultColumn(withdrawn.resultId(), "result_internal_status"))
+                .isEqualTo("INTERNAL_PUBLISHED");
+
+        Fixture draft = fixture("NOT_SUBMITTED", "CANCELLED", false);
+        jdbc.update("UPDATE activity_results SET result_internal_status = 'INTERNAL_WITHDRAWN' WHERE id = ?",
+                draft.resultId());
+        assertThatThrownBy(() -> resultService.returnToDraft(draft.resultId()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("CANCELLED");
+        assertThat(resultColumn(draft.resultId(), "result_internal_status"))
+                .isEqualTo("INTERNAL_WITHDRAWN");
+    }
+
+    @Test
     void resetHistoryFailureRollsBackAggregateAndPreservesTakedown() {
         Fixture fixture = takedownFixture("PUBLISHED");
         doThrow(new IllegalStateException("history unavailable")).when(reviewRecords)

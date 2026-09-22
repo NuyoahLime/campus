@@ -106,7 +106,44 @@ class ActivityResultSliceCIT extends PostgreSqlIntegrationTestSupport {
         assertThat(jdbc.queryForObject("""
                 SELECT submitted_at IS NOT NULL FROM result_review_records
                 WHERE result_id = ? AND result_version_id = ? AND action = 'SUBMITTED'
-                """, Boolean.class, fixture.resultId(), fixture.versionId())).isTrue();
+        """, Boolean.class, fixture.resultId(), fixture.versionId())).isTrue();
+    }
+
+    @Test
+    void submitRejectsCancelledActivityBeforeChangingReviewState() {
+        ReviewFixture fixture = publishedFixture("Cancelled submit");
+        jdbc.update("UPDATE activities SET execution_status = 'CANCELLED' WHERE id = ?", fixture.activityId());
+
+        assertThatThrownBy(() -> reviewService.submit(fixture.resultId()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("CANCELLED");
+        assertThat(resultPublicStatus(fixture.resultId())).isEqualTo("NOT_SUBMITTED");
+        assertThat(historyCount(fixture.resultId())).isZero();
+    }
+
+    @Test
+    void approveAndRejectRejectCancelledActivityWithValidOpenSubmission() {
+        ReviewFixture approvedCandidate = publishedFixture("Cancelled approve");
+        reviewService.submit(approvedCandidate.resultId());
+        jdbc.update("UPDATE activities SET execution_status = 'CANCELLED' WHERE id = ?",
+                approvedCandidate.activityId());
+        authenticate(superAdminA, "SUPER_ADMIN", null, null);
+        assertThatThrownBy(() -> reviewService.approve(approvedCandidate.resultId()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("CANCELLED");
+        assertThat(resultPublicStatus(approvedCandidate.resultId())).isEqualTo("PENDING_PUBLIC_REVIEW");
+        assertThat(historyActions(approvedCandidate.resultId(), approvedCandidate.versionId()))
+                .containsExactly("SUBMITTED");
+
+        authenticate(adminA, "SCHOOL_ADMIN", schoolA, "SCHOOL_ADMIN");
+        ReviewFixture rejectedCandidate = publishedFixture("Cancelled reject");
+        reviewService.submit(rejectedCandidate.resultId());
+        jdbc.update("UPDATE activities SET execution_status = 'CANCELLED' WHERE id = ?",
+                rejectedCandidate.activityId());
+        authenticate(superAdminA, "SUPER_ADMIN", null, null);
+        assertThatThrownBy(() -> reviewService.reject(rejectedCandidate.resultId(), "reason"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("CANCELLED");
+        assertThat(resultPublicStatus(rejectedCandidate.resultId())).isEqualTo("PENDING_PUBLIC_REVIEW");
+        assertThat(historyActions(rejectedCandidate.resultId(), rejectedCandidate.versionId()))
+                .containsExactly("SUBMITTED");
     }
 
     @Test
@@ -406,7 +443,7 @@ class ActivityResultSliceCIT extends PostgreSqlIntegrationTestSupport {
         UUID activityId = insertActivity(schoolA);
         var saved = editorService.saveEditorContent(activityId, command(title));
         editorService.publishInternal(saved.resultId());
-        return new ReviewFixture(saved.resultId(), saved.currentCandidateVersionId());
+        return new ReviewFixture(activityId, saved.resultId(), saved.currentCandidateVersionId());
     }
 
     private ReviewFixture submittedFixture(String title) {
@@ -550,6 +587,11 @@ class ActivityResultSliceCIT extends PostgreSqlIntegrationTestSupport {
         return false;
     }
 
-    private record ReviewFixture(UUID resultId, UUID versionId) {
+    private String resultPublicStatus(UUID resultId) {
+        return jdbc.queryForObject("SELECT result_public_status FROM activity_results WHERE id = ?",
+                String.class, resultId);
+    }
+
+    private record ReviewFixture(UUID activityId, UUID resultId, UUID versionId) {
     }
 }
