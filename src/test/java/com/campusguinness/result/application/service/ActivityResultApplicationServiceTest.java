@@ -106,6 +106,13 @@ class ActivityResultApplicationServiceTest {
                 .activityId(UUID.randomUUID()));
         UUID candidateId = UUID.randomUUID();
         result.createFirstCandidate(candidateId);
+        Activity activity = Activity.reconstitute(new Activity.Builder()
+                .id(new ActivityId(result.activityId()))
+                .schoolId(result.schoolId())
+                .title("Activity")
+                .createdBy(UUID.randomUUID())
+                .executionStatus(ExecutionStatus.PUBLISHED)
+                .publicStatus(PublicStatus.NOT_SUBMITTED));
         ResultVersion candidate = ResultVersion.create(new ResultVersion.Builder()
                 .id(new ResultVersionId(candidateId))
                 .resultId(result.id())
@@ -115,6 +122,7 @@ class ActivityResultApplicationServiceTest {
                 .scoreHighlights("[]")
                 .mediaRefs("[]"));
         when(activityResults.findById(result.id())).thenReturn(Optional.of(result));
+        when(activities.findById(new ActivityId(result.activityId()))).thenReturn(Optional.of(activity));
         when(resultVersions.findById(candidate.id())).thenReturn(Optional.of(candidate));
 
         var published = svc.publishInternal(result.id().value());
