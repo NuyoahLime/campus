@@ -1,5 +1,9 @@
 package com.campusguinness.interfaces.web.activityresult;
 
+import com.campusguinness.project.application.query.model.QueryPage;
+import com.campusguinness.result.application.query.ActivityResultGovernanceQueryService;
+import com.campusguinness.result.application.query.model.GovernanceActivityResultDetail;
+import com.campusguinness.result.application.query.model.GovernanceActivityResultSummary;
 import com.campusguinness.result.application.result.ActivityResultResult;
 import com.campusguinness.result.application.service.ActivityResultGovernanceApplicationService;
 import org.junit.jupiter.api.Test;
@@ -10,11 +14,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,6 +30,47 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ActivityResultGovernanceControllerTest {
     @Autowired private MockMvc mvc;
     @MockitoBean private ActivityResultGovernanceApplicationService service;
+    @MockitoBean private ActivityResultGovernanceQueryService queryService;
+
+    @Test
+    void governanceListDelegatesReadFilters() throws Exception {
+        UUID resultId = UUID.randomUUID();
+        UUID schoolId = UUID.randomUUID();
+        UUID activityId = UUID.randomUUID();
+        when(queryService.list(0, 20, "PUBLIC", false, "central"))
+                .thenReturn(new QueryPage<>(List.of(new GovernanceActivityResultSummary(
+                        resultId, schoolId, activityId, "Central School", "Finals", "ENDED",
+                        "INTERNAL_PUBLISHED", "PUBLIC", false, UUID.randomUUID(), Instant.now())),
+                        0, 20, 1));
+
+        mvc.perform(get("/api/v1/super-admin/activity-results/governance")
+                        .param("publicStatus", "PUBLIC")
+                        .param("blocked", "false")
+                        .param("q", "central"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.items[0].schoolName").value("Central School"));
+
+        verify(queryService).list(0, 20, "PUBLIC", false, "central");
+    }
+
+    @Test
+    void governanceDetailDelegatesExactResultId() throws Exception {
+        UUID resultId = UUID.randomUUID();
+        UUID schoolId = UUID.randomUUID();
+        UUID activityId = UUID.randomUUID();
+        when(queryService.detail(resultId)).thenReturn(new GovernanceActivityResultDetail(
+                resultId, schoolId, activityId, "Central School", "Finals", "CANCELLED",
+                "INTERNAL_PUBLISHED", "PLATFORM_TAKEDOWN", true, null, null, UUID.randomUUID(),
+                null, List.of(), Instant.now()));
+
+        mvc.perform(get("/api/v1/super-admin/activity-results/{id}/governance", resultId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultId").value(resultId.toString()))
+                .andExpect(jsonPath("$.activityExecutionStatus").value("CANCELLED"));
+
+        verify(queryService).detail(resultId);
+    }
 
     @Test
     void takedownDelegatesResultAndReasonOnly() throws Exception {

@@ -142,6 +142,37 @@ class ActivityResultReviewAuthorizationIT extends PostgreSqlIntegrationTestSuppo
     }
 
     @Test
+    void governanceReadEndpointsAreSuperAdminOnly() throws Exception {
+        Fixture fixture = insertVisiblePublicResult();
+
+        mvc.perform(get("/api/v1/super-admin/activity-results/governance"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/super-admin/activity-results/governance")
+                        .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/super-admin/activity-results/governance")
+                        .with(principal(studentA, "STUDENT", studentMembership, schoolA, "STUDENT")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/super-admin/activity-results/governance")
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].resultId").value(fixture.resultId().toString()));
+
+        mvc.perform(get("/api/v1/super-admin/activity-results/{id}/governance", fixture.resultId()))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/super-admin/activity-results/{id}/governance", fixture.resultId())
+                        .with(principal(adminA, "SCHOOL_ADMIN", adminAMembership, schoolA, "SCHOOL_ADMIN")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/super-admin/activity-results/{id}/governance", fixture.resultId())
+                        .with(principal(studentA, "STUDENT", studentMembership, schoolA, "STUDENT")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/super-admin/activity-results/{id}/governance", fixture.resultId())
+                        .with(principal(superAdmin, "SUPER_ADMIN", null, null, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentPublicVersionId").value(fixture.versionId().toString()));
+    }
+
+    @Test
     void rejectEndpointIsSuperAdminOnlyAndRequiresCsrf() throws Exception {
         Fixture fixture = insertPublishedResult();
         submit(fixture.resultId());
