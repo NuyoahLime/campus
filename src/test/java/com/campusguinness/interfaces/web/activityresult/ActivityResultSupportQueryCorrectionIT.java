@@ -125,7 +125,7 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
 
         mvc.perform(get(GOVERNANCE_DETAIL, fixture.resultId()).with(superAdmin()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.history[*].action").value(List.of("TAKEDOWN", "RESET")));
+                .andExpect(jsonPath("$.governanceHistory[*].action").value(List.of("TAKEDOWN", "RESET")));
     }
 
     @Test
@@ -139,8 +139,8 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
         mvc.perform(get(GOVERNANCE_DETAIL, fixture.resultId()).with(superAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currentPublicVersionId").value(fixture.v2().toString()))
-                .andExpect(jsonPath("$.history[0].resultVersionId").value(fixture.v1().toString()))
-                .andExpect(jsonPath("$.history[1].resultVersionId").value(fixture.v1().toString()));
+                .andExpect(jsonPath("$.governanceHistory[0].resultVersionId").value(fixture.v1().toString()))
+                .andExpect(jsonPath("$.governanceHistory[1].resultVersionId").value(fixture.v1().toString()));
     }
 
     @Test
@@ -185,7 +185,7 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
                 .andExpect(jsonPath("$.items[0].resultId").value(publicResult.resultId().toString()));
         mvc.perform(get(GOVERNANCE_LIST).param("q", "V1").with(superAdmin()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
-        mvc.perform(get(GOVERNANCE_LIST).param("q", "-A").with(superAdmin()))
+        mvc.perform(get(GOVERNANCE_LIST).param("q", prefix + "-a").with(superAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2));
         mvc.perform(get(GOVERNANCE_LIST).param("publicStatus", "NOT_A_STATUS").with(superAdmin()))
@@ -354,6 +354,9 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
     }
 
     private int count(String table, UUID resultId) {
-        return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE result_id = ?", Integer.class, resultId);
+        String sql = "activity_results".equals(table)
+                ? "SELECT count(*) FROM activity_results WHERE id = ?"
+                : "SELECT count(*) FROM " + table + " WHERE result_id = ?";
+        return jdbc.queryForObject(sql, Integer.class, resultId);
     }
 }
