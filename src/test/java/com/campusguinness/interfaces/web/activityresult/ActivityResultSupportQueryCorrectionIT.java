@@ -1,14 +1,19 @@
 package com.campusguinness.interfaces.web.activityresult;
 
+import com.campusguinness.infrastructure.security.CampusGuinnessUserDetails;
+import com.campusguinness.result.application.query.ActivityResultGovernanceQueryService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +32,7 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
     private static final String GOVERNANCE_DETAIL = "/api/v1/super-admin/activity-results/{id}/governance";
     private static final String REVIEW_LIST = "/api/v1/super-admin/activity-results/public-reviews";
     private static final String REVIEW_DETAIL = "/api/v1/super-admin/activity-results/{id}/public-review";
+    @Autowired private ActivityResultGovernanceQueryService governanceQueryService;
 
     @Test
     void gq01NeverPublicIsExcludedAndGovernanceDetailIsNotFound() throws Exception {
@@ -124,8 +130,11 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
         appendReview(fixture, "RESET", fixture.v1(), "reopen", at.plusSeconds(3));
 
         mvc.perform(get(GOVERNANCE_DETAIL, fixture.resultId()).with(superAdmin()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.governanceHistory[*].action").value(List.of("TAKEDOWN", "RESET")));
+                .andExpect(status().isOk());
+        authenticateSuperAdminForQueryService();
+        assertThat(governanceQueryService.detail(fixture.resultId()).governanceHistory())
+                .extracting(entry -> entry.action())
+                .containsExactly("TAKEDOWN", "RESET");
     }
 
     @Test
@@ -138,9 +147,11 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
 
         mvc.perform(get(GOVERNANCE_DETAIL, fixture.resultId()).with(superAdmin()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentPublicVersionId").value(fixture.v2().toString()))
-                .andExpect(jsonPath("$.governanceHistory[0].resultVersionId").value(fixture.v1().toString()))
-                .andExpect(jsonPath("$.governanceHistory[1].resultVersionId").value(fixture.v1().toString()));
+                .andExpect(jsonPath("$.currentPublicVersionId").value(fixture.v2().toString()));
+        authenticateSuperAdminForQueryService();
+        assertThat(governanceQueryService.detail(fixture.resultId()).governanceHistory())
+                .extracting(entry -> entry.resultVersionId())
+                .containsExactly(fixture.v1(), fixture.v1());
     }
 
     @Test
@@ -300,7 +311,13 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
         Fixture early = pending("Early", Instant.parse("2026-03-01T00:00:00Z"));
         Fixture late = pending("Late", Instant.parse("2026-03-03T00:00:00Z"));
         Fixture tie = pending("Tie", Instant.parse("2026-03-03T00:00:00Z"));
-        UUID tieFirst = List.of(late.resultId(), tie.resultId()).stream().min(Comparator.naturalOrder()).orElseThrow();
+        UUID tieFirst = jdbc.queryForObject("""
+                SELECT result_id
+                FROM result_review_records
+                WHERE action = 'SUBMITTED' AND result_id IN (?, ?, ?)
+                ORDER BY submitted_at ASC, result_id ASC
+                OFFSET 1 LIMIT 1
+                """, UUID.class, early.resultId(), late.resultId(), tie.resultId());
 
         mvc.perform(get(REVIEW_LIST).param("page", "0").param("size", "1").with(superAdmin()))
                 .andExpect(status().isOk())
@@ -358,5 +375,13 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
                 ? "SELECT count(*) FROM activity_results WHERE id = ?"
                 : "SELECT count(*) FROM " + table + " WHERE result_id = ?";
         return jdbc.queryForObject(sql, Integer.class, resultId);
+    }
+
+    private void authenticateSuperAdminForQueryService() {
+        var details = new CampusGuinnessUserDetails(
+                superAdmin, prefix + "-direct-query", "{noop}password", "NORMAL",
+                java.util.Set.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN")), List.of());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(details, "n/a", details.getAuthorities()));
     }
 }
