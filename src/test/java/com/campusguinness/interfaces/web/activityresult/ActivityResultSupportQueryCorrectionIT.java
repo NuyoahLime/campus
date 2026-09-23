@@ -225,11 +225,16 @@ class ActivityResultSupportQueryCorrectionIT extends ActivityResultReadTestSuppo
         Instant tie = Instant.parse("2026-01-04T00:00:00Z");
         setUpdatedAt(first.resultId(), tie);
         setUpdatedAt(second.resultId(), tie);
-        UUID expected = List.of(first.resultId(), second.resultId()).stream()
-                .max(Comparator.naturalOrder()).orElseThrow();
+        List<UUID> expected = jdbc.queryForList("""
+                SELECT id FROM activity_results
+                WHERE id IN (?, ?, ?)
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 2
+                """, UUID.class, first.resultId(), second.resultId(), third.resultId());
         mvc.perform(get(GOVERNANCE_LIST).param("size", "2").with(superAdmin()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].resultId").value(expected.toString()));
+                .andExpect(jsonPath("$.items[0].resultId").value(expected.get(0).toString()))
+                .andExpect(jsonPath("$.items[1].resultId").value(expected.get(1).toString()));
     }
 
     @Test
