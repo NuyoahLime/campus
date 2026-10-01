@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import PublicShell from '../components/PublicShell.vue';
+import ResultPresentation from '../components/ResultPresentation.vue';
 import { getPublicActivity } from '../api/activities';
 import { getPublicActivityResult } from '../api/activityResult';
 import { ApiError } from '../api/http';
@@ -61,7 +62,7 @@ watch(() => String(route.params.id), id => void load(id), { immediate: true });
           </div>
           <section v-if="activityResult" class="project-detail-section activity-result-public" aria-labelledby="activity-result-title">
             <div class="activity-result-public-heading"><div><p class="eyebrow">ACTIVITY RESULT</p><h2 id="activity-result-title">{{ activityResult.title }}</h2></div><span>版本 V{{ activityResult.versionNumber }}</span></div>
-            <p class="activity-result-summary">{{ activityResult.summaryText }}</p>
+            <ResultPresentation :summary-text="activityResult.summaryText" :presentation="activityResult.presentation" />
             <ul v-if="activityResult.scoreHighlights.length" class="activity-result-highlights"><li v-for="highlight in activityResult.scoreHighlights" :key="highlight">{{ highlight }}</li></ul>
             <small>公开于 {{ new Date(activityResult.publishedPubliclyAt).toLocaleString() }}</small>
           </section>

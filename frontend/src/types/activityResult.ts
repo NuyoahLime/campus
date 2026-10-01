@@ -1,5 +1,45 @@
 import type { PageResponse } from './schoolGovernance';
 
+export type ResultFormatStyle = 'BOLD' | 'ITALIC';
+
+export interface ResultFormatParagraph {
+  start: number;
+  end: number;
+  style: 'NORMAL';
+}
+
+export interface ResultFormatEmphasisRange {
+  start: number;
+  end: number;
+  style: ResultFormatStyle;
+}
+
+export interface ResultFormatPresentation {
+  paragraphs: ResultFormatParagraph[];
+  emphasisRanges: ResultFormatEmphasisRange[];
+}
+
+export interface ResultFormatEditResult {
+  formatEditId: string;
+  resultId: string;
+  resultVersionId: string;
+  revision: number;
+  presentation: ResultFormatPresentation;
+  reason: string;
+  editedAt: string;
+}
+
+export interface ResultFormatHistoryEntry {
+  formatEditId: string;
+  resultId: string;
+  resultVersionId: string;
+  revision: number;
+  presentation: ResultFormatPresentation;
+  reason: string;
+  editedBy: string | null;
+  editedAt: string;
+}
+
 export type ActivityResultInternalStatus = 'DRAFT' | 'INTERNAL_PUBLISHED' | 'INTERNAL_WITHDRAWN' | string;
 export type ActivityResultPublicStatus =
   | 'NOT_SUBMITTED'
@@ -20,6 +60,9 @@ export interface ActivityResultVersionProjection {
   mediaRefs: string[];
   publishedInternallyAt: string | null;
   publishedPubliclyAt: string | null;
+  presentation: ResultFormatPresentation | null;
+  currentFormatEditRecordId: string | null;
+  currentFormatRevision: number | null;
 }
 
 export interface ActivityResultEditor {
@@ -67,6 +110,7 @@ export interface PublicActivityResult {
   summaryText: string;
   scoreHighlights: string[];
   publishedPubliclyAt: string;
+  presentation: ResultFormatPresentation | null;
 }
 
 export interface StudentActivityResult extends PublicActivityResult {

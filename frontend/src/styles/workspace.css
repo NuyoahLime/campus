@@ -1797,6 +1797,28 @@
 .activity-snapshot { margin-top: 24px; }
 .activity-snapshot .registration-detail-grid-wide { grid-column: 1 / -1; }
 .danger-outline { color: #a92c38 !important; border-color: #e6b6bc !important; }
+.result-presentation { margin-top: 16px; color: #536176; line-height: 1.8; }
+.result-presentation-paragraph { margin: 0 0 12px; white-space: pre-wrap; }
+.result-presentation-paragraph:last-child { margin-bottom: 0; }
+.result-presentation-bold, .result-format-bold { font-weight: 800; }
+.result-presentation-italic, .result-format-italic { font-style: italic; }
+.result-format-section { margin-top: 24px; }
+.result-format-section > header p { margin: 0; }
+.result-format-section .section-description { margin: 7px 0 0; color: #637084; font-size: 13px; line-height: 1.6; }
+.result-format-content { display: grid; gap: 16px; padding: 20px; }
+.result-format-target { display: grid; gap: 7px; max-width: 360px; color: #354155; font-size: 13px; font-weight: 750; }
+.result-format-target select { min-height: 42px; border: 1px solid #d7dee7; border-radius: 6px; padding: 0 10px; color: #202b3c; background: #ffffff; }
+.result-format-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.result-format-toolbar button { min-height: 38px; }
+.result-format-surface { min-height: 150px; border: 1px solid #cfd8e3; border-radius: 6px; padding: 18px; color: #354155; background: #fbfcfe; line-height: 1.8; cursor: text; user-select: text; }
+.result-format-surface:focus { border-color: #b84935; outline: 3px solid rgba(184, 73, 53, 0.12); }
+.result-format-paragraph { margin: 0 0 12px; white-space: pre-wrap; }
+.result-format-paragraph:last-child { margin-bottom: 0; }
+.result-format-history { display: grid; gap: 9px; }
+.result-format-history h3 { margin: 0 0 2px; font-size: 15px; }
+.result-format-history-item { border-top: 1px solid #e5e9ef; padding-top: 10px; }
+.result-format-history-item > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.result-format-history-item span, .result-format-history-item small { color: #718096; font-size: 12px; }
 
 .student-overview-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
 .student-overview-action { display: grid; gap: 8px; border: 1px solid #dde3ea; border-radius: 8px; padding: 20px; color: inherit; background: #fff; text-decoration: none; box-shadow: 0 6px 18px rgba(32, 43, 60, .04); }

@@ -4,6 +4,9 @@ import type {
   ActivityResultEditor,
   ActivityResultHistoryEntry,
   ActivityResultMutationResponse,
+  ResultFormatEditResult,
+  ResultFormatHistoryEntry,
+  ResultFormatPresentation,
   ActivityResultSavePayload,
   GovernanceResultDetail,
   GovernanceResultSummary,
@@ -87,3 +90,16 @@ function governanceAction(resultId: string, action: string, reason: string) {
 
 export const takedownActivityResult = (id: string, reason: string) => governanceAction(id, 'takedown', reason);
 export const resetActivityResultTakedown = (id: string, reason: string) => governanceAction(id, 'reset-takedown', reason);
+
+export function saveResultFormatEdit(resultId: string, versionId: string, reason: string, presentation: ResultFormatPresentation) {
+  return apiRequest<ResultFormatEditResult>(
+    `/activity-results/${encodeURIComponent(resultId)}/versions/${encodeURIComponent(versionId)}/format-edits`,
+    { method: 'POST', body: JSON.stringify({ reason, presentation }) }
+  );
+}
+
+export function getResultFormatHistory(resultId: string, versionId: string) {
+  return apiRequest<ResultFormatHistoryEntry[]>(
+    `/school-admin/activity-results/${encodeURIComponent(resultId)}/versions/${encodeURIComponent(versionId)}/format-history`
+  );
+}

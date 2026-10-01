@@ -145,4 +145,57 @@ test.describe('ActivityResult product lifecycle', () => {
     await expect(page.getByText('Replacement after governance reset.')).toBeVisible();
     await expect(page.getByText(/V\d+ · 校内成果/)).toBeVisible();
   });
+
+  test('school admin edits exact public presentation and projections reload it', async ({ page }) => {
+    const ids = await fixture();
+    await loginUi(page, actors.schoolAdminA);
+    await page.goto(`/school-admin/activities/${ids.activityLifecycle}/result`);
+    await expect(page.locator('.result-format-section')).toBeVisible();
+
+    const editorResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === `/api/v1/activities/${ids.activityLifecycle}/result`
+      && response.request().method() === 'GET'
+    );
+    await page.reload();
+    const editor = await (await editorResponse).json() as { resultId: string; currentPublicVersionId: string };
+    const surface = page.locator('.result-format-surface');
+    await expect(surface).toContainText('Replacement after governance reset.');
+    await surface.evaluate(element => {
+      const text = element.querySelector('span')?.firstChild;
+      if (!text) throw new Error('format surface text node missing');
+      const range = document.createRange();
+      range.setStart(text, 0);
+      range.setEnd(text, Math.min(11, text.textContent?.length ?? 0));
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+    await page.getByRole('button', { name: /加粗/ }).click();
+    await page.getByLabel('调整原因').fill('Emphasize the published result lead.');
+    await page.getByRole('button', { name: '保存展示样式' }).click();
+    await expect(page.getByText('展示样式已保存，页面已重新读取服务端状态。')).toBeVisible();
+    await expect(page.locator('.result-format-history-item')).toContainText('Emphasize the published result lead.');
+    await expect(page.locator('.result-format-bold')).toContainText('Replacement');
+
+    await page.context().clearCookies();
+    await page.goto(`/activities/${ids.activityLifecycle}`);
+    await expect(page.locator('.result-presentation-bold')).toContainText('Replacement');
+    await expect(page.getByText('Replacement after governance reset.')).toBeVisible();
+
+    await loginUi(page, actors.studentA);
+    await page.goto(`/student/activities/${ids.activityLifecycle}`);
+    await expect(page.locator('.result-presentation-bold')).toContainText('Replacement');
+    const denied = await page.evaluate(async ({ resultId, versionId }) => {
+      const csrfResponse = await fetch('/api/v1/auth/csrf', { credentials: 'include' });
+      const csrf = await csrfResponse.json() as { headerName: string; token: string };
+      const response = await fetch(`/api/v1/activity-results/${resultId}/versions/${versionId}/format-edits`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', [csrf.headerName]: csrf.token },
+        body: JSON.stringify({ reason: 'student must be denied', presentation: { paragraphs: [], emphasisRanges: [] } })
+      });
+      return response.status;
+    }, editor);
+    expect(denied).toBe(403);
+  });
 });
