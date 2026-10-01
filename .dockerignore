@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+.codex
+.claude
+target
+frontend
+test-results
+playwright-report
+*.log
+.env
+.env.*
