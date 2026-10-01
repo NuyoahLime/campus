@@ -62,6 +62,7 @@ async function save() {
     if (isNew.value) {
       const created = await createProject(form.value);
       await router.push(`/super-admin/projects/${created.id}`);
+      await load();
     } else {
       await updateProject(String(route.params.id), form.value);
       message.value = '项目草稿已保存。';

@@ -53,6 +53,7 @@ async function save() {
     if (isNew.value) {
       const created = await createManagedActivity(form.value);
       await router.push(`/school-admin/activities/${created.id}`);
+      await load();
     } else {
       await updateManagedActivity(String(route.params.id), form.value);
       message.value = '活动资料已保存。'; await load();
