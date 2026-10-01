@@ -17,7 +17,12 @@ test.describe('ActivityResult product lifecycle', () => {
   test('school admin creates, publishes internally, and submits an exact result candidate', async ({ page }) => {
     const ids = await fixture();
     await loginUi(page, actors.schoolAdminA);
-    await page.goto(`/school-admin/activities/${ids.activityLifecycle}/result`);
+    await page.goto('/school-admin/activities');
+    const activityRow = page.getByRole('row').filter({ hasText: 'ACTIVITY_LIFECYCLE' });
+    await expect(activityRow).toBeVisible();
+    await activityRow.getByRole('link', { name: '查看详情' }).click();
+    await page.getByRole('link', { name: '活动成果' }).click();
+    await expect(page).toHaveURL(new RegExp(`/school-admin/activities/${ids.activityLifecycle}/result$`));
     await expect(page.getByText('该活动尚未创建活动成果')).toBeVisible();
     await page.getByRole('button', { name: '创建活动成果' }).click();
     await page.getByLabel('标题').fill('E2E Activity Result');
@@ -92,5 +97,52 @@ test.describe('ActivityResult product lifecycle', () => {
     await page.context().clearCookies();
     await page.goto(`/activities/${ids.activityLifecycle}`);
     await expect(page.getByText('E2E Activity Result')).toHaveCount(0);
+
+    await loginUi(page, actors.schoolAdminA);
+    await page.goto(`/school-admin/activities/${ids.activityLifecycle}/result`);
+    await page.getByRole('button', { name: '编辑成果' }).click();
+    await page.getByLabel('标题').fill('E2E Activity Result Replacement');
+    await page.getByLabel('成果摘要').fill('Replacement after governance reset.');
+    await page.getByRole('button', { name: '保存成果' }).click();
+    await expect(page.getByText('成果草稿已保存。')).toBeVisible();
+    await page.getByRole('button', { name: '内部发布' }).click();
+    await page.getByRole('button', { name: '提交平台审核' }).click();
+    await expect(page.locator('.activity-status').filter({ hasText: '平台审核中' })).toBeVisible();
+
+    await loginUi(page, actors.superAdmin);
+    await page.goto('/super-admin/activity-results/reviews');
+    const replacementReviewRow = page.getByRole('row').filter({ hasText: 'E2E Activity Result Replacement' });
+    await expect(replacementReviewRow).toBeVisible();
+    await replacementReviewRow.getByRole('link', { name: '查看详情' }).click();
+    await page.getByRole('button', { name: '通过' }).click();
+    await expect(page).toHaveURL(/\/super-admin\/activity-results\/reviews$/);
+
+    await loginUi(page, actors.schoolAdminA);
+    await page.goto(`/school-admin/activities/${ids.activityLifecycle}/result`);
+    await page.getByRole('button', { name: '正式公开' }).click();
+    await expect(page.locator('.activity-status').filter({ hasText: '已公开' })).toBeVisible();
+
+    await page.context().clearCookies();
+    await page.goto(`/activities/${ids.activityLifecycle}`);
+    await expect(page.getByText('E2E Activity Result Replacement')).toBeVisible();
+    await expect(page.getByText('E2E Activity Result', { exact: true })).toHaveCount(0);
+  });
+
+  test('student reaches assigned activity detail and reads the student result endpoint', async ({ page }) => {
+    const ids = await fixture();
+    await loginUi(page, actors.studentA);
+    await page.goto('/student/activities');
+    const activityLink = page.getByRole('link', { name: /ACTIVITY_LIFECYCLE/ });
+    await expect(activityLink).toBeVisible();
+    const studentResultResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === `/api/v1/student/activities/${ids.activityLifecycle}/result`
+      && response.request().method() === 'GET'
+    );
+    await activityLink.click();
+    const response = await studentResultResponse;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByRole('heading', { name: 'E2E Activity Result Replacement' })).toBeVisible();
+    await expect(page.getByText('Replacement after governance reset.')).toBeVisible();
+    await expect(page.getByText(/V\d+ · 校内成果/)).toBeVisible();
   });
 });
