@@ -28,6 +28,11 @@ import SchoolAdminActivityListView from '../views/SchoolAdminActivityListView.vu
 import SchoolAdminActivityDetailView from '../views/SchoolAdminActivityDetailView.vue';
 import SchoolAdminActivityParticipantsView from '../views/SchoolAdminActivityParticipantsView.vue';
 import SchoolAdminActivityScoresView from '../views/SchoolAdminActivityScoresView.vue';
+import SchoolAdminActivityResultView from '../views/SchoolAdminActivityResultView.vue';
+import SuperAdminResultReviewListView from '../views/SuperAdminResultReviewListView.vue';
+import SuperAdminResultReviewDetailView from '../views/SuperAdminResultReviewDetailView.vue';
+import SuperAdminResultGovernanceListView from '../views/SuperAdminResultGovernanceListView.vue';
+import SuperAdminResultGovernanceDetailView from '../views/SuperAdminResultGovernanceDetailView.vue';
 import StudentScoresView from '../views/StudentScoresView.vue';
 import StudentScoreDetailView from '../views/StudentScoreDetailView.vue';
 import StudentActivitiesView from '../views/StudentActivitiesView.vue';
@@ -160,6 +165,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
     },
     {
+      path: '/school-admin/activities/:id/result',
+      name: 'school-admin-activity-result',
+      component: SchoolAdminActivityResultView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SCHOOL_ADMIN' }
+    },
+    {
       path: '/school-admin/activities/:id',
       name: 'school-admin-activity-detail',
       component: SchoolAdminActivityDetailView,
@@ -261,6 +272,30 @@ const router = createRouter({
       path: '/super-admin/projects/:id',
       name: 'super-admin-project-detail',
       component: SuperAdminProjectDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/activity-results/reviews',
+      name: 'super-admin-result-reviews',
+      component: SuperAdminResultReviewListView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/activity-results/reviews/:id',
+      name: 'super-admin-result-review-detail',
+      component: SuperAdminResultReviewDetailView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/activity-results',
+      name: 'super-admin-result-governance',
+      component: SuperAdminResultGovernanceListView,
+      meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
+    },
+    {
+      path: '/super-admin/activity-results/:id',
+      name: 'super-admin-result-governance-detail',
+      component: SuperAdminResultGovernanceDetailView,
       meta: { requiresAuth: true, requiredAuthority: 'ROLE_SUPER_ADMIN' }
     },
     {

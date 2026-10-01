@@ -3,8 +3,10 @@ import { ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import PublicShell from '../components/PublicShell.vue';
 import { getPublicActivity } from '../api/activities';
+import { getPublicActivityResult } from '../api/activityResult';
 import { ApiError } from '../api/http';
 import type { ActivityDetail } from '../types/activity';
+import type { PublicActivityResult } from '../types/activityResult';
 import { activityTimeRange, labelForActivityStatus } from '../utils/activityLabels';
 import { labelForCategory, labelForComparisonDirection, labelForScoreIndicatorType, labelForScoreStorageType } from '../utils/challengeProjectLabels';
 
@@ -13,6 +15,7 @@ const activity = ref<ActivityDetail | null>(null);
 const loading = ref(true);
 const error = ref('');
 const notFound = ref(false);
+const activityResult = ref<PublicActivityResult | null>(null);
 
 async function load(id: string) {
   loading.value = true;
@@ -20,8 +23,15 @@ async function load(id: string) {
   notFound.value = false;
   try {
     activity.value = await getPublicActivity(id);
+    try {
+      activityResult.value = await getPublicActivityResult(id);
+    } catch (value) {
+      activityResult.value = null;
+      if (!(value instanceof ApiError && value.status === 404)) throw value;
+    }
   } catch (value) {
     activity.value = null;
+    activityResult.value = null;
     notFound.value = value instanceof ApiError && value.status === 404;
     error.value = notFound.value ? '活动不存在或尚未公开。' : '活动详情加载失败，请稍后重试。';
   } finally {
@@ -49,6 +59,12 @@ watch(() => String(route.params.id), id => void load(id), { immediate: true });
             <section class="project-detail-section"><h2>活动信息</h2><dl><div><dt>举办学校</dt><dd>{{ activity.schoolName }}</dd></div><div><dt>地区</dt><dd>{{ activity.schoolRegion }}</dd></div><div><dt>活动时间</dt><dd>{{ activityTimeRange(activity.startTime, activity.endTime) }}</dd></div><div><dt>活动地点</dt><dd>{{ activity.location || '地点待定' }}</dd></div></dl></section>
             <section class="project-detail-section"><h2>挑战项目</h2><div v-if="activity.projects.length === 0" class="activity-empty-note">当前活动未提供公开项目规则。</div><div v-for="project in activity.projects" :key="project.projectId" class="activity-project-block"><h3>{{ project.projectName }}</h3><p>{{ labelForCategory(project.category) }}</p><dl><div><dt>规则版本</dt><dd>V{{ project.ruleVersionNumber }}</dd></div><div><dt>成绩类型</dt><dd>{{ labelForScoreStorageType(project.scoreStorageType) }}</dd></div><div><dt>成绩指标</dt><dd>{{ labelForScoreIndicatorType(project.scoreIndicatorType) }}</dd></div><div><dt>比较方向</dt><dd>{{ labelForComparisonDirection(project.comparisonDirection) }}</dd></div><div><dt>成绩单位</dt><dd>{{ project.scoreUnit || '未填写' }}</dd></div></dl><p class="project-rule-text">{{ project.rulesText || '暂无规则说明。' }}</p></div></section>
           </div>
+          <section v-if="activityResult" class="project-detail-section activity-result-public" aria-labelledby="activity-result-title">
+            <div class="activity-result-public-heading"><div><p class="eyebrow">ACTIVITY RESULT</p><h2 id="activity-result-title">{{ activityResult.title }}</h2></div><span>版本 V{{ activityResult.versionNumber }}</span></div>
+            <p class="activity-result-summary">{{ activityResult.summaryText }}</p>
+            <ul v-if="activityResult.scoreHighlights.length" class="activity-result-highlights"><li v-for="highlight in activityResult.scoreHighlights" :key="highlight">{{ highlight }}</li></ul>
+            <small>公开于 {{ new Date(activityResult.publishedPubliclyAt).toLocaleString() }}</small>
+          </section>
         </template>
       </section>
     </main>

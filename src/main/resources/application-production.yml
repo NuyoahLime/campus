@@ -2,6 +2,10 @@
 # Requires explicit CORS origins and HTTPS termination at reverse proxy.
 
 spring:
+  datasource:
+    # Production must never fall back to the development postgres/postgres pair.
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   session:
     timeout: 30m
     jdbc:
